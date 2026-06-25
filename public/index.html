@@ -153,6 +153,21 @@
     return fetch(SB_URL+'/rest/v1/'+path, {headers:{apikey:SB_KEY, Authorization:'Bearer '+SB_KEY}})
       .then(function(r){ if(!r.ok) throw new Error('Supabase '+r.status); return r.json(); });
   }
+  // Paged fetch: PostgREST caps each response at db-max-rows (1000 on this project),
+  // and a `limit` param can't exceed that cap — so we page with limit/offset until a
+  // short page signals the end. Pass `path` WITHOUT limit/offset.
+  function sbGetAll(path){
+    var PAGE=1000, all=[];
+    var sep = path.indexOf('?')>=0 ? '&' : '?';
+    function page(offset){
+      return sbGet(path+sep+'limit='+PAGE+'&offset='+offset).then(function(rows){
+        all=all.concat(rows);
+        if(rows.length<PAGE) return all;
+        return page(offset+PAGE);
+      });
+    }
+    return page(0);
+  }
   function sbPost(table, body){
     return fetch(SB_URL+'/rest/v1/'+table, {method:'POST',
       headers:{apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Content-Type':'application/json', Prefer:'return=minimal'},
@@ -173,7 +188,7 @@
     }
     Promise.all([
       sbGet('tracked_tokens?active=eq.true&select=*&order=created_at.asc'),
-      sbGet('score_readings?select=*&order=fetched_at.asc&limit=20000')
+      sbGetAll('score_readings?select=*&order=fetched_at.asc')
     ]).then(function(res){
       state.tokens = res[0];
       var byTok = {};
