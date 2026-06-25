@@ -75,13 +75,39 @@
     font-size:22px;font-weight:700;cursor:pointer;line-height:1;flex:none;}
   .empty,.err{color:var(--muted);text-align:center;padding:30px 10px;font-size:14px;}
   .err{color:#f87171;}
+  /* Token colour accent bar */
+  .row-btn{position:relative;}
+  .acc{position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:0 3px 3px 0;}
+  /* Clickable logo */
+  .title{cursor:pointer;display:inline-block;}
+  .title:active{opacity:.65;}
+  /* Report modal */
+  .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.62);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);
+    display:none;align-items:flex-start;justify-content:center;z-index:50;padding:18px 12px;overflow-y:auto;}
+  .modal-back.show{display:flex;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    max-width:560px;width:100%;margin:auto;padding:18px 16px 22px;}
+  .modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+  .modal-head h2{font-size:20px;font-weight:800;margin:0;letter-spacing:-.02em;}
+  .modal-head .when{color:var(--muted);font-size:12px;margin-top:4px;}
+  .modal-x{all:unset;cursor:pointer;color:var(--muted);font-size:24px;line-height:1;padding:0 6px;border-radius:8px;}
+  .modal-x:hover{background:var(--panel-2);color:var(--text);}
+  .report-intro{color:var(--muted);font-size:13px;line-height:1.5;margin-top:12px;}
+  .report-topic{margin-top:18px;}
+  .report-topic h3{font-size:14.5px;font-weight:700;margin:0 0 2px;}
+  .report-topic .desc{color:var(--muted);font-size:12px;line-height:1.45;margin-bottom:4px;}
+  .report-line{font-size:13px;line-height:1.55;margin-top:5px;}
+  .report-line .g{color:var(--good);font-weight:700;font-variant-numeric:tabular-nums;}
+  .report-line .r{color:#f87171;font-weight:700;font-variant-numeric:tabular-nums;}
+  .report-line .n{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums;}
+  .report-disc{color:var(--muted);font-size:11.5px;font-style:italic;line-height:1.5;margin-top:18px;}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
     <div>
-      <div class="title">BestBuy</div>
+      <div class="title" id="logo" title="Ver relatório">BestBuy</div>
       <div class="sub" id="dateline">—</div>
     </div>
     <div class="live"><span class="dot" id="livedot"></span><span id="livetext">—</span></div>
@@ -106,6 +132,20 @@
       <option value="">Manage tokens…</option>
     </select>
     <button class="add-btn" id="add-btn" title="Add a token">+</button>
+  </div>
+</div>
+
+<!-- Benchmarking report (opens when the BestBuy logo is tapped) -->
+<div class="modal-back" id="report-back">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Relatório BestBuy">
+    <div class="modal-head">
+      <div>
+        <h2>Relatório BestBuy</h2>
+        <div class="when" id="report-when"></div>
+      </div>
+      <button class="modal-x" id="report-x" aria-label="Fechar">×</button>
+    </div>
+    <div id="report-body"></div>
   </div>
 </div>
 
@@ -263,35 +303,69 @@
       if(!ca||!x) return;
       var min=x.min, max=x.max;
       if(min==null||max==null) return;
-      // month starts within range
-      var d=new Date(min); var marks=[];
-      var cur=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1));
-      if(cur.getTime()<min) cur=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1));
-      var guard=0;
-      while(cur.getTime()<=max && guard++<60){
-        marks.push(new Date(cur));
-        cur=new Date(Date.UTC(cur.getUTCFullYear(),cur.getUTCMonth()+1,1));
-      }
+      var spanDays=(max-min)/86400000;
       ctx.save();
-      ctx.textAlign='center'; ctx.fillStyle='#a1a1aa';
-      var yMon=ca.bottom+15, yYear=ca.bottom+30;
-      var span=max-min;
-      var lastYearPx=-999;
-      marks.forEach(function(m,i){
-        var px=x.getPixelForValue(m.getTime());
-        if(px<ca.left-2||px>ca.right+2) return;
-        ctx.font='11px -apple-system,sans-serif';
-        ctx.fillStyle='#a1a1aa';
-        ctx.fillText(MON[m.getUTCMonth()],px,yMon);
-        // year (bold) at January, or the first visible mark, spaced out
-        var isYearBoundary = m.getUTCMonth()===0 || i===0;
-        if(isYearBoundary && px-lastYearPx>30){
-          ctx.font='700 11px -apple-system,sans-serif';
-          ctx.fillStyle='#f4f4f5';
-          ctx.fillText(String(m.getUTCFullYear()),px,yYear);
-          lastYearPx=px;
+      ctx.textAlign='center';
+      var yT1=ca.bottom+15, yT2=ca.bottom+30;
+
+      if(spanDays<=75){
+        // ── short ranges: day-of-month on top tier, month + year below ──
+        var d0=new Date(min);
+        var base=Date.UTC(d0.getUTCFullYear(),d0.getUTCMonth(),d0.getUTCDate());
+        var step = spanDays<=10?1 : spanDays<=20?2 : spanDays<=35?3 : 7;
+        var first=base; if(first<min) first+=86400000;
+        var lastPx=-999;
+        for(var t=first, g=0; t<=max && g<400; t+=86400000, g++){
+          var dayIdx=Math.round((t-base)/86400000);
+          if(dayIdx%step!==0) continue;
+          var px=x.getPixelForValue(t);
+          if(px<ca.left-2||px>ca.right+2||px-lastPx<18) continue;
+          ctx.font='10px -apple-system,sans-serif';
+          ctx.fillStyle='#71717a';
+          ctx.fillText(String(new Date(t).getUTCDate()), px, yT1);
+          lastPx=px;
         }
-      });
+        // month + year band: at range start and each month boundary
+        var mMarks=[{t:min, m:d0.getUTCMonth(), y:d0.getUTCFullYear()}];
+        var mm=new Date(Date.UTC(d0.getUTCFullYear(),d0.getUTCMonth()+1,1));
+        for(var g2=0; mm.getTime()<=max && g2<12; g2++){
+          mMarks.push({t:mm.getTime(), m:mm.getUTCMonth(), y:mm.getUTCFullYear()});
+          mm=new Date(Date.UTC(mm.getUTCFullYear(),mm.getUTCMonth()+1,1));
+        }
+        var lastMpx=-999;
+        mMarks.forEach(function(mk){
+          var px=x.getPixelForValue(mk.t);
+          if(px<ca.left-2||px>ca.right+2||px-lastMpx<48) return;
+          ctx.font='700 10px -apple-system,sans-serif';
+          ctx.fillStyle='#a1a1aa';
+          ctx.fillText(MON[mk.m]+' '+mk.y, px, yT2);
+          lastMpx=px;
+        });
+      } else {
+        // ── long ranges: month names on top tier, year (bold) below ──
+        var d=new Date(min); var marks=[];
+        var cur=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1));
+        if(cur.getTime()<min) cur=new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+1,1));
+        for(var gg=0; cur.getTime()<=max && gg<60; gg++){
+          marks.push(new Date(cur));
+          cur=new Date(Date.UTC(cur.getUTCFullYear(),cur.getUTCMonth()+1,1));
+        }
+        var lastYearPx=-999;
+        marks.forEach(function(m,i){
+          var px=x.getPixelForValue(m.getTime());
+          if(px<ca.left-2||px>ca.right+2) return;
+          ctx.font='11px -apple-system,sans-serif';
+          ctx.fillStyle='#a1a1aa';
+          ctx.fillText(MON[m.getUTCMonth()],px,yT1);
+          var isYearBoundary = m.getUTCMonth()===0 || i===0;
+          if(isYearBoundary && px-lastYearPx>30){
+            ctx.font='700 11px -apple-system,sans-serif';
+            ctx.fillStyle='#f4f4f5';
+            ctx.fillText(String(m.getUTCFullYear()),px,yT2);
+            lastYearPx=px;
+          }
+        });
+      }
       ctx.restore();
     }
   };
@@ -395,6 +469,7 @@
       var row=el('div','row'+(state.openRow===t.id?' open':''));
 
       var btn=el('button','row-btn');
+      var acc=el('span','acc'); acc.style.background=t.color; btn.appendChild(acc);
       btn.appendChild(el('span','rank-num',String(idx+1)));
       var tok=el('div','tok');
       tok.appendChild(el('div','sym',t.symbol));
@@ -462,7 +537,120 @@
       .catch(function(e){ alert('Failed to add: '+e.message); });
   }
 
+  // ── benchmarking report (pt-PT) — opens on logo tap ──────────────────────────
+  var PT_MON=['jan.','fev.','mar.','abr.','mai.','jun.','jul.','ago.','set.','out.','nov.','dez.'];
+  function ptDate(iso){ var d=iso?new Date(iso):new Date(); return d.getUTCDate()+' '+PT_MON[d.getUTCMonth()]+' '+d.getUTCFullYear(); }
+  function ptVerdict(s){
+    if(s==null)   return 'sem dados suficientes';
+    if(s>=8.0)    return 'sinal forte de compra';
+    if(s>=6.5)    return 'boa altura para comprar';
+    if(s>=4.5)    return 'momento neutro, sem pressa';
+    if(s>=3.0)    return 'fraco, melhor aguardar';
+    return 'arriscado, evitar por agora';
+  }
+  function clsScore(s){ return s==null?'n': s>=6.5?'g': s<=4.5?'r':'n'; }
+  function clsDelta(cur,prev,higherBetter){
+    if(cur==null||prev==null||isNaN(cur)||isNaN(prev)||Number(prev)===0) return 'n';
+    var up=Number(cur)>Number(prev), down=Number(cur)<Number(prev);
+    if(!up&&!down) return 'n';
+    return (higherBetter?up:down)?'g':'r';
+  }
+  function rLine(parts){
+    var p=el('div','report-line');
+    parts.forEach(function(seg){
+      if(typeof seg==='string') p.appendChild(document.createTextNode(seg));
+      else p.appendChild(el('span',seg.c||'n',seg.n));
+    });
+    return p;
+  }
+  function buildReport(){
+    var body=document.getElementById('report-body'); body.innerHTML='';
+    var ranked=state.tokens.map(function(t){ return {t:t,l:latestOf(t.id),p:prevOf(t.id)}; })
+      .filter(function(x){ return x.l; })
+      .sort(function(a,b){ return Number(b.l.final_score)-Number(a.l.final_score); });
+
+    if(!ranked.length){
+      document.getElementById('report-when').textContent='';
+      body.appendChild(el('div','report-intro','Ainda não há dados suficientes para gerar o relatório.'));
+      return;
+    }
+    document.getElementById('report-when').textContent='Atualizado a '+ptDate(ranked[0].l.fetched_at);
+    body.appendChild(el('div','report-intro',
+      'Comparação simples dos '+ranked.length+' ativos do seu painel, sem termos complicados. '+
+      'Os números a verde são bons sinais; os números a vermelho são sinais de alerta.'));
+
+    function topic(title,desc){
+      var box=el('div','report-topic');
+      box.appendChild(el('h3',null,title));
+      if(desc) box.appendChild(el('div','desc',desc));
+      body.appendChild(box); return box;
+    }
+
+    // 1 — Nota geral
+    var t1=topic('Nota geral (1 a 10)','A nota BestBuy junta todos os sinais numa única pontuação fácil de ler.');
+    ranked.forEach(function(x){
+      var s=Number(x.l.final_score);
+      t1.appendChild(rLine(['O '+x.t.symbol+' está com ', {n:fmtScore(s)+'/10', c:clsScore(s)}, ' — '+ptVerdict(s)+'.']));
+    });
+
+    // 2 — Preço face à média
+    var t2=topic('Preço face à média','Mostra se o preço está acima (bom sinal) ou abaixo (sinal fraco) da média recente.');
+    ranked.forEach(function(x){
+      var v=x.l.score_price_ma, sv=v==null?null:Number(v);
+      t2.appendChild(rLine([x.t.symbol+': ', {n:(sv==null?'—':fmtScore(sv)+'/10'), c:clsScore(sv)},
+        ' — preço '+(sv==null?'sem dados':(sv>=5?'acima':'abaixo')+' da média recente')+'.']));
+    });
+
+    // 3 — Barato ou esticado (RSI)
+    var t3=topic('Está barato ou esticado? (RSI)','O RSI vai de 0 a 100: abaixo de 30 costuma estar barato, acima de 70 esticado.');
+    ranked.forEach(function(x){
+      var r=x.l.rsi_14, rv=r==null?null:Number(r);
+      var c=rv==null?'n': rv<30?'g': rv>70?'r':'n';
+      var txt=rv==null?'sem dados': rv<30?'pode estar barato': rv>70?'pode estar caro (esticado)':'em equilíbrio';
+      t3.appendChild(rLine([x.t.symbol+': ', {n:(rv==null?'—':fmtNum(rv,0)), c:c}, ' — '+txt+'.']));
+    });
+
+    // 4 — Distância ao fundo recente
+    var t4=topic('Distância ao fundo recente','Quanto mais perto do fundo dos últimos 90 dias, mais barato o ativo parece estar.');
+    ranked.forEach(function(x){
+      var v=x.l.score_dist_low, sv=v==null?null:Number(v);
+      var txt=sv==null?'sem dados': sv>=6?'perto do fundo, mais barato': sv<=4?'longe do fundo, mais caro':'a meio caminho';
+      t4.appendChild(rLine([x.t.symbol+': ', {n:(sv==null?'—':fmtScore(sv)+'/10'), c:clsScore(sv)}, ' — '+txt+'.']));
+    });
+
+    // 5 — Fundamentos
+    var t5=topic('O projeto tem uso real? (fundamentos)','Dinheiro depositado no projeto (TVL) e as receitas mostram se há uso verdadeiro.');
+    ranked.forEach(function(x){
+      if(x.l.reweighted){
+        t5.appendChild(rLine([x.t.symbol+': ', {n:'sem dados', c:'n'}, ' — avaliado apenas pelo preço de mercado.']));
+      } else {
+        var pr=x.p||{};
+        t5.appendChild(rLine([x.t.symbol+': depósitos ', {n:fmtUsd(x.l.tvl), c:clsDelta(x.l.tvl,pr.tvl,true)},
+          ', receita anual ', {n:fmtUsd(x.l.holders_revenue), c:clsDelta(x.l.holders_revenue,pr.holders_revenue,true)}, '.']));
+      }
+    });
+
+    // 6 — Conclusão
+    var top=ranked[0], bot=ranked[ranked.length-1];
+    var t6=topic('Conclusão',null);
+    t6.appendChild(rLine(['Hoje, o '+top.t.symbol+' reúne os melhores sinais, com ',
+      {n:fmtScore(Number(top.l.final_score))+'/10', c:clsScore(Number(top.l.final_score))}, '.']));
+    if(bot!==top){
+      t6.appendChild(rLine(['O '+bot.t.symbol+' é o mais arriscado de momento, com ',
+        {n:fmtScore(Number(bot.l.final_score))+'/10', c:clsScore(Number(bot.l.final_score))}, '.']));
+    }
+    body.appendChild(el('div','report-disc',
+      'Isto não é aconselhamento financeiro. São apenas sinais automáticos — faça sempre a sua própria análise antes de investir.'));
+  }
+  function openReport(){ buildReport(); document.getElementById('report-back').classList.add('show'); }
+  function closeReport(){ document.getElementById('report-back').classList.remove('show'); }
+
   function renderAll(){ renderHeader(); renderRanges(); renderChart(); renderLegend(); renderRankList(); renderManage(); }
+
+  document.getElementById('logo').onclick=openReport;
+  document.getElementById('report-x').onclick=closeReport;
+  document.getElementById('report-back').onclick=function(e){ if(e.target===this) closeReport(); };
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeReport(); });
 
   load();
 })();
