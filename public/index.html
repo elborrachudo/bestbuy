@@ -488,7 +488,7 @@
       {k:'RSI (14d)',           val:fmtNum(latest.rsi_14,1), d:delta('rsi_14',false)},
       {k:'TVL trend',           val:rew?'—':fmtUsd(latest.tvl),            d:rew?{txt:'n/a',cls:'na'}:delta('tvl',true)},
       {k:'Holders rev (ann.)',  val:rew?'—':fmtUsd(latest.holders_revenue),d:rew?{txt:'n/a',cls:'na'}:delta('holders_revenue',true)},
-      {k:'Emissions rate',      val:rew?'—':fmtPct(latest.emissions_rate), d:rew?{txt:'n/a',cls:'na'}:delta('emissions_rate',false)}
+      {k:'Inflation (annual)',  val:latest.emissions_rate==null?'n/a':fmtPct(latest.emissions_rate)+' / yr', d:delta('emissions_rate',false)}
     ];
   }
 

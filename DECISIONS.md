@@ -55,3 +55,18 @@ noted it here.
 - Per-metric delta "improved" direction: higher-is-better for the score-based and
   TVL/revenue rows; lower-is-better for RSI and emissions (oversold / low inflation
   are the favorable directions).
+
+## Emissions axis — real annual inflation (Option B)
+- The 5th axis originally fed a **supply overhang** `(total−circ)/circ` into a function
+  that expects an **annual rate**, so every token with locked supply clamped to 0. Fixed
+  per `EMISSIONS_METRIC_REPORT.md` Option B: derive a circulating-supply series from
+  `market_cap ÷ price` (CoinGecko `market_chart` returns both), then
+  `inflation = (circ_now − circ_1yr_ago) / circ_1yr_ago`. `scoreEmissions` is unchanged.
+- Short windows (young tokens / early backfill days) annualize the partial-window change
+  (`× 365/days`); net burns floor at 0 → score 10.
+- **Sanity check:** XRP's circulating supply grows ~6–8%/yr as escrow releases, so it should
+  now score moderate-to-high on emissions instead of the old 0. A high-emission incentive
+  token (e.g. AERO, whose supply inflates fast) should score low. Confirm the four live
+  values after running `/api/recompute-emissions` (they must differ across tokens, not all 0).
+- History is realigned in place by `/api/recompute-emissions` (only `emissions_rate`,
+  `score_emissions`, `final_score` change) so the progression chart has no step at the fix.
