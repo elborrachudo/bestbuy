@@ -103,7 +103,12 @@ export default async function handler(req, res) {
           hasDefiSlug: !!t.defillama_slug,
         };
         const r = buildReading(inputs);
-        if (r.final_score == null) continue;
+        // Skip thin early-history readings whose only signal is the short-window
+        // below-high value (no MAs / RSI / fundamentals yet) — otherwise the very
+        // start of the backfill collapses to a misleading near-zero score.
+        const hasOtherSignal = r.score_price_ma != null || r.score_rsi != null ||
+          r.score_tvl_rev != null || r.score_emissions != null;
+        if (r.final_score == null || !hasOtherSignal) continue;
 
         rows.push({
           token_id: t.id,
