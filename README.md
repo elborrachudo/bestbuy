@@ -31,7 +31,7 @@ readings.
 | Input | Weight | If no DeFi data (reweighted) |
 |---|---|---|
 | Price vs 50/200d MAs | 25% | 42% |
-| Distance from 90d low (contrarian) | 20% | 33% |
+| % below 1-year high (contrarian) | 20% | 33% |
 | RSI 14d (oversold scores high) | 15% | 25% |
 | TVL trend + holders-revenue value | 25% | dropped |
 | Emissions vs supply (low inflation high) | 15% | dropped |

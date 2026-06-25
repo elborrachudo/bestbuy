@@ -89,12 +89,14 @@ export default async function handler(req, res) {
         const tvlNow = tvlSeries ? tvlAtDate(tvlSeries, daySec) : null;
         const tvl30dAgo = tvlSeries ? tvlAtDate(tvlSeries, daySec - 30 * DAY_SEC) : null;
 
-        const hl = highLow(prices, 90, i);
+        // Trailing 1-year high ending at day i. Capped at the data we have (≤365d),
+        // so the oldest backfilled days use a shorter effective window than today.
+        const high365 = highLow(prices, 365, i).high;
         const inputs = {
           price: prices[i],
           ma50: sma(prices, 50, i),
           ma200: sma(prices, 200, i),
-          high90: hl.high, low90: hl.low,
+          high365,
           rsi14: rsi(prices, 14, i),
           tvlNow, tvl30dAgo, holdersRevenue,
           circSupply, totalSupply,
@@ -108,7 +110,7 @@ export default async function handler(req, res) {
           fetched_at: dayStartUtcIso(ts),
           final_score: r.final_score,
           score_price_ma: r.score_price_ma,
-          score_dist_low: r.score_dist_low,
+          score_below_high: r.score_below_high,
           score_rsi: r.score_rsi,
           score_tvl_rev: r.score_tvl_rev,
           score_emissions: r.score_emissions,

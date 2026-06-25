@@ -447,7 +447,7 @@
     }
     return [
       {k:'Price vs MAs',        val:fmtScore(r1(latest.score_price_ma)), d:delta('score_price_ma',true)},
-      {k:'Distance from 90d low',val:fmtScore(r1(latest.score_dist_low)), d:delta('score_dist_low',true)},
+      {k:'Below 1-year high',    val:fmtScore(r1(latest.score_below_high)), d:delta('score_below_high',true)},
       {k:'RSI (14d)',           val:fmtNum(latest.rsi_14,1), d:delta('rsi_14',false)},
       {k:'TVL trend',           val:rew?'—':fmtUsd(latest.tvl),            d:rew?{txt:'n/a',cls:'na'}:delta('tvl',true)},
       {k:'Holders rev (ann.)',  val:rew?'—':fmtUsd(latest.holders_revenue),d:rew?{txt:'n/a',cls:'na'}:delta('holders_revenue',true)},
@@ -610,11 +610,11 @@
       t3.appendChild(rLine([x.t.symbol+': ', {n:(rv==null?'—':fmtNum(rv,0)), c:c}, ' — '+txt+'.']));
     });
 
-    // 4 — Distância ao fundo recente
-    var t4=topic('Distância ao fundo recente','Quanto mais perto do fundo dos últimos 90 dias, mais barato o ativo parece estar.');
+    // 4 — Distância ao topo do último ano
+    var t4=topic('Quão longe do topo do último ano?','Quanto mais abaixo do valor máximo dos últimos 12 meses, mais barato o ativo parece estar.');
     ranked.forEach(function(x){
-      var v=x.l.score_dist_low, sv=v==null?null:Number(v);
-      var txt=sv==null?'sem dados': sv>=6?'perto do fundo, mais barato': sv<=4?'longe do fundo, mais caro':'a meio caminho';
+      var v=x.l.score_below_high, sv=v==null?null:Number(v);
+      var txt=sv==null?'sem dados': sv>=6?'bem abaixo do topo, mais barato': sv<=4?'perto do topo, mais caro':'a meio caminho';
       t4.appendChild(rLine([x.t.symbol+': ', {n:(sv==null?'—':fmtScore(sv)+'/10'), c:clsScore(sv)}, ' — '+txt+'.']));
     });
 

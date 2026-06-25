@@ -57,7 +57,7 @@ export default async function handler(req, res) {
         fetched_at: fetchedAt,
         final_score: r.final_score,
         score_price_ma: r.score_price_ma,
-        score_dist_low: r.score_dist_low,
+        score_below_high: r.score_below_high,
         score_rsi: r.score_rsi,
         score_tvl_rev: r.score_tvl_rev,
         score_emissions: r.score_emissions,

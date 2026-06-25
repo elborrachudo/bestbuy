@@ -27,7 +27,7 @@ create table if not exists public.score_readings (
   fetched_at        timestamptz not null,
   final_score       numeric(4,1) not null,
   score_price_ma    numeric(4,1),
-  score_dist_low    numeric(4,1),
+  score_below_high  numeric(4,1),             -- % below trailing 1-year high (value/contrarian)
   score_rsi         numeric(4,1),
   score_tvl_rev     numeric(4,1),             -- null when reweighted
   score_emissions   numeric(4,1),             -- null when reweighted
