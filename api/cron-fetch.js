@@ -41,6 +41,14 @@ export default async function handler(req, res) {
     return;
   }
 
+  // Fisher–Yates shuffle: if a run still hits a rate-limit or time cap, the tokens
+  // that get dropped vary each time instead of always being the last in load order
+  // — so no single token is permanently starved of live readings.
+  for (let i = tokens.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tokens[i], tokens[j]] = [tokens[j], tokens[i]];
+  }
+
   for (const t of tokens) {
     try {
       // Idempotency: skip if a row already landed in the last ~2h for this token.

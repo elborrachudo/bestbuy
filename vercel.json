@@ -6,7 +6,7 @@
     { "path": "/api/cron-fetch", "schedule": "0 16 * * *" }
   ],
   "functions": {
-    "api/cron-fetch.js": { "maxDuration": 60 },
+    "api/cron-fetch.js": { "maxDuration": 300 },
     "api/backfill.js": { "maxDuration": 300 },
     "api/backfill-token.js": { "maxDuration": 120 },
     "api/recompute-emissions.js": { "maxDuration": 300 }
