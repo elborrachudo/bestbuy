@@ -33,6 +33,10 @@
   .range-btn{background:var(--panel-2);color:var(--muted);border:1px solid transparent;border-radius:999px;
     font-size:12px;font-weight:600;padding:5px 10px;cursor:pointer;line-height:1;}
   .range-btn.active{color:var(--accent);border-color:rgba(34,211,238,.4);}
+  .head-left{display:flex;align-items:center;gap:8px;min-width:0;}
+  .axis-toggle{background:var(--panel-2);color:var(--muted);border:1px solid transparent;border-radius:999px;
+    font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer;line-height:1;letter-spacing:.03em;}
+  .axis-toggle.fit{color:var(--accent);border-color:rgba(34,211,238,.4);}
   .chart-box{position:relative;height:230px;width:100%;}
   /* Legend chips */
   .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
@@ -116,7 +120,10 @@
   <!-- Score progression chart ON TOP -->
   <div class="card">
     <div class="chart-head">
-      <span class="lbl">Score progression</span>
+      <div class="head-left">
+        <span class="lbl">Score progression</span>
+        <button class="axis-toggle" id="axis-toggle" title="Toggle y-axis zoom (Fit = spread the lines, Full = 0–10)">Fit</button>
+      </div>
       <div class="ranges" id="ranges"></div>
     </div>
     <div class="chart-box"><canvas id="chart"></canvas></div>
@@ -164,7 +171,7 @@
   var DEFAULT_RANGE = '30d';
   var GOOD_ZONE = 6.5;
 
-  var state = { tokens:[], readingsByToken:{}, range:DEFAULT_RANGE, hidden:{}, openRow:null, chart:null };
+  var state = { tokens:[], readingsByToken:{}, range:DEFAULT_RANGE, hidden:{}, openRow:null, chart:null, axisMode:'fit' };
 
   // ── helpers ─────────────────────────────────────────────────────────────────
   function el(tag, cls, txt){ var e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; }
@@ -279,19 +286,29 @@
     beforeDatasetsDraw:function(chart){
       var ctx=chart.ctx, ca=chart.chartArea, y=chart.scales.y;
       if(!ca||!y) return;
-      var yTop=y.getPixelForValue(10), yBase=y.getPixelForValue(GOOD_ZONE);
-      var g=ctx.createLinearGradient(0,yTop,0,yBase);
-      g.addColorStop(0,'rgba(34,197,94,0.30)');
-      g.addColorStop(0.45,'rgba(34,197,94,0.13)');
-      g.addColorStop(1,'rgba(34,197,94,0.02)');
-      ctx.save();
-      ctx.fillStyle=g;
-      ctx.fillRect(ca.left,yTop,ca.right-ca.left,yBase-yTop);
-      // dotted baseline at 6.5
-      ctx.beginPath(); ctx.setLineDash([2,3]); ctx.lineWidth=1;
-      ctx.strokeStyle='rgba(34,197,94,0.30)';
-      ctx.moveTo(ca.left,yBase); ctx.lineTo(ca.right,yBase); ctx.stroke();
-      ctx.restore();
+      // Nothing to draw when the BUY zone sits entirely above the visible window
+      // (happens in Fit mode when every score is below 6.5).
+      if(GOOD_ZONE >= y.max) return;
+      var top10=y.getPixelForValue(10), yBase=y.getPixelForValue(GOOD_ZONE);
+      var fillTop=Math.max(ca.top, top10), fillBase=Math.min(ca.bottom, yBase);
+      if(fillBase>fillTop){
+        var g=ctx.createLinearGradient(0,top10,0,yBase);
+        g.addColorStop(0,'rgba(34,197,94,0.30)');
+        g.addColorStop(0.45,'rgba(34,197,94,0.13)');
+        g.addColorStop(1,'rgba(34,197,94,0.02)');
+        ctx.save();
+        ctx.fillStyle=g;
+        ctx.fillRect(ca.left,fillTop,ca.right-ca.left,fillBase-fillTop);
+        ctx.restore();
+      }
+      // dotted baseline at 6.5, only when it falls inside the visible window
+      if(GOOD_ZONE>=y.min && GOOD_ZONE<=y.max){
+        ctx.save();
+        ctx.beginPath(); ctx.setLineDash([2,3]); ctx.lineWidth=1;
+        ctx.strokeStyle='rgba(34,197,94,0.30)';
+        ctx.moveTo(ca.left,yBase); ctx.lineTo(ca.right,yBase); ctx.stroke();
+        ctx.restore();
+      }
     }
   };
 
@@ -370,6 +387,24 @@
     }
   };
 
+  // y-axis bounds: 'full' = fixed 0–10; 'fit' = zoom to the visible (non-hidden)
+  // scores with padding, rounded to 0.5, so bunched lines spread apart.
+  function computeYBounds(datasets){
+    if(state.axisMode!=='fit') return {min:0, max:10, step:2};
+    var lo=Infinity, hi=-Infinity;
+    datasets.forEach(function(ds){
+      if(ds.hidden) return;
+      ds.data.forEach(function(p){ if(p.y<lo)lo=p.y; if(p.y>hi)hi=p.y; });
+    });
+    if(!isFinite(lo)||!isFinite(hi)) return {min:0, max:10, step:2};
+    var pad=Math.max(0.3,(hi-lo)*0.15);
+    var min=Math.max(0, Math.floor((lo-pad)*2)/2);
+    var max=Math.min(10, Math.ceil((hi+pad)*2)/2);
+    if(max-min<1){ max=Math.min(10, min+1); if(max-min<1) min=Math.max(0, max-1); }
+    var span=max-min;
+    return {min:min, max:max, step: span<=2?0.5 : span<=5?1 : 2};
+  }
+
   function renderChart(){
     var cutoff=rangeCutoff();
     var datasets=state.tokens.map(function(t){
@@ -388,6 +423,8 @@
       };
     });
 
+    var yb=computeYBounds(datasets);
+
     if(state.chart) state.chart.destroy();
     var ctx=document.getElementById('chart').getContext('2d');
     state.chart=new Chart(ctx,{
@@ -400,9 +437,9 @@
         scales:{
           x:{ type:'linear', min:cutoff==null?undefined:cutoff, grid:{display:false},
               ticks:{display:false}, border:{display:false} },
-          y:{ min:0, max:10, grid:{color:'rgba(255,255,255,0.05)'},
+          y:{ min:yb.min, max:yb.max, grid:{color:'rgba(255,255,255,0.05)'},
               border:{display:false},
-              ticks:{color:'#52525b', stepSize:2, font:{size:10}} }
+              ticks:{color:'#52525b', stepSize:yb.step, font:{size:10}} }
         },
         plugins:{
           legend:{display:false},
@@ -646,6 +683,14 @@
   function closeReport(){ document.getElementById('report-back').classList.remove('show'); }
 
   function renderAll(){ renderHeader(); renderRanges(); renderChart(); renderLegend(); renderRankList(); renderManage(); }
+
+  var axisBtn=document.getElementById('axis-toggle');
+  function syncAxisToggle(){
+    axisBtn.textContent = state.axisMode==='fit' ? 'Fit' : 'Full';
+    axisBtn.className = 'axis-toggle'+(state.axisMode==='fit' ? ' fit' : '');
+  }
+  axisBtn.onclick=function(){ state.axisMode = state.axisMode==='fit' ? 'full' : 'fit'; syncAxisToggle(); renderChart(); };
+  syncAxisToggle();
 
   document.getElementById('logo').onclick=openReport;
   document.getElementById('report-x').onclick=closeReport;
