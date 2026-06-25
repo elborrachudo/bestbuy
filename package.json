@@ -1,0 +1,13 @@
+{
+  "name": "bestbuy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Crypto BestBuy scoring dashboard — 3×/day fetch + score, Supabase-backed.",
+  "scripts": {
+    "test": "node lib/scoring.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
