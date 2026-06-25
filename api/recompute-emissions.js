@@ -12,7 +12,7 @@
 
 import { getActiveTokens, sbSelect, sbUpsert } from '../lib/tokens.js';
 import { getCoinGeckoPriceSeries, buildCircSeries } from '../lib/sources.js';
-import { scoreEmissions, annualInflationAt, computeFinalScore, round1 } from '../lib/scoring.js';
+import { scoreEmissions, annualInflationAt, scoreFundamentals, scoreTechnicals, blendPillars, round1 } from '../lib/scoring.js';
 
 const PAGE = 1000;
 
@@ -55,21 +55,28 @@ export default async function handler(req, res) {
         `score_readings?token_id=eq.${t.id}&select=*&order=fetched_at.asc&limit=${PAGE}`
       );
 
+      const num = (v) => (v == null ? null : Number(v));
       let changed = 0, nonzero = 0;
       const updates = rows.map((row) => {
         const nowT = new Date(row.fetched_at).getTime();
         const inflation = annualInflationAt(circSeries, nowT);
         const emiss = round1(scoreEmissions(inflation));
-        const finalScore = computeFinalScore({
-          priceMa: row.score_price_ma,
-          belowHigh: row.score_below_high,
-          rsi: row.score_rsi,
-          tvlRev: row.score_tvl_rev,
-          emissions: emiss,
-        }, row.reweighted);
+        // Re-derive pillars + blended final (sentiment stays null).
+        const fundamentals = row.reweighted ? null
+          : scoreFundamentals(num(row.score_tvl_rev), emiss, t.supply_mechanism);
+        const technicals = scoreTechnicals(num(row.score_price_ma), num(row.score_below_high), num(row.score_rsi));
+        const finalScore = blendPillars(fundamentals, technicals, null);
         if (emiss != null && emiss > 0) nonzero++;
         if (Number(row.final_score) !== finalScore) changed++;
-        return { ...row, emissions_rate: inflation, score_emissions: emiss, final_score: finalScore };
+        return {
+          ...row,
+          emissions_rate: inflation,
+          score_emissions: emiss,
+          score_fundamentals: round1(fundamentals),
+          score_technicals: round1(technicals),
+          score_sentiment: null,
+          final_score: finalScore,
+        };
       });
 
       for (let i = 0; i < updates.length; i += 100) {

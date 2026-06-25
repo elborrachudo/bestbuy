@@ -6,6 +6,7 @@
 <meta name="color-scheme" content="dark" />
 <title>Compro o quê?!</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>📈</text></svg>" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css" />
 <style>
   :root{
     --bg:#0a0b0f; --panel:#11131a; --panel-2:#15171f; --line:#1e2130;
@@ -27,16 +28,17 @@
   @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.45)}70%{box-shadow:0 0 0 7px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
   /* Card */
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:16px;}
-  .chart-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
-  .chart-head .lbl{font-size:14px;font-weight:600;color:var(--text);}
+  .chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
+  .chart-head .lbl{font-size:14px;font-weight:600;color:var(--text);padding-top:4px;}
+  .head-controls{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+  /* Bare pillar toggle icons (no pill/border/label) */
+  .pillars{display:flex;gap:14px;justify-content:flex-end;align-items:center;}
+  .pillar-ico{font-size:21px;line-height:1;cursor:pointer;transition:color .15s ease;}
+  .pillar-ico.inert{cursor:default;}
   .ranges{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;}
   .range-btn{background:var(--panel-2);color:var(--muted);border:1px solid transparent;border-radius:999px;
     font-size:12px;font-weight:600;padding:5px 10px;cursor:pointer;line-height:1;}
   .range-btn.active{color:var(--accent);border-color:rgba(34,211,238,.4);}
-  .head-left{display:flex;align-items:center;gap:8px;min-width:0;}
-  .axis-toggle{background:var(--panel-2);color:var(--muted);border:1px solid transparent;border-radius:999px;
-    font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer;line-height:1;letter-spacing:.03em;}
-  .axis-toggle.fit{color:var(--accent);border-color:rgba(34,211,238,.4);}
   .chart-box{position:relative;height:230px;width:100%;}
   /* Legend chips */
   .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
@@ -47,14 +49,18 @@
   .chip.off .swatch{filter:grayscale(1);}
   /* Ranked list */
   .rank-list{display:flex;flex-direction:column;gap:10px;}
-  .row{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  .row{background:#15171f;border:1px solid var(--line);border-left-width:3px;border-radius:var(--radius);overflow:hidden;}
   .row-btn{all:unset;display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;
     padding:14px;cursor:pointer;}
   .rank-num{color:var(--muted);font-size:13px;font-weight:700;width:18px;text-align:center;flex:none;}
   .tok{flex:1;min-width:0;}
   .tok .sym{font-size:16px;font-weight:700;}
   .tok .nm{color:var(--muted);font-size:12.5px;margin-top:2px;}
+  .tok .nm .price{color:var(--text);font-weight:600;}
   .flag{color:var(--muted);font-style:italic;font-size:11px;margin-top:3px;}
+  /* Collapsed-row score bar (black track, green fill = blended %) */
+  .score-bar{width:62px;height:6px;background:#000;border-radius:3px;overflow:hidden;flex:none;}
+  .score-bar > span{display:block;height:100%;background:var(--good);border-radius:3px;}
   .score-wrap{display:flex;flex-direction:column;align-items:flex-end;flex:none;}
   .score{font-size:28px;font-weight:800;line-height:1;letter-spacing:-.02em;}
   .verdict{font-size:11px;font-weight:700;letter-spacing:.04em;margin-top:4px;}
@@ -63,6 +69,10 @@
   /* Expand panel */
   .panel{max-height:0;overflow:hidden;transition:max-height .3s ease;}
   .panel-inner{padding:0 14px 14px;border-top:1px solid var(--line);}
+  .panel-cols{display:flex;gap:18px;}
+  .panel-readings{flex:1;min-width:0;}
+  .panel-pillars{width:172px;flex:none;}
+  @media(max-width:420px){ .panel-cols{flex-direction:column;gap:4px;} .panel-pillars{width:auto;} }
   .reading{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);}
   .reading:last-of-type{border-bottom:none;}
   .reading .k{color:var(--muted);font-size:13px;}
@@ -71,6 +81,15 @@
   .delta{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;}
   .delta.up{color:var(--good);} .delta.down{color:#f87171;} .delta.na{color:var(--muted);}
   .foot{color:var(--muted);font-size:11px;margin-top:10px;font-style:italic;}
+  /* PILLARS mini-section */
+  .pillars-mini h4{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--muted);margin:14px 0 8px;}
+  .pmini{margin-bottom:12px;}
+  .pmini-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+  .pmini-head .lab{font-size:12.5px;font-weight:600;}
+  .pmini-head .pv{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .ptrack{height:7px;background:#000;border-radius:4px;overflow:hidden;}
+  .ptrack > span{display:block;height:100%;border-radius:4px;}
+  .pmini-off{font-size:12px;font-style:italic;color:var(--muted);}
   /* Manage */
   .manage{display:flex;gap:8px;align-items:center;margin-top:18px;}
   .manage select{flex:1;background:var(--panel-2);color:var(--text);border:1px solid var(--line);
@@ -79,9 +98,6 @@
     font-size:22px;font-weight:700;cursor:pointer;line-height:1;flex:none;}
   .empty,.err{color:var(--muted);text-align:center;padding:30px 10px;font-size:14px;}
   .err{color:#f87171;}
-  /* Token colour accent bar */
-  .row-btn{position:relative;}
-  .acc{position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:0 3px 3px 0;}
   /* Clickable logo */
   .title{cursor:pointer;display:inline-block;}
   .title:active{opacity:.65;}
@@ -120,11 +136,11 @@
   <!-- Score progression chart ON TOP -->
   <div class="card">
     <div class="chart-head">
-      <div class="head-left">
-        <span class="lbl">Score progression</span>
-        <button class="axis-toggle" id="axis-toggle" title="Toggle y-axis zoom (Fit = spread the lines, Full = 0–10)">Fit</button>
+      <span class="lbl">Score progression</span>
+      <div class="head-controls">
+        <div class="pillars" id="pillars"></div>
+        <div class="ranges" id="ranges"></div>
       </div>
-      <div class="ranges" id="ranges"></div>
     </div>
     <div class="chart-box"><canvas id="chart"></canvas></div>
     <div class="legend" id="legend"></div>
@@ -169,9 +185,30 @@
     {k:'90d',days:90},{k:'6m',days:182},{k:'1y',days:365},{k:'all',days:null}
   ];
   var DEFAULT_RANGE = '30d';
-  var GOOD_ZONE = 6.5;
+  var GOOD_ZONE = 65;   // % — good-buy zone / dotted line on the 0–100 chart
 
-  var state = { tokens:[], readingsByToken:{}, range:DEFAULT_RANGE, hidden:{}, openRow:null, chart:null, axisMode:'fit' };
+  var PILLAR_DEFS = [
+    {key:'fundamentals', icon:'ti-building-bank', on:'#6399ed', off:'#2c3a52'},
+    {key:'technicals',   icon:'ti-chart-candle',  on:'#a78bfa', off:'#3a3357'},
+    {key:'sentiment',    icon:'ti-flame',         on:'#3f3f46', off:'#3f3f46', inert:true}
+  ];
+  var PILLAR_W = { fundamentals:45, technicals:35, sentiment:20 };
+
+  var state = { tokens:[], readingsByToken:{}, range:DEFAULT_RANGE, hidden:{}, openRow:null, chart:null,
+    pillars:{ fundamentals:true, technicals:true, sentiment:false } };
+
+  // Blend a reading from its stored pillar scores over the currently-active pillars.
+  // Mirrors the server blend: null pillars drop and weights renormalize. Returns 0–10.
+  function blendRow(r){
+    var total=0, wsum=0;
+    PILLAR_DEFS.forEach(function(p){
+      if(!state.pillars[p.key]) return;
+      var v=r['score_'+p.key];
+      if(v==null) return;
+      total += PILLAR_W[p.key]*Number(v); wsum += PILLAR_W[p.key];
+    });
+    return wsum===0 ? null : total/wsum;
+  }
 
   // ── helpers ─────────────────────────────────────────────────────────────────
   function el(tag, cls, txt){ var e=document.createElement(tag); if(cls)e.className=cls; if(txt!=null)e.textContent=txt; return e; }
@@ -289,10 +326,10 @@
       // Nothing to draw when the BUY zone sits entirely above the visible window
       // (happens in Fit mode when every score is below 6.5).
       if(GOOD_ZONE >= y.max) return;
-      var top10=y.getPixelForValue(10), yBase=y.getPixelForValue(GOOD_ZONE);
-      var fillTop=Math.max(ca.top, top10), fillBase=Math.min(ca.bottom, yBase);
+      var topMax=y.getPixelForValue(100), yBase=y.getPixelForValue(GOOD_ZONE);
+      var fillTop=Math.max(ca.top, topMax), fillBase=Math.min(ca.bottom, yBase);
       if(fillBase>fillTop){
-        var g=ctx.createLinearGradient(0,top10,0,yBase);
+        var g=ctx.createLinearGradient(0,topMax,0,yBase);
         g.addColorStop(0,'rgba(34,197,94,0.30)');
         g.addColorStop(0.45,'rgba(34,197,94,0.13)');
         g.addColorStop(1,'rgba(34,197,94,0.02)');
@@ -387,22 +424,19 @@
     }
   };
 
-  // y-axis bounds: 'full' = fixed 0–10; 'fit' = zoom to the visible (non-hidden)
-  // scores with padding, rounded to 0.5, so bunched lines spread apart.
-  function computeYBounds(datasets){
-    if(state.axisMode!=='fit') return {min:0, max:10, step:2};
-    var lo=Infinity, hi=-Infinity;
-    datasets.forEach(function(ds){
-      if(ds.hidden) return;
-      ds.data.forEach(function(p){ if(p.y<lo)lo=p.y; if(p.y>hi)hi=p.y; });
+  // ── pillar toggle icons ───────────────────────────────────────────────────────
+  function renderPillars(){
+    var box=document.getElementById('pillars'); box.innerHTML='';
+    PILLAR_DEFS.forEach(function(p){
+      var on=!!state.pillars[p.key];
+      var i=el('i','pillar-ico ti '+p.icon+(p.inert?' inert':''));
+      i.style.color = p.inert ? p.off : (on ? p.on : p.off);
+      i.title = p.key.charAt(0).toUpperCase()+p.key.slice(1)+(p.inert?' (sem dados)':'');
+      if(!p.inert){
+        i.onclick=function(){ state.pillars[p.key]=!state.pillars[p.key]; renderPillars(); renderChart(); renderRankList(); };
+      }
+      box.appendChild(i);
     });
-    if(!isFinite(lo)||!isFinite(hi)) return {min:0, max:10, step:2};
-    var pad=Math.max(0.3,(hi-lo)*0.15);
-    var min=Math.max(0, Math.floor((lo-pad)*2)/2);
-    var max=Math.min(10, Math.ceil((hi+pad)*2)/2);
-    if(max-min<1){ max=Math.min(10, min+1); if(max-min<1) min=Math.max(0, max-1); }
-    var span=max-min;
-    return {min:min, max:max, step: span<=2?0.5 : span<=5?1 : 2};
   }
 
   function renderChart(){
@@ -418,12 +452,12 @@
         borderColor:t.color,
         backgroundColor:t.color,
         borderWidth:2,
-        data:rows.map(function(r){ return {x:new Date(r.fetched_at).getTime(), y:Number(r.final_score)}; }),
-        tension:0.4, pointRadius:0, pointHitRadius:8, hidden:!!state.hidden[t.id]
+        // blended score → percentage (0–100), reblended live from active pillars
+        data:rows.map(function(r){ var b=blendRow(r); return {x:new Date(r.fetched_at).getTime(), y:b==null?null:b*10}; })
+                 .filter(function(p){ return p.y!=null; }),
+        tension:0.4, pointRadius:0, pointHitRadius:8, spanGaps:true, hidden:!!state.hidden[t.id]
       };
     });
-
-    var yb=computeYBounds(datasets);
 
     if(state.chart) state.chart.destroy();
     var ctx=document.getElementById('chart').getContext('2d');
@@ -437,9 +471,9 @@
         scales:{
           x:{ type:'linear', min:cutoff==null?undefined:cutoff, grid:{display:false},
               ticks:{display:false}, border:{display:false} },
-          y:{ min:yb.min, max:yb.max, grid:{color:'rgba(255,255,255,0.05)'},
+          y:{ min:0, max:100, grid:{color:'rgba(255,255,255,0.05)'},
               border:{display:false},
-              ticks:{color:'#52525b', stepSize:yb.step, font:{size:10}} }
+              ticks:{color:'#52525b', stepSize:20, font:{size:10}, callback:function(v){ return v+'%'; } } }
         },
         plugins:{
           legend:{display:false},
@@ -448,7 +482,7 @@
             titleColor:'#a1a1aa', bodyColor:'#f4f4f5', padding:10, displayColors:true,
             callbacks:{
               title:function(items){ return new Date(items[0].parsed.x).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); },
-              label:function(it){ return it.dataset.label+': '+Number(it.parsed.y).toFixed(1); }
+              label:function(it){ return it.dataset.label+': '+Math.round(Number(it.parsed.y))+'%'; }
             }
           }
         }
@@ -492,39 +526,58 @@
     ];
   }
 
+  function fmtPrice(n){
+    if(n==null||isNaN(n)) return '';
+    n=Number(n);
+    if(n>=1000) return '$'+n.toLocaleString(undefined,{maximumFractionDigits:0});
+    if(n>=1) return '$'+n.toFixed(2);
+    return '$'+n.toFixed(n<0.1?4:3);
+  }
+  function verdictColor(s){ return s==null?'#a1a1aa': s>=6.5?'#34d399': s>=4.5?'#a1a1aa':'#f87171'; }
+  var PILLAR_BAR = { fundamentals:'#6399ed', technicals:'#a78bfa' };
+
   function renderRankList(){
     var box=document.getElementById('ranklist'); box.innerHTML='';
-    var ranked=state.tokens.map(function(t){ return {t:t, l:latestOf(t.id)}; })
-      .filter(function(x){ return x.l; })
-      .sort(function(a,b){ return Number(b.l.final_score)-Number(a.l.final_score); });
+    var ranked=state.tokens.map(function(t){ var l=latestOf(t.id); return {t:t, l:l, b:l?blendRow(l):null}; })
+      .filter(function(x){ return x.l && x.b!=null; })
+      .sort(function(a,b){ return b.b-a.b; });
 
-    if(!ranked.length){ box.appendChild(el('div','empty','No readings yet — run the backfill and the first cron fetch.')); return; }
+    if(!ranked.length){ box.appendChild(el('div','empty','No readings for the selected pillars.')); return; }
 
     ranked.forEach(function(x,idx){
-      var t=x.t, latest=x.l, prev=prevOf(t.id);
-      var v=verdict(Number(latest.final_score));
+      var t=x.t, latest=x.l, prev=prevOf(t.id), blended=x.b;
+      var pct=Math.max(0,Math.min(100,blended*10));
       var row=el('div','row'+(state.openRow===t.id?' open':''));
+      row.style.borderLeftColor=t.color;
 
       var btn=el('button','row-btn');
-      var acc=el('span','acc'); acc.style.background=t.color; btn.appendChild(acc);
       btn.appendChild(el('span','rank-num',String(idx+1)));
       var tok=el('div','tok');
       tok.appendChild(el('div','sym',t.symbol));
-      tok.appendChild(el('div','nm',t.name));
+      var nm=el('div','nm');
+      nm.appendChild(document.createTextNode(t.name+' · '));
+      nm.appendChild(el('span','price',fmtPrice(latest.price)));
+      tok.appendChild(nm);
       if(latest.reweighted) tok.appendChild(el('div','flag','fundamentals N/A · market-only'));
       btn.appendChild(tok);
 
+      var bar=el('div','score-bar'); var fill=el('span'); fill.style.width=pct+'%'; bar.appendChild(fill); btn.appendChild(bar);
+
       var sw=el('div','score-wrap');
-      var sc=el('div','score',fmtScore(Number(latest.final_score))); sc.style.color=t.color; sw.appendChild(sc);
-      var vd=el('div','verdict',v.label); vd.style.color=v.good?t.color:'#a1a1aa'; sw.appendChild(vd);
+      var sc=el('div','score',blended.toFixed(1)); sc.style.color=verdictColor(blended); sw.appendChild(sc);
+      var vd=el('div','verdict',verdict(blended).label); vd.style.color=verdictColor(blended); sw.appendChild(vd);
       btn.appendChild(sw);
 
       var chev=el('span','chev','⌄'); chev.style.fontSize='18px'; btn.appendChild(chev);
       btn.onclick=function(){ state.openRow = state.openRow===t.id?null:t.id; renderRankList(); };
       row.appendChild(btn);
 
+      // expand panel — two columns (readings | pillars), stacking on narrow mobile
       var panel=el('div','panel');
       var inner=el('div','panel-inner');
+      var cols=el('div','panel-cols');
+
+      var left=el('div','panel-readings');
       readingFields(latest, prev).forEach(function(f){
         var r=el('div','reading');
         r.appendChild(el('div','k',f.k));
@@ -532,9 +585,35 @@
         vbox.appendChild(el('span','val',f.val));
         vbox.appendChild(el('span','delta '+f.d.cls,f.d.txt));
         r.appendChild(vbox);
-        inner.appendChild(r);
+        left.appendChild(r);
       });
-      inner.appendChild(el('div','foot','Δ vs previous reading (last 8h)'));
+      left.appendChild(el('div','foot','Δ vs previous reading (last 8h)'));
+      cols.appendChild(left);
+
+      var right=el('div','panel-pillars');
+      var mini=el('div','pillars-mini');
+      mini.appendChild(el('h4',null,'PILLARS'));
+      [{key:'fundamentals',lab:'Fundamentals'},{key:'technicals',lab:'Technicals'}].forEach(function(p){
+        var val=latest['score_'+p.key];
+        var pm=el('div','pmini');
+        var head=el('div','pmini-head');
+        head.appendChild(el('span','lab',p.lab));
+        head.appendChild(el('span','pv',val==null?'n/a':Number(val).toFixed(1)));
+        pm.appendChild(head);
+        var tr=el('div','ptrack'); var fl=el('span');
+        fl.style.width=(val==null?0:Math.max(0,Math.min(100,Number(val)*10)))+'%';
+        fl.style.background=PILLAR_BAR[p.key];
+        tr.appendChild(fl); pm.appendChild(tr);
+        mini.appendChild(pm);
+      });
+      var sm=el('div','pmini');
+      var smh=el('div','pmini-head'); smh.appendChild(el('span','lab','Sentiment')); sm.appendChild(smh);
+      sm.appendChild(el('div','pmini-off','not connected'));
+      mini.appendChild(sm);
+      right.appendChild(mini);
+      cols.appendChild(right);
+
+      inner.appendChild(cols);
       panel.appendChild(inner);
       row.appendChild(panel);
       box.appendChild(row);
@@ -698,15 +777,7 @@
   function openReport(){ buildReport(); document.getElementById('report-back').classList.add('show'); }
   function closeReport(){ document.getElementById('report-back').classList.remove('show'); }
 
-  function renderAll(){ renderHeader(); renderRanges(); renderChart(); renderLegend(); renderRankList(); renderManage(); }
-
-  var axisBtn=document.getElementById('axis-toggle');
-  function syncAxisToggle(){
-    axisBtn.textContent = state.axisMode==='fit' ? 'Fit' : 'Full';
-    axisBtn.className = 'axis-toggle'+(state.axisMode==='fit' ? ' fit' : '');
-  }
-  axisBtn.onclick=function(){ state.axisMode = state.axisMode==='fit' ? 'full' : 'fit'; syncAxisToggle(); renderChart(); };
-  syncAxisToggle();
+  function renderAll(){ renderHeader(); renderPillars(); renderRanges(); renderChart(); renderLegend(); renderRankList(); renderManage(); }
 
   document.getElementById('logo').onclick=openReport;
   document.getElementById('report-x').onclick=closeReport;

@@ -16,6 +16,8 @@ create table if not exists public.tracked_tokens (
   defillama_slug  text,                       -- NULL → market-only reweight
   color           text not null,              -- hex, e.g. '#22d3ee'
   active          boolean not null default true,
+  supply_mechanism text not null default 'none'  -- 've-lock' | 'burn' | 'none' (emissions modifier)
+    check (supply_mechanism in ('ve-lock','burn','none')),
   created_at      timestamptz not null default now()
 );
 
@@ -31,6 +33,9 @@ create table if not exists public.score_readings (
   score_rsi         numeric(4,1),
   score_tvl_rev     numeric(4,1),             -- null when reweighted
   score_emissions   numeric(4,1),             -- null when reweighted
+  score_fundamentals numeric(4,1),            -- pillar: TVL/rev + emissions (null = market-only)
+  score_technicals   numeric(4,1),            -- pillar: priceMA + below-1y-high + RSI
+  score_sentiment    numeric(4,1),            -- pillar: stubbed (null until a feed exists)
   price             numeric,
   ma_50             numeric,
   ma_200            numeric,
