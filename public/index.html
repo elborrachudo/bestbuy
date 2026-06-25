@@ -568,9 +568,16 @@
     var slug=prompt('DefiLlama slug (optional — leave blank for market-only):')||null;
     var color=prompt('Hex color (optional, e.g. #22d3ee):')||'#22d3ee';
     var name=prompt('Display name (optional):')||symbol;
-    sbPost('tracked_tokens', [{symbol:symbol.toUpperCase().trim(), name:name.trim(),
+    var sym=symbol.toUpperCase().trim();
+    sbPost('tracked_tokens', [{symbol:sym, name:name.trim(),
       coingecko_id:cg.trim(), defillama_slug:slug?slug.trim():null, color:color.trim()}])
-      .then(function(){ alert(symbol.toUpperCase()+' added. It will be scored on the next cron run.'); load(); })
+      .then(function(){
+        // Auto-seed 12 months of history for the new token (one token → no rate
+        // limit). Runs server-side; safe endpoint that only seeds zero-history tokens.
+        alert(sym+' added. Seeding 12 months of history — this can take ~20s, then the chart will fill in.');
+        return fetch('/api/backfill-token', {method:'POST'}).catch(function(){ return null; });
+      })
+      .then(function(){ load(); })
       .catch(function(e){ alert('Failed to add: '+e.message); });
   }
 

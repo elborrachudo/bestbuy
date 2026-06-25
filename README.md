@@ -30,14 +30,15 @@ readings.
 
 | Input | Weight | If no DeFi data (reweighted) |
 |---|---|---|
-| Price vs 50/200d MAs | 25% | 42% |
-| % below 1-year high (contrarian) | 20% | 33% |
-| RSI 14d (oversold scores high) | 15% | 25% |
-| TVL trend + holders-revenue value | 25% | dropped |
-| Emissions vs supply (low inflation high) | 15% | dropped |
+| Price vs 50/200d MAs | 25% | 38% |
+| % below 1-year high (contrarian) | 20% | 30% |
+| RSI 14d (oversold scores high) | 15% | 22% |
+| TVL trend + revenue value | 25% | dropped |
+| Emissions vs supply (low inflation high) | 15% | 10% |
 
 Tokens with no `defillama_slug` (or whose fundamental fetches fail) are
-**auto-reweighted** to market-only and flagged in the UI. Verdict bands:
+**auto-reweighted** — TVL + revenue are dropped and their weight shifts to price,
+value, RSI and (supply-based) emissions — and flagged in the UI. Verdict bands:
 8.0+ STRONG BUY · 6.5–7.9 BUY · 4.5–6.4 NEUTRAL · 3.0–4.4 WEAK · <3 AVOID.
 
 ---
