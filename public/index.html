@@ -185,6 +185,8 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <script>
@@ -192,6 +194,13 @@
   "use strict";
   var CFG = window.BESTBUY_CONFIG || {};
   var SB_URL = CFG.SUPABASE_URL, SB_KEY = CFG.SUPABASE_ANON_KEY;
+
+  // Register the zoom/pan plugin if its CDN loaded. If it didn't, the chart still
+  // works (unknown plugin options are ignored) and double-tap-to-fit still works.
+  try {
+    var ZP = window.ChartZoom && (window.ChartZoom.default || window.ChartZoom);
+    if (window.Chart && ZP && Chart.registry && !Chart.registry.plugins.get('zoom')) Chart.register(ZP);
+  } catch (e) {}
 
   var RANGES = [
     {k:'7d',days:7},{k:'15d',days:15},{k:'30d',days:30},{k:'60d',days:60},
@@ -496,6 +505,13 @@
               title:function(items){ return new Date(items[0].parsed.x).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); },
               label:function(it){ return it.dataset.label+': '+Math.round(Number(it.parsed.y))+'%'; }
             }
+          },
+          // Pinch (mobile) / wheel (desktop) zoom + drag-pan on both axes. Constrained
+          // so you can't pan past the loaded data or zoom the y-axis past 0–100%.
+          zoom:{
+            limits:{ x:{min:'original', max:'original'}, y:{min:0, max:100, minRange:3} },
+            pan:{ enabled:true, mode:'xy' },
+            zoom:{ wheel:{enabled:true}, pinch:{enabled:true}, mode:'xy' }
           }
         }
       },
@@ -938,6 +954,48 @@
   function closeReport(){ document.getElementById('report-back').classList.remove('show'); }
 
   function renderAll(){ renderHeader(); renderPillars(); renderRanges(); renderChart(); renderLegend(); renderRankList(); renderManage(); }
+
+  // ── Double-tap to frame the data ──────────────────────────────────────────────
+  // Fit the y-axis to the lowest/highest plotted point currently in view, so the
+  // bottom point sits at the chart floor and the top point at the ceiling. Double-
+  // tap again restores the full 0–100% view. Uses the current visible x-window, so
+  // it respects any pinch/pan zoom already applied.
+  function fitChartY(chart){
+    var xs=chart.scales.x; if(!xs) return;
+    var xmin=xs.min, xmax=xs.max, lo=Infinity, hi=-Infinity;
+    chart.data.datasets.forEach(function(ds,i){
+      if(chart.getDatasetMeta(i).hidden) return;
+      ds.data.forEach(function(p){
+        if(!p||p.y==null||p.x<xmin||p.x>xmax) return;
+        if(p.y<lo) lo=p.y; if(p.y>hi) hi=p.y;
+      });
+    });
+    if(lo===Infinity) return;
+    if(hi-lo<1){ lo-=1; hi+=1; }            // flat line → give it a little height
+    var pad=(hi-lo)*0.03;                    // hair of breathing room so lines aren't clipped
+    chart.options.scales.y.min=Math.max(0, lo-pad);
+    chart.options.scales.y.max=Math.min(100, hi+pad);
+    chart._fitted=true; chart.update('none');
+  }
+  function resetChartY(chart){
+    chart.options.scales.y.min=0; chart.options.scales.y.max=100;
+    chart._fitted=false; chart.update('none');
+  }
+  function toggleChartFit(){ var c=state.chart; if(!c) return; c._fitted?resetChartY(c):fitChartY(c); }
+
+  (function attachChartGestures(){
+    var cv=document.getElementById('chart');
+    if(!cv) return;
+    cv.addEventListener('dblclick', function(e){ e.preventDefault(); toggleChartFit(); });
+    var lt=0, lx=0, ly=0;   // double-tap detector that ignores pinch/pan (single clean tap only)
+    cv.addEventListener('touchend', function(e){
+      if(e.changedTouches.length!==1 || e.touches.length!==0) return;
+      var t=e.changedTouches[0], now=Date.now();
+      if(now-lt<300 && Math.abs(t.clientX-lx)<30 && Math.abs(t.clientY-ly)<30){
+        e.preventDefault(); toggleChartFit(); lt=0;
+      } else { lt=now; lx=t.clientX; ly=t.clientY; }
+    }, {passive:false});
+  })();
 
   document.getElementById('export-btn').onclick=exportExcel;
   document.getElementById('logo').onclick=openReport;
