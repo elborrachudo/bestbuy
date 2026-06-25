@@ -494,7 +494,7 @@
               ticks:{display:false}, border:{display:false} },
           y:{ min:0, max:100, grid:{color:'rgba(255,255,255,0.05)'},
               border:{display:false},
-              ticks:{color:'#52525b', stepSize:20, font:{size:10}, callback:function(v){ return v+'%'; } } }
+              ticks:{color:'#52525b', stepSize:20, font:{size:10}, callback:function(v){ return Math.round(v)+'%'; } } }
         },
         plugins:{
           legend:{display:false},
@@ -973,8 +973,9 @@
     if(lo===Infinity) return;
     if(hi-lo<1){ lo-=1; hi+=1; }            // flat line → give it a little height
     var pad=(hi-lo)*0.03;                    // hair of breathing room so lines aren't clipped
-    chart.options.scales.y.min=Math.max(0, lo-pad);
-    chart.options.scales.y.max=Math.min(100, hi+pad);
+    // Snap bounds to whole percents so the y-axis never shows fractional ticks.
+    chart.options.scales.y.min=Math.max(0, Math.floor(lo-pad));
+    chart.options.scales.y.max=Math.min(100, Math.ceil(hi+pad));
     chart._fitted=true; chart.update('none');
   }
   function resetChartY(chart){
