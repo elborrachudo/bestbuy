@@ -77,11 +77,19 @@ noted it here.
   full strength — so XRP's low inflation alone pushed Fundamentals to 8.3 and the
   token to #1 STRONG BUY above AERO/CRV, which have real revenue. Root cause: the
   pillar carried no confidence penalty for thin coverage.
-- Fix: a coverage factor in `scoreFundamentals`. `coverage = nComponentsPresent / 2`;
-  with one component the score is shrunk toward the neutral 5.0:
-  `adjusted = 5 + (raw − 5) × coverage`. Both present → unchanged. XRP's Fundamentals
-  fell 8.3 → 6.7 and its final 7.0 → 6.1 (now BUY, clustered with CRV/AERO, not a
-  lone STRONG BUY). Pillar-level reweight (Fundamentals fully null) is unchanged.
+- Fix, part 1 — coverage factor in `scoreFundamentals`: `coverage = nComponentsPresent
+  / 2`; with one component the score is shrunk toward neutral 5.0,
+  `adjusted = 5 + (raw − 5) × coverage`. Both present → unchanged.
+- Fix, part 2 — emissions-only cap: when there is NO TVL/revenue at all, the pillar
+  rests entirely on emissions. Low inflation is the absence of a weakness, not a
+  demonstrated strength, so an emissions-only pillar earns **no credit above neutral**
+  (`adjusted = min(adjusted, 5.0)`) and cannot out-rank tokens with real TVL/revenue.
+  High inflation alone still penalizes (below-neutral passes through). TVL-only is
+  unaffected — TVL is a real fundamental.
+- Result: XRP Fundamentals 8.3 → **5.0** (flat — its inflation never crosses below
+  the neutral band), final 7.0 → **5.2 NEUTRAL**, dropping below the revenue tokens
+  CRV (6.0) and AERO (5.9). XRP's score now varies with Technicals (and future
+  Activity), not an emissions-inflated Fundamentals. Pillar-level reweight unchanged.
 - History recomputed in place from stored sub-scores (only `score_fundamentals` +
   `final_score` change) → no chart discontinuity.
 
