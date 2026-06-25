@@ -558,7 +558,7 @@
       nm.appendChild(document.createTextNode(t.name+' · '));
       nm.appendChild(el('span','price',fmtPrice(latest.price)));
       tok.appendChild(nm);
-      if(latest.reweighted) tok.appendChild(el('div','flag','fundamentals N/A · market-only'));
+      if(latest.reweighted) tok.appendChild(el('div','flag','market-only · fundamentals from emissions'));
       btn.appendChild(tok);
 
       var bar=el('div','score-bar'); var fill=el('span'); fill.style.width=pct+'%'; bar.appendChild(fill); btn.appendChild(bar);

@@ -62,8 +62,7 @@ export default async function handler(req, res) {
         const inflation = annualInflationAt(circSeries, nowT);
         const emiss = round1(scoreEmissions(inflation));
         // Re-derive pillars + blended final (sentiment stays null).
-        const fundamentals = row.reweighted ? null
-          : scoreFundamentals(num(row.score_tvl_rev), emiss, t.supply_mechanism);
+        const fundamentals = scoreFundamentals(num(row.score_tvl_rev), emiss, t.supply_mechanism);
         const technicals = scoreTechnicals(num(row.score_price_ma), num(row.score_below_high), num(row.score_rsi));
         const finalScore = blendPillars(fundamentals, technicals, null);
         if (emiss != null && emiss > 0) nonzero++;
