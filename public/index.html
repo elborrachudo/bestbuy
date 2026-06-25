@@ -674,13 +674,22 @@
       }
     });
 
-    // 6 — Conclusão
+    // 6 — Inflação (emissões de novas moedas)
+    var t6=topic('Inflação anual (moedas novas)','Quantas moedas novas entram em circulação por ano. Mais inflação = mais pressão de venda; menos é melhor.');
+    ranked.forEach(function(x){
+      var ir=x.l.emissions_rate, es=x.l.score_emissions;
+      var sv=es==null?null:Number(es);
+      var txt=ir==null?'sem dados': sv>=6.5?'baixa — pouca diluição': sv<=4.5?'alta — muita pressão de venda':'moderada';
+      t6.appendChild(rLine([x.t.symbol+': ', {n:(ir==null?'—':fmtPct(ir)+' ao ano'), c:clsScore(sv)}, ' — '+txt+'.']));
+    });
+
+    // 7 — Conclusão
     var top=ranked[0], bot=ranked[ranked.length-1];
-    var t6=topic('Conclusão',null);
-    t6.appendChild(rLine(['Hoje, o '+top.t.symbol+' reúne os melhores sinais, com ',
+    var t7=topic('Conclusão',null);
+    t7.appendChild(rLine(['Hoje, o '+top.t.symbol+' reúne os melhores sinais, com ',
       {n:fmtScore(Number(top.l.final_score))+'/10', c:clsScore(Number(top.l.final_score))}, '.']));
     if(bot!==top){
-      t6.appendChild(rLine(['O '+bot.t.symbol+' é o mais arriscado de momento, com ',
+      t7.appendChild(rLine(['O '+bot.t.symbol+' é o mais arriscado de momento, com ',
         {n:fmtScore(Number(bot.l.final_score))+'/10', c:clsScore(Number(bot.l.final_score))}, '.']));
     }
     body.appendChild(el('div','report-disc',
