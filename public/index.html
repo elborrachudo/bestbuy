@@ -34,7 +34,6 @@
   /* Bare pillar toggle icons (no pill/border/label) */
   .pillars{display:flex;gap:14px;justify-content:flex-end;align-items:center;}
   .pillar-ico{font-size:21px;line-height:1;cursor:pointer;transition:color .15s ease;}
-  .pillar-ico.inert{cursor:default;}
   .ranges{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;}
   .range-btn{background:var(--panel-2);color:var(--muted);border:1px solid transparent;border-radius:999px;
     font-size:12px;font-weight:600;padding:5px 10px;cursor:pointer;line-height:1;}
@@ -98,6 +97,13 @@
     font-size:22px;font-weight:700;cursor:pointer;line-height:1;flex:none;}
   .empty,.err{color:var(--muted);text-align:center;padding:30px 10px;font-size:14px;}
   .err{color:#f87171;}
+  /* Excel export */
+  .export{margin-top:14px;text-align:center;}
+  .export-btn{display:inline-flex;align-items:center;gap:8px;background:var(--panel-2);color:var(--text);
+    border:1px solid var(--line);border-radius:12px;padding:11px 16px;font-size:14px;font-weight:600;cursor:pointer;}
+  .export-btn:hover{border-color:rgba(52,211,153,.5);color:#34d399;}
+  .export-btn:disabled{opacity:.55;cursor:default;}
+  .export-note{color:var(--muted);font-size:11px;margin-top:7px;font-style:italic;}
   /* Clickable logo */
   .title{cursor:pointer;display:inline-block;}
   .title:active{opacity:.65;}
@@ -156,6 +162,12 @@
     </select>
     <button class="add-btn" id="add-btn" title="Add a token">+</button>
   </div>
+
+  <!-- Export all raw data to Excel -->
+  <div class="export">
+    <button class="export-btn" id="export-btn"><i class="ti ti-file-spreadsheet"></i> Descarregar dados (Excel)</button>
+    <div class="export-note" id="export-note"></div>
+  </div>
 </div>
 
 <!-- Benchmarking report (opens when the logo is tapped) -->
@@ -173,6 +185,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <script>
 (function(){
@@ -190,12 +203,12 @@
   var PILLAR_DEFS = [
     {key:'fundamentals', icon:'ti-building-bank', on:'#6399ed', off:'#2c3a52'},
     {key:'technicals',   icon:'ti-chart-candle',  on:'#a78bfa', off:'#3a3357'},
-    {key:'sentiment',    icon:'ti-flame',         on:'#3f3f46', off:'#3f3f46', inert:true}
+    {key:'activity',     icon:'ti-activity',       on:'#34d399', off:'#1f3a2e'}
   ];
-  var PILLAR_W = { fundamentals:45, technicals:35, sentiment:20 };
+  var PILLAR_W = { fundamentals:45, technicals:35, activity:20 };
 
   var state = { tokens:[], readingsByToken:{}, range:DEFAULT_RANGE, hidden:{}, openRow:null, chart:null,
-    pillars:{ fundamentals:true, technicals:true, sentiment:false } };
+    pillars:{ fundamentals:true, technicals:true, activity:true } };
 
   // Blend a reading from its stored pillar scores over the currently-active pillars.
   // Mirrors the server blend: null pillars drop and weights renormalize. Returns 0–10.
@@ -425,16 +438,15 @@
   };
 
   // ── pillar toggle icons ───────────────────────────────────────────────────────
+  var PILLAR_LABEL = { fundamentals:'Fundamentals', technicals:'Technicals', activity:'Atividade' };
   function renderPillars(){
     var box=document.getElementById('pillars'); box.innerHTML='';
     PILLAR_DEFS.forEach(function(p){
       var on=!!state.pillars[p.key];
-      var i=el('i','pillar-ico ti '+p.icon+(p.inert?' inert':''));
-      i.style.color = p.inert ? p.off : (on ? p.on : p.off);
-      i.title = p.key.charAt(0).toUpperCase()+p.key.slice(1)+(p.inert?' (sem dados)':'');
-      if(!p.inert){
-        i.onclick=function(){ state.pillars[p.key]=!state.pillars[p.key]; renderPillars(); renderChart(); renderRankList(); };
-      }
+      var i=el('i','pillar-ico ti '+p.icon);
+      i.style.color = on ? p.on : p.off;
+      i.title = PILLAR_LABEL[p.key]+(on?'':' (desligado)');
+      i.onclick=function(){ state.pillars[p.key]=!state.pillars[p.key]; renderPillars(); renderChart(); renderRankList(); };
       box.appendChild(i);
     });
   }
@@ -522,9 +534,14 @@
       {k:'RSI (14d)',           val:fmtNum(latest.rsi_14,1), d:delta('rsi_14',false)},
       {k:'TVL trend',           val:rew?'—':fmtUsd(latest.tvl),            d:rew?{txt:'n/a',cls:'na'}:delta('tvl',true)},
       {k:'Holders rev (ann.)',  val:rew?'—':fmtUsd(latest.holders_revenue),d:rew?{txt:'n/a',cls:'na'}:delta('holders_revenue',true)},
-      {k:'Inflation (annual)',  val:latest.emissions_rate==null?'n/a':fmtPct(latest.emissions_rate)+' / yr', d:delta('emissions_rate',false)}
+      {k:'Inflation (annual)',  val:latest.emissions_rate==null?'n/a':fmtPct(latest.emissions_rate)+' / yr', d:delta('emissions_rate',false)},
+      {k:'Endereços ativos',    val:fmtCount(latest.active_addresses), d:delta('active_addresses',true)},
+      {k:'Holders (on-chain)',  val:fmtCount(latest.holder_count),     d:delta('holder_count',true)},
+      {k:'Transferências',      val:fmtCount(latest.transfer_count),   d:delta('transfer_count',true)}
     ];
   }
+  // On-chain counts: "a recolher" while empty (live-only, accumulating) — never 0.
+  function fmtCount(n){ return (n==null||isNaN(n))?'a recolher':Number(n).toLocaleString('pt-PT'); }
 
   function fmtPrice(n){
     if(n==null||isNaN(n)) return '';
@@ -534,7 +551,7 @@
     return '$'+n.toFixed(n<0.1?4:3);
   }
   function verdictColor(s){ return s==null?'#a1a1aa': s>=6.5?'#34d399': s>=4.5?'#a1a1aa':'#f87171'; }
-  var PILLAR_BAR = { fundamentals:'#6399ed', technicals:'#a78bfa' };
+  var PILLAR_BAR = { fundamentals:'#6399ed', technicals:'#a78bfa', activity:'#34d399' };
 
   function renderRankList(){
     var box=document.getElementById('ranklist'); box.innerHTML='';
@@ -593,23 +610,23 @@
       var right=el('div','panel-pillars');
       var mini=el('div','pillars-mini');
       mini.appendChild(el('h4',null,'PILLARS'));
-      [{key:'fundamentals',lab:'Fundamentals'},{key:'technicals',lab:'Technicals'}].forEach(function(p){
+      [{key:'fundamentals',lab:'Fundamentals'},{key:'technicals',lab:'Technicals'},{key:'activity',lab:'Atividade'}].forEach(function(p){
         var val=latest['score_'+p.key];
         var pm=el('div','pmini');
         var head=el('div','pmini-head');
         head.appendChild(el('span','lab',p.lab));
-        head.appendChild(el('span','pv',val==null?'n/a':Number(val).toFixed(1)));
+        head.appendChild(el('span','pv',val==null?(p.key==='activity'?'a recolher':'n/a'):Number(val).toFixed(1)));
         pm.appendChild(head);
-        var tr=el('div','ptrack'); var fl=el('span');
-        fl.style.width=(val==null?0:Math.max(0,Math.min(100,Number(val)*10)))+'%';
-        fl.style.background=PILLAR_BAR[p.key];
-        tr.appendChild(fl); pm.appendChild(tr);
+        if(val==null && p.key==='activity'){
+          pm.appendChild(el('div','pmini-off','recolha on-chain a iniciar'));
+        } else {
+          var tr=el('div','ptrack'); var fl=el('span');
+          fl.style.width=(val==null?0:Math.max(0,Math.min(100,Number(val)*10)))+'%';
+          fl.style.background=PILLAR_BAR[p.key];
+          tr.appendChild(fl); pm.appendChild(tr);
+        }
         mini.appendChild(pm);
       });
-      var sm=el('div','pmini');
-      var smh=el('div','pmini-head'); smh.appendChild(el('span','lab','Sentiment')); sm.appendChild(smh);
-      sm.appendChild(el('div','pmini-off','not connected'));
-      mini.appendChild(sm);
       right.appendChild(mini);
       cols.appendChild(right);
 
@@ -658,6 +675,149 @@
       })
       .then(function(){ load(); })
       .catch(function(e){ alert('Failed to add: '+e.message); });
+  }
+
+  // ── Excel export — full raw archive, one sheet per token + consolidated ───────
+  // Honesty: every score's RAW inputs and the time-aligned price go in each row, so
+  // the series can be analysed later (e.g. Activity-vs-Price correlation). Activity
+  // cells are left BLANK (never 0) wherever there is no on-chain snapshot, and the
+  // Legenda sheet states the exact date Activity collection began.
+  var XLS_COLS = ['Data/hora','Tipo','Preço','Score Final','Fundamentals','Technicals','Atividade',
+    'TVL','Holders Revenue','Emissões %','MA50','MA200','RSI','Dist. do mínimo %',
+    'Endereços ativos','Holders','Transferências'];
+
+  function numOrBlank(v){ return (v==null||v===''||isNaN(Number(v))) ? null : Number(v); }
+  function rnd(v,d){ var n=numOrBlank(v); return n==null?null:Math.round(n*Math.pow(10,d))/Math.pow(10,d); }
+  function priceRound(v){ var n=numOrBlank(v); if(n==null) return null;
+    var a=Math.abs(n); return a>=1000?Math.round(n):a>=1?rnd(n,4):rnd(n,6); }
+
+  // Map one reading → a row array aligned to XLS_COLS. Activity raw stays blank (null)
+  // when absent so empty ≠ zero. `prefix` optionally prepends the Token column.
+  function readingToRow(r, prefix){
+    var row = [
+      new Date(r.fetched_at),
+      r.source_tier || (r.is_backfill?'backfill':'live'),
+      priceRound(r.price),
+      rnd(r.final_score,1), rnd(r.score_fundamentals,1), rnd(r.score_technicals,1), rnd(r.score_activity,1),
+      numOrBlank(r.tvl), numOrBlank(r.holders_revenue),
+      r.emissions_rate==null?null:rnd(Number(r.emissions_rate)*100,2),
+      numOrBlank(r.ma_50), numOrBlank(r.ma_200), rnd(r.rsi_14,1),
+      r.dist_from_low_pct==null?null:rnd(Number(r.dist_from_low_pct)*100,1),
+      numOrBlank(r.active_addresses), numOrBlank(r.holder_count), numOrBlank(r.transfer_count)
+    ];
+    return prefix==null ? row : [prefix].concat(row);
+  }
+
+  function sortedReadings(tid){
+    return (state.readingsByToken[tid]||[]).slice()
+      .sort(function(a,b){ return new Date(a.fetched_at)-new Date(b.fetched_at); });
+  }
+
+  // Earliest timestamp at which any on-chain activity was actually recorded (date X).
+  function activityStartDate(){
+    var min=null;
+    state.tokens.forEach(function(t){
+      (state.readingsByToken[t.id]||[]).forEach(function(r){
+        if(r.active_addresses!=null||r.holder_count!=null||r.transfer_count!=null){
+          var ms=new Date(r.fetched_at).getTime();
+          if(min==null||ms<min) min=ms;
+        }
+      });
+    });
+    return min;
+  }
+
+  function makeSheet(aoa, withToken){
+    var ws=XLSX.utils.aoa_to_sheet(aoa);
+    var widths=(withToken?[{wch:9}]:[]).concat(
+      [{wch:17},{wch:9},{wch:12},{wch:10},{wch:12},{wch:11},{wch:11},
+       {wch:15},{wch:15},{wch:11},{wch:12},{wch:12},{wch:8},{wch:15},
+       {wch:14},{wch:12},{wch:14}]);
+    ws['!cols']=widths;
+    ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(1,aoa.length-1),c:(withToken?XLS_COLS.length:XLS_COLS.length-1)}})};
+    return ws;
+  }
+
+  function legendSheet(startMs){
+    var X = startMs==null ? null : new Date(startMs);
+    var xTxt = X==null
+      ? 'AINDA NÃO COMEÇOU — não há registos de Atividade live até à data deste ficheiro.'
+      : ('começa em ' + ptDate(X.toISOString()) + ' (' + X.toISOString().slice(0,10) + ').');
+    var L=[
+      ['Compro o quê?! — arquivo de dados'],
+      [''],
+      ['IMPORTANTE — leia antes de analisar:'],
+      ['Fundamentals, Technicals e Preço têm ~1 ANO de histórico (reconstruído).'],
+      ['A coluna ATIVIDADE (on-chain) ' + xTxt],
+      ['Antes dessa data as células de Atividade estão VAZIAS (não é zero — é "sem dado").'],
+      ['Para correlacionar Atividade vs Preço, use APENAS as linhas a partir dessa data;'],
+      ['caso contrário estará a comparar preço real com células vazias e a tirar conclusões falsas.'],
+      [''],
+      ['Tipo de cada linha:'],
+      ['  backfill = reconstruído de dados históricos (1 ponto/dia).'],
+      ['  live = recolhido ao vivo no momento (3x/dia).'],
+      [''],
+      ['O que cada coluna significa:'],
+      ['  Preço — preço USD no momento da leitura (eixo para correlação).'],
+      ['  Score Final — nota 0–10 (mistura Fundamentals 45% / Technicals 35% / Atividade 20%).'],
+      ['  Fundamentals — TVL/receita + emissões (com fator de cobertura quando só há 1 componente).'],
+      ['  Technicals — preço vs médias, distância ao topo de 1 ano, RSI.'],
+      ['  Atividade — adoção on-chain: endereços ativos, crescimento de holders, transferências.'],
+      ['  TVL — valor depositado no protocolo (USD).'],
+      ['  Holders Revenue — receita anualizada (USD).'],
+      ['  Emissões % — inflação anual da oferta (mais baixo é melhor).'],
+      ['  MA50 / MA200 — médias móveis do preço.'],
+      ['  RSI — força relativa (0–100; <30 barato, >70 esticado).'],
+      ['  Dist. do mínimo % — quanto o preço está acima do mínimo de 1 ano.'],
+      ['  Endereços ativos / Holders / Transferências — métricas on-chain cruas (só live).'],
+      [''],
+      ['Gerado em ' + new Date().toISOString().slice(0,19).replace('T',' ') + ' UTC.'],
+      ['Isto não é aconselhamento financeiro.']
+    ];
+    var ws=XLSX.utils.aoa_to_sheet(L);
+    ws['!cols']=[{wch:95}];
+    return ws;
+  }
+
+  function exportExcel(){
+    if(typeof XLSX==='undefined'){ alert('Biblioteca Excel ainda a carregar — tente novamente num instante.'); return; }
+    var btn=document.getElementById('export-btn'); var note=document.getElementById('export-note');
+    btn.disabled=true;
+    try {
+      var startMs=activityStartDate();
+      var wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, legendSheet(startMs), 'Legenda');
+
+      var header=XLS_COLS.slice();
+      var actHdr='Atividade'+(startMs!=null?(' (desde '+new Date(startMs).toISOString().slice(0,10)+')'):' (sem dados)');
+      header[6]=actHdr;
+
+      // Consolidated "Todos" first, then one sheet per token.
+      var allRows=[['Token'].concat(header)];
+      state.tokens.forEach(function(t){
+        var rs=sortedReadings(t.id);
+        var sheetRows=[header.slice()];
+        rs.forEach(function(r){
+          sheetRows.push(readingToRow(r,null));
+          allRows.push(readingToRow(r,t.symbol));
+        });
+        var name=String(t.symbol).slice(0,31).replace(/[\\\/\?\*\[\]:]/g,'');
+        XLSX.utils.book_append_sheet(wb, makeSheet(sheetRows,false), name||('Token'+t.id.slice(0,4)));
+      });
+      // Insert "Todos" right after Legenda for visibility.
+      var todos=makeSheet(allRows,true);
+      XLSX.utils.book_append_sheet(wb, todos, 'Todos');
+      wb.SheetNames.splice(wb.SheetNames.indexOf('Todos'),1);
+      wb.SheetNames.splice(1,0,'Todos');
+
+      var fname='bestbuy_dados_'+new Date().toISOString().slice(0,10)+'.xlsx';
+      XLSX.writeFile(wb, fname);
+      note.textContent='Exportado: '+fname+(startMs==null?' · Atividade ainda sem registos.':'');
+    } catch(e){
+      note.textContent='Falha ao exportar: '+e.message;
+    } finally {
+      btn.disabled=false;
+    }
   }
 
   // ── benchmarking report (pt-PT) — opens on logo tap ──────────────────────────
@@ -779,6 +939,7 @@
 
   function renderAll(){ renderHeader(); renderPillars(); renderRanges(); renderChart(); renderLegend(); renderRankList(); renderManage(); }
 
+  document.getElementById('export-btn').onclick=exportExcel;
   document.getElementById('logo').onclick=openReport;
   document.getElementById('report-x').onclick=closeReport;
   document.getElementById('report-back').onclick=function(e){ if(e.target===this) closeReport(); };

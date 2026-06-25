@@ -3,9 +3,10 @@
 // Never writes a gap: on any per-token failure it still inserts the row with the
 // inputs it has and nulls the rest.
 
-import { getActiveTokens, sbInsert, recentReadingExists } from '../lib/tokens.js';
+import { getActiveTokens, sbInsert, recentReadingExists, getPrevActivitySnapshot } from '../lib/tokens.js';
 import { fetchTokenInputs } from '../lib/sources.js';
-import { buildReading, round1 } from '../lib/scoring.js';
+import { fetchActivityRaw } from '../lib/activity.js';
+import { buildReading, scoreActivity, round1 } from '../lib/scoring.js';
 
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL;
@@ -50,11 +51,27 @@ export default async function handler(req, res) {
       }
 
       const inputs = await fetchTokenInputs(t, cgKey);
+
+      // On-chain Activity (live only). Snapshot the raw counts, then score the FLOW
+      // against the previous live snapshot. No prior snapshot → score stays null
+      // (no fabricated history); the raw counts are still stored to seed the next.
+      const actRaw = await fetchActivityRaw(t);
+      let activityScore = null;
+      if (actRaw) {
+        const prev = await getPrevActivitySnapshot(base, serviceKey, t.id);
+        if (prev) {
+          const intervalDays = (now.getTime() - new Date(prev.fetched_at).getTime()) / 86400000;
+          activityScore = scoreActivity(prev, actRaw, intervalDays);
+        }
+      }
+      inputs.activityScore = activityScore;
+
       const r = buildReading(inputs);
 
       const row = {
         token_id: t.id,
         fetched_at: fetchedAt,
+        source_tier: 'live',
         final_score: r.final_score,
         score_price_ma: r.score_price_ma,
         score_below_high: r.score_below_high,
@@ -63,15 +80,19 @@ export default async function handler(req, res) {
         score_emissions: r.score_emissions,
         score_fundamentals: r.score_fundamentals,
         score_technicals: r.score_technicals,
-        score_sentiment: r.score_sentiment,
+        score_activity: r.score_activity,
         price: inputs.price,
         ma_50: inputs.ma50,
         ma_200: inputs.ma200,
         rsi_14: inputs.rsi14,
+        dist_from_low_pct: r.dist_from_low_pct,
         tvl: inputs.tvlNow,
         holders_revenue: inputs.holdersRevenue,
         circ_supply: inputs.circSupply,
         emissions_rate: r.emissions_rate,
+        active_addresses: actRaw ? actRaw.active_addresses : null,
+        holder_count: actRaw ? actRaw.holder_count : null,
+        transfer_count: actRaw ? actRaw.transfer_count : null,
         reweighted: r.reweighted,
         is_backfill: false,
       };
@@ -88,6 +109,9 @@ export default async function handler(req, res) {
         symbol: t.symbol,
         score: row.final_score,
         reweighted: r.reweighted,
+        activity: r.score_activity,
+        holders: row.holder_count,
+        transfers: row.transfer_count,
         failures: inputs._failures.length ? inputs._failures : undefined,
       });
     } catch (e) {

@@ -70,3 +70,54 @@ noted it here.
   values after running `/api/recompute-emissions` (they must differ across tokens, not all 0).
 - History is realigned in place by `/api/recompute-emissions` (only `emissions_rate`,
   `score_emissions`, `final_score` change) so the progression chart has no step at the fix.
+
+## Fundamentals coverage factor (fixes emissions-only domination)
+- A market-only token (no DeFi TVL/revenue) had its Fundamentals pillar built from
+  **emissions alone**, and `weightedBlend` renormalized that lone 40%-weight slot to
+  full strength — so XRP's low inflation alone pushed Fundamentals to 8.3 and the
+  token to #1 STRONG BUY above AERO/CRV, which have real revenue. Root cause: the
+  pillar carried no confidence penalty for thin coverage.
+- Fix: a coverage factor in `scoreFundamentals`. `coverage = nComponentsPresent / 2`;
+  with one component the score is shrunk toward the neutral 5.0:
+  `adjusted = 5 + (raw − 5) × coverage`. Both present → unchanged. XRP's Fundamentals
+  fell 8.3 → 6.7 and its final 7.0 → 6.1 (now BUY, clustered with CRV/AERO, not a
+  lone STRONG BUY). Pillar-level reweight (Fundamentals fully null) is unchanged.
+- History recomputed in place from stored sub-scores (only `score_fundamentals` +
+  `final_score` change) → no chart discontinuity.
+
+## Third pillar: Sentiment → Activity (on-chain adoption)
+- The stubbed Sentiment slot becomes **Activity** (`score_sentiment` renamed to
+  `score_activity`; pillar weights F45/T35/**A20**). Activity measures real on-chain
+  use: active addresses (40%), holder growth (35%), transfer flow (25%) — weights via
+  `W_ACTIVITY`, missing components drop and renormalize.
+- **Stock-vs-flow honesty:** the APIs give current state, so Activity is a FLOW
+  derived from the delta between two **live** snapshots. There is NO honest backfill —
+  `score_activity` and the raw counts are null for every backfilled day and until two
+  live snapshots exist. Never fabricated; empty ≠ zero everywhere (UI + Excel).
+- **Sources (keyless — no new secret):** EVM tokens (AERO/VIRTUAL on Base,
+  CRV/ONDO on Ethereum) use Blockscout v2 `/tokens/{contract}/counters`
+  (`token_holders_count`, `transfers_count`); active addresses isn't exposed
+  per-token by Blockscout → left null (honest gap). XRP uses public XRPL network
+  metrics (xrpscan) — **best-effort and unverified** (sandbox network policy blocked
+  live endpoint testing); it degrades to null if the response shape differs.
+- **chain ≠ token separation:** XRP's Activity is XRPL *chain* activity (accounts,
+  transactions) — never the TVL/revenue of DeFi protocols built on the XRPL, which
+  is not XRP's. XRP Fundamentals stays free of any XRPL-DeFi value.
+- Activity scoring curves (holder-growth band, transfer turnover) are provisional and
+  tunable once real live data accumulates; they affect nothing until then.
+
+## Raw-data archive (foundation for later correlation analysis)
+- `score_readings` is an append-only log that now stores, per reading, the RAW value
+  behind every score (`dist_from_low_pct`, `active_addresses`, `holder_count`,
+  `transfer_count`, alongside the existing `ma_50/200`, `rsi_14`, `tvl`,
+  `holders_revenue`, `emissions_rate`, `circ_supply`), the time-aligned `price`, and a
+  `source_tier` (`backfill`|`live`) provenance flag — so the full series (e.g.
+  Activity-vs-Price) is analysable months from now. `tracked_tokens` carries
+  `chain`/`chain_id`/`contract_address` for the on-chain fetch.
+
+## Excel export
+- Client-side **SheetJS** (CDN, buildless). One sheet per token + a consolidated
+  **Todos** + a **Legenda** first sheet. Activity cells are left BLANK (never 0)
+  through the backfill period, and the Legenda states the exact date Activity
+  collection began (or that it hasn't yet). Bold header cells aren't applied — the
+  free SheetJS community build can't write cell styles; column widths + autofilter are.
