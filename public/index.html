@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
-<title>BestBuy</title>
+<title>Compro o quê?!</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>📈</text></svg>" />
 <style>
   :root{
@@ -135,12 +135,12 @@
   </div>
 </div>
 
-<!-- Benchmarking report (opens when the BestBuy logo is tapped) -->
+<!-- Benchmarking report (opens when the logo is tapped) -->
 <div class="modal-back" id="report-back">
-  <div class="modal" role="dialog" aria-modal="true" aria-label="Relatório BestBuy">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Relatório Compro o quê?!">
     <div class="modal-head">
       <div>
-        <h2>Relatório BestBuy</h2>
+        <h2>Relatório Compro o quê?!</h2>
         <div class="when" id="report-when"></div>
       </div>
       <button class="modal-x" id="report-x" aria-label="Fechar">×</button>
@@ -587,7 +587,7 @@
     }
 
     // 1 — Nota geral
-    var t1=topic('Nota geral (1 a 10)','A nota BestBuy junta todos os sinais numa única pontuação fácil de ler.');
+    var t1=topic('Nota geral (1 a 10)','A nossa nota junta todos os sinais numa única pontuação fácil de ler.');
     ranked.forEach(function(x){
       var s=Number(x.l.final_score);
       t1.appendChild(rLine(['O '+x.t.symbol+' está com ', {n:fmtScore(s)+'/10', c:clsScore(s)}, ' — '+ptVerdict(s)+'.']));
