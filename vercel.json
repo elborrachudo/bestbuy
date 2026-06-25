@@ -8,7 +8,7 @@
   "functions": {
     "api/cron-fetch.js": { "maxDuration": 300 },
     "api/backfill.js": { "maxDuration": 300 },
-    "api/backfill-token.js": { "maxDuration": 120 },
+    "api/backfill-token.js": { "maxDuration": 300 },
     "api/recompute-emissions.js": { "maxDuration": 300 }
   }
 }
