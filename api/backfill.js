@@ -6,8 +6,11 @@
 //
 // Protected: requires `?secret=<CRON_SECRET>` (or Authorization: Bearer) when
 // CRON_SECRET is set, so it can't be triggered by the public. Optional query:
-//   ?days=365   how far back to seed (capped at 365 by CoinGecko free tier)
-//   ?reset=1    delete existing backfill rows for each token before reseeding
+//   ?days=365     how far back to seed (capped at 365 by CoinGecko free tier)
+//   ?reset=1      delete existing backfill rows for each token before reseeding
+//   ?symbol=LINK  restrict the reseed to a single token (case-insensitive); used to
+//                 backfill one token whose source was fixed (e.g. a newly-added slug)
+//                 without disturbing the others
 
 import { getActiveTokens } from '../lib/tokens.js';
 import { seedTokenHistory } from '../lib/seed.js';
@@ -34,12 +37,18 @@ export default async function handler(req, res) {
 
   const days = Math.min(parseInt((req.query && req.query.days) || '365', 10) || 365, 365);
   const reset = (req.query && req.query.reset) === '1';
+  const onlySymbol = ((req.query && req.query.symbol) || '').trim().toUpperCase();
 
   let tokens;
   try {
     tokens = await getActiveTokens(base, serviceKey);
   } catch (e) {
     res.status(500).json({ ok: false, error: `load tokens: ${e.message}` });
+    return;
+  }
+  if (onlySymbol) tokens = tokens.filter((t) => (t.symbol || '').toUpperCase() === onlySymbol);
+  if (onlySymbol && !tokens.length) {
+    res.status(404).json({ ok: false, error: `no active token with symbol ${onlySymbol}` });
     return;
   }
 
