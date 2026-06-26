@@ -3,10 +3,14 @@
 // Never writes a gap: on any per-token failure it still inserts the row with the
 // inputs it has and nulls the rest.
 
-import { getActiveTokens, sbInsert, recentReadingExists, getPrevActivitySnapshot } from '../lib/tokens.js';
+import {
+  getActiveTokens, sbInsert, recentReadingExists, getPrevActivitySnapshot,
+  getPrevReadingForSignals, getLastSignalDates,
+} from '../lib/tokens.js';
 import { fetchTokenInputs } from '../lib/sources.js';
 import { fetchActivityRaw } from '../lib/activity.js';
 import { buildReading, scoreActivity, round1 } from '../lib/scoring.js';
+import { detectLiveSignal } from '../lib/signals.js';
 
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL;
@@ -99,6 +103,10 @@ export default async function handler(req, res) {
         holders_revenue: inputs.holdersRevenue,
         circ_supply: inputs.circSupply,
         emissions_rate: r.emissions_rate,
+        stochrsi_14: inputs.stochrsi14,
+        macd_line: inputs.macdLine,
+        macd_signal: inputs.macdSignal,
+        macd_histogram: inputs.macdHistogram,
         active_addresses: actRaw ? actRaw.active_addresses : null,
         holder_count: actRaw ? actRaw.holder_count : null,
         transfer_count: actRaw ? actRaw.transfer_count : null,
@@ -115,6 +123,26 @@ export default async function handler(req, res) {
       }
 
       await sbInsert(base, serviceKey, 'score_readings', [row]);
+
+      // ── Graded signal (independent of the score/pillars) ──────────────────
+      // The RSI is the trigger; confluence only grades confidence. Crossovers use
+      // the previous reading; per-side 30d cooldown uses the last signal dates.
+      let firedSignal;
+      try {
+        const cur = {
+          rsi_14: row.rsi_14, stochrsi_14: row.stochrsi_14, macd_histogram: row.macd_histogram,
+          score_below_high: row.score_below_high, score_fundamentals: row.score_fundamentals,
+          score_activity: row.score_activity, price: row.price,
+        };
+        const prevR = await getPrevReadingForSignals(base, serviceKey, t.id, fetchedAt);
+        const last = await getLastSignalDates(base, serviceKey, t.id);
+        const sig = detectLiveSignal(cur, prevR, last.BUY, last.SELL, fetchedAt);
+        if (sig) {
+          await sbInsert(base, serviceKey, 'signals', [{ ...sig, token_id: t.id, is_backfill: false }]);
+          firedSignal = { side: sig.side, confidence: sig.confidence, strength: sig.strength };
+        }
+      } catch (e) { firedSignal = { error: e.message }; }
+
       summary.push({
         symbol: t.symbol,
         score: row.final_score,
@@ -122,6 +150,7 @@ export default async function handler(req, res) {
         activity: r.score_activity,
         holders: row.holder_count,
         transfers: row.transfer_count,
+        signal: firedSignal,
         activity_error: act.error || undefined,
         failures: inputs._failures.length ? inputs._failures : undefined,
       });

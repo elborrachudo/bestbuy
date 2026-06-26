@@ -39,6 +39,12 @@
     font-size:12px;font-weight:600;padding:5px 10px;cursor:pointer;line-height:1;}
   .range-btn.active{color:var(--accent);border-color:rgba(34,211,238,.4);}
   .chart-box{position:relative;height:230px;width:100%;}
+  #signal-tip{position:absolute;z-index:6;pointer-events:none;display:none;max-width:230px;
+    background:#15171f;border:1px solid #1e2130;border-radius:8px;padding:8px 10px;
+    font-size:11px;line-height:1.5;color:var(--text);box-shadow:0 6px 20px rgba(0,0,0,0.45);transform:translate(-50%,-100%);}
+  #signal-tip .st-h{font-weight:700;letter-spacing:0.02em;margin-bottom:2px;}
+  #signal-tip .st-row{color:var(--muted);}
+  #signal-tip .st-row b{color:var(--text);font-weight:600;}
   /* Legend chips */
   .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
   .chip{display:inline-flex;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--line);
@@ -342,7 +348,7 @@
         <div class="ranges" id="ranges"></div>
       </div>
     </div>
-    <div class="chart-box"><canvas id="chart"></canvas></div>
+    <div class="chart-box"><canvas id="chart"></canvas><div id="signal-tip"></div></div>
     <div class="legend" id="legend"></div>
   </div>
 
@@ -410,7 +416,7 @@
   ];
   var PILLAR_W = { fundamentals:45, technicals:35, activity:20 };
 
-  var state = { tokens:[], readingsByToken:{}, range:DEFAULT_RANGE, hidden:{}, openRow:null, chart:null,
+  var state = { tokens:[], readingsByToken:{}, signalsByToken:{}, range:DEFAULT_RANGE, hidden:{}, openRow:null, chart:null,
     pillars:{ fundamentals:true, technicals:true, activity:true } };
 
   // Blend a reading from its stored pillar scores over the currently-active pillars.
@@ -488,12 +494,16 @@
     }
     Promise.all([
       sbGet('tracked_tokens?active=eq.true&select=*&order=created_at.asc'),
-      sbGetAll('score_readings?select=*&order=fetched_at.asc')
+      sbGetAll('score_readings?select=*&order=fetched_at.asc'),
+      sbGet('signals?select=*&order=signal_date.asc').catch(function(){ return []; })
     ]).then(function(res){
       state.tokens = res[0];
       var byTok = {};
       res[1].forEach(function(row){ (byTok[row.token_id]=byTok[row.token_id]||[]).push(row); });
       state.readingsByToken = byTok;
+      var sigTok = {};
+      (res[2]||[]).forEach(function(s){ (sigTok[s.token_id]=sigTok[s.token_id]||[]).push(s); });
+      state.signalsByToken = sigTok;
       renderAll();
     }).catch(function(e){
       document.getElementById('ranklist').innerHTML = '<div class="err">Failed to load: '+e.message+'</div>';
@@ -562,6 +572,46 @@
         ctx.moveTo(ca.left,yBase); ctx.lineTo(ca.right,yBase); ctx.stroke();
         ctx.restore();
       }
+    }
+  };
+
+  // Graded BUY/SELL signal markers. BUY = green triangle up just below the line;
+  // SELL = red triangle down just above it. Size + opacity scale with confidence
+  // (0–10). Hit boxes are recorded on chart._sigHits for tap/hover details. This is
+  // the signals layer only — it never reads into or changes the score/pillars.
+  var signalMarkerPlugin = {
+    id:'signalMarkers',
+    afterDatasetsDraw:function(chart){
+      var ctx=chart.ctx, ca=chart.chartArea, xs=chart.scales.x, ys=chart.scales.y;
+      chart._sigHits=[];
+      if(!ca||!xs||!ys||!state.signalsByToken) return;
+      chart.data.datasets.forEach(function(ds){
+        if(ds.hidden) return;
+        var sigs=state.signalsByToken[ds.tokenId]; if(!sigs||!sigs.length) return;
+        var pts=ds.data;
+        sigs.forEach(function(s){
+          var ms=new Date(s.signal_date).getTime();
+          if(ms<xs.min||ms>xs.max) return;
+          // y comes from the nearest plotted point of this token's line.
+          var best=null,bd=Infinity;
+          for(var k=0;k<pts.length;k++){ var d=Math.abs(pts[k].x-ms); if(d<bd){bd=d;best=pts[k];} }
+          if(!best||bd>2*86400000) return;
+          var px=xs.getPixelForValue(ms), py=ys.getPixelForValue(best.y);
+          var conf=Number(s.confidence); if(isNaN(conf)) conf=4;
+          var half=4+(conf/10)*7;          // 4.7px (fraco) → 11px (forte)
+          var alpha=0.4+(conf/10)*0.6;     // 0.4 → 1.0
+          var buy=s.side==='BUY', col=buy?'34,197,94':'248,113,113', gap=5;
+          ctx.save(); ctx.beginPath();
+          if(buy){ var ty=py+gap; ctx.moveTo(px,ty); ctx.lineTo(px-half,ty+half*1.5); ctx.lineTo(px+half,ty+half*1.5); }
+          else   { var tb=py-gap; ctx.moveTo(px,tb); ctx.lineTo(px-half,tb-half*1.5); ctx.lineTo(px+half,tb-half*1.5); }
+          ctx.closePath();
+          ctx.fillStyle='rgba('+col+','+alpha+')';
+          ctx.strokeStyle='rgba('+col+',1)'; ctx.lineWidth=1;
+          ctx.fill(); ctx.stroke(); ctx.restore();
+          var cy=buy?py+gap+half:py-gap-half;
+          chart._sigHits.push({x:px,y:cy,r:half+7,sig:s,sym:ds.label,color:ds.borderColor});
+        });
+      });
     }
   };
 
@@ -721,11 +771,42 @@
           }
         }
       },
-      plugins:[greenZonePlugin, dualAxisPlugin]
+      plugins:[greenZonePlugin, signalMarkerPlugin, dualAxisPlugin]
     });
     // Keep the double-tap "fit to data" framing across rebuilds (legend/pillar/range
     // toggles all recreate the chart) — re-fit to whatever is now visible.
     if(state.fitY) fitChartY(state.chart);
+    setupSignalHover();
+  }
+
+  // Tap/hover a signal marker → floating detail card. Bound once to the canvas
+  // (which persists across chart rebuilds); reads the live chart's hit boxes.
+  function setupSignalHover(){
+    var cv=document.getElementById('chart'); if(!cv || cv._sigBound) return; cv._sigBound=true;
+    var tip=document.getElementById('signal-tip');
+    function fmtHist(h){ return h==null?'—':Number(h).toFixed(4); }
+    function hitAt(ox,oy){
+      var hits=(state.chart&&state.chart._sigHits)||[]; var best=null,bd=Infinity;
+      for(var i=0;i<hits.length;i++){ var dx=hits[i].x-ox, dy=hits[i].y-oy, d=dx*dx+dy*dy;
+        if(d<=hits[i].r*hits[i].r && d<bd){ bd=d; best=hits[i]; } }
+      return best;
+    }
+    function show(h){
+      var s=h.sig, buy=s.side==='BUY', col=buy?'#22c55e':'#f87171';
+      var date=new Date(s.signal_date).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+      tip.innerHTML=
+        '<div class="st-h" style="color:'+col+'">'+h.sym+' · '+s.side+' · '+(s.strength||'')+'</div>'+
+        '<div class="st-row">Confiança: <b>'+Number(s.confidence).toFixed(1)+'/10</b></div>'+
+        '<div class="st-row">RSI <b>'+(s.rsi_at_signal==null?'—':s.rsi_at_signal)+'</b> · StochRSI <b>'+(s.stochrsi_at_signal==null?'—':s.stochrsi_at_signal)+'</b></div>'+
+        '<div class="st-row">MACD hist <b>'+fmtHist(s.macd_hist_at_signal)+'</b></div>'+
+        '<div class="st-row">Confirmadores: <b>'+(s.confirmers||'RSI')+'</b></div>'+
+        '<div class="st-row">'+date+'</div>';
+      tip.style.left=h.x+'px'; tip.style.top=(h.y-8)+'px'; tip.style.display='block';
+    }
+    function hide(){ tip.style.display='none'; }
+    cv.addEventListener('pointermove',function(e){ var h=hitAt(e.offsetX,e.offsetY); if(h) show(h); else hide(); });
+    cv.addEventListener('pointerdown',function(e){ var h=hitAt(e.offsetX,e.offsetY); if(h){ show(h); e.stopPropagation(); } else hide(); });
+    cv.addEventListener('pointerleave',hide);
   }
 
   // ── legend chips ──────────────────────────────────────────────────────────────
