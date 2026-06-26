@@ -165,6 +165,33 @@ noted it here.
   circ_supply`, `emissions_rate`) — only `score_tvl_rev`/`score_fundamentals`/
   `final_score`/`reweighted` change, so the progression chart has no discontinuity.
 
+## Chart line = historical percentile (not absolute score)
+- **Two separate concepts, deliberately.** The **list** ranks tokens by the **absolute**
+  blended score (cross-token comparison) — unchanged. The **chart line** plots each
+  token's **historical percentile**: where each day's score sits versus that token's own
+  complete history. Best day → 100 (top/buy zone), worst → ~0 (bottom/sell zone),
+  median → ~50. This stretches the line across the full height instead of living in a
+  narrow band (e.g. AVAX was stuck ~68–72% plotting the absolute average).
+- **Percentile formula:** `percentile(v) = (count(scores ≤ v) − 1) / (n − 1) × 100`,
+  computed over the token's entire reading history. Best day = 100 always; the worst day
+  = 0 when its score is unique, or slightly above 0 when several days tie at the minimum
+  (chosen so equal scores always plot at equal heights — no fabricated separation).
+  Robust to outliers (a lone spike is just "the highest day", not a scale-blowing max).
+- **Wiggle fix (critical).** The percentile is computed **once against the full, fixed
+  history**, never against the visible window — so a given date's plotted value is
+  identical at every range (7d/15d/30d/1y/all) and zoom; the window only changes *which*
+  points are shown. The old "line moves in the past" came from the **double-tap fit-Y**,
+  which rescaled the y-axis to the visible min/max (a window-dependent renormalization).
+  That fit-Y behavior was removed; the y-axis is now fixed at 0–100. Double-tap/dbl-click
+  resets pan/zoom instead.
+- **Sell zone.** Mirror of the green buy zone: red gradient + dotted boundary below
+  `SELL_ZONE = 35` (buy stays green above `GOOD_ZONE = 65`). Thresholds are symmetric
+  around the 50th percentile; tune as desired.
+- **Signal triangles removed** from the chart (the percentile line *is* the read:
+  top = buy, bottom = sell). The `signals` table is retained in the DB — just not drawn.
+- **Hover** shows both numbers: e.g. `AVAX · percentil 82% · score 6.4`, so the absolute
+  reading isn't lost. Score and pillar math are untouched — only how the line is plotted.
+
 ## Excel export
 - Client-side **SheetJS** (CDN, buildless). One sheet per token + a consolidated
   **Todos** + a **Legenda** first sheet. Activity cells are left BLANK (never 0)

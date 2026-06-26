@@ -345,7 +345,7 @@
   <!-- Score progression chart ON TOP -->
   <div class="card">
     <div class="chart-head">
-      <span class="lbl">Score progression</span>
+      <span class="lbl">Score — percentil histórico</span>
       <div class="head-controls">
         <div class="pillars" id="pillars"></div>
         <div class="ranges" id="ranges"></div>
@@ -410,7 +410,8 @@
     {k:'90d',days:90},{k:'6m',days:182},{k:'1y',days:365},{k:'all',days:null}
   ];
   var DEFAULT_RANGE = '30d';
-  var GOOD_ZONE = 65;   // % — good-buy zone / dotted line on the 0–100 chart
+  var GOOD_ZONE = 65;   // % percentile — BUY zone (green) at the top of the chart
+  var SELL_ZONE = 35;   // % percentile — SELL zone (red) at the bottom, mirror of BUY
 
   var PILLAR_DEFS = [
     {key:'fundamentals', icon:'ti-building-bank', on:'#6399ed', off:'#2c3a52'},
@@ -433,6 +434,26 @@
       total += PILLAR_W[p.key]*Number(v); wsum += PILLAR_W[p.key];
     });
     return wsum===0 ? null : total/wsum;
+  }
+
+  // ── Historical percentile (chart line) ────────────────────────────────────────
+  // The chart plots each token's score as its PERCENTILE against that token's OWN
+  // COMPLETE, FIXED history — never the visible window. So a given day's plotted
+  // value is identical at every range/zoom/isolation (no "wiggle in the past"); the
+  // window only changes WHICH points are shown, never their value. Best day → 100,
+  // worst → 0, median → ~50. The absolute score is unchanged and still drives the list.
+  function tokenSortedScores(tid){
+    var a=(state.readingsByToken[tid]||[]).map(function(r){ return blendRow(r); })
+          .filter(function(v){ return v!=null; });
+    a.sort(function(x,y){ return x-y; });
+    return a;
+  }
+  function percentileOf(sorted, v){
+    if(v==null || sorted.length===0) return null;
+    if(sorted.length===1) return 50;
+    var lo=0, hi=sorted.length;                 // upper bound: count of values ≤ v
+    while(lo<hi){ var m=(lo+hi)>>1; if(sorted[m]<=v) lo=m+1; else hi=m; }
+    return Math.max(0, Math.min(100, (lo-1)/(sorted.length-1)*100));  // best→100, worst→0
   }
 
   // ── helpers ─────────────────────────────────────────────────────────────────
@@ -547,76 +568,41 @@
   }
 
   // ── chart ───────────────────────────────────────────────────────────────────
+  // BUY zone (green, top) + mirrored SELL zone (red, bottom) on the percentile axis.
   var greenZonePlugin = {
-    id:'greenZone',
+    id:'zones',
     beforeDatasetsDraw:function(chart){
       var ctx=chart.ctx, ca=chart.chartArea, y=chart.scales.y;
       if(!ca||!y) return;
-      // Nothing to draw when the BUY zone sits entirely above the visible window
-      // (happens in Fit mode when every score is below 6.5).
-      if(GOOD_ZONE >= y.max) return;
-      var topMax=y.getPixelForValue(100), yBase=y.getPixelForValue(GOOD_ZONE);
-      var fillTop=Math.max(ca.top, topMax), fillBase=Math.min(ca.bottom, yBase);
-      if(fillBase>fillTop){
-        var g=ctx.createLinearGradient(0,topMax,0,yBase);
-        g.addColorStop(0,'rgba(34,197,94,0.30)');
-        g.addColorStop(0.45,'rgba(34,197,94,0.13)');
-        g.addColorStop(1,'rgba(34,197,94,0.02)');
-        ctx.save();
-        ctx.fillStyle=g;
-        ctx.fillRect(ca.left,fillTop,ca.right-ca.left,fillBase-fillTop);
-        ctx.restore();
+      // shaded band between two percentile levels, fading away from the boundary,
+      // plus a dotted boundary line. `dir`=-1 fades upward (BUY), +1 downward (SELL).
+      function band(fromPct, toPct, rgb, dir){
+        var pHi=y.getPixelForValue(Math.max(fromPct,toPct)), pLo=y.getPixelForValue(Math.min(fromPct,toPct));
+        var top=Math.max(ca.top,pHi), base=Math.min(ca.bottom,pLo);
+        if(base>top){
+          var g=ctx.createLinearGradient(0, dir<0?pHi:pLo, 0, dir<0?pLo:pHi);
+          g.addColorStop(0,'rgba('+rgb+',0.30)');
+          g.addColorStop(0.45,'rgba('+rgb+',0.13)');
+          g.addColorStop(1,'rgba('+rgb+',0.02)');
+          ctx.save(); ctx.fillStyle=g; ctx.fillRect(ca.left,top,ca.right-ca.left,base-top); ctx.restore();
+        }
       }
-      // dotted baseline at 6.5, only when it falls inside the visible window
-      if(GOOD_ZONE>=y.min && GOOD_ZONE<=y.max){
-        ctx.save();
-        ctx.beginPath(); ctx.setLineDash([2,3]); ctx.lineWidth=1;
-        ctx.strokeStyle='rgba(34,197,94,0.30)';
-        ctx.moveTo(ca.left,yBase); ctx.lineTo(ca.right,yBase); ctx.stroke();
-        ctx.restore();
+      function dottedAt(pct, rgb){
+        if(pct<y.min||pct>y.max) return;
+        var yp=y.getPixelForValue(pct);
+        ctx.save(); ctx.beginPath(); ctx.setLineDash([2,3]); ctx.lineWidth=1;
+        ctx.strokeStyle='rgba('+rgb+',0.32)'; ctx.moveTo(ca.left,yp); ctx.lineTo(ca.right,yp); ctx.stroke(); ctx.restore();
       }
+      // BUY (green) from GOOD_ZONE up to 100, fading up toward the top.
+      if(GOOD_ZONE < y.max){ band(GOOD_ZONE, 100, '34,197,94', -1); dottedAt(GOOD_ZONE, '34,197,94'); }
+      // SELL (red) from 0 up to SELL_ZONE, fading down toward the floor.
+      if(SELL_ZONE > y.min){ band(0, SELL_ZONE, '248,113,113', 1); dottedAt(SELL_ZONE, '248,113,113'); }
     }
   };
 
-  // Graded BUY/SELL signal markers. BUY = green triangle up just below the line;
-  // SELL = red triangle down just above it. Size + opacity scale with confidence
-  // (0–10). Hit boxes are recorded on chart._sigHits for tap/hover details. This is
-  // the signals layer only — it never reads into or changes the score/pillars.
-  var signalMarkerPlugin = {
-    id:'signalMarkers',
-    afterDatasetsDraw:function(chart){
-      var ctx=chart.ctx, ca=chart.chartArea, xs=chart.scales.x, ys=chart.scales.y;
-      chart._sigHits=[];
-      if(!ca||!xs||!ys||!state.signalsByToken) return;
-      chart.data.datasets.forEach(function(ds){
-        if(ds.hidden) return;
-        var sigs=state.signalsByToken[ds.tokenId]; if(!sigs||!sigs.length) return;
-        var pts=ds.data;
-        sigs.forEach(function(s){
-          var ms=new Date(s.signal_date).getTime();
-          if(ms<xs.min||ms>xs.max) return;
-          // y comes from the nearest plotted point of this token's line.
-          var best=null,bd=Infinity;
-          for(var k=0;k<pts.length;k++){ var d=Math.abs(pts[k].x-ms); if(d<bd){bd=d;best=pts[k];} }
-          if(!best||bd>2*86400000) return;
-          var px=xs.getPixelForValue(ms), py=ys.getPixelForValue(best.y);
-          var conf=Number(s.confidence); if(isNaN(conf)) conf=4;
-          var half=4+(conf/10)*7;          // 4.7px (fraco) → 11px (forte)
-          var alpha=0.4+(conf/10)*0.6;     // 0.4 → 1.0
-          var buy=s.side==='BUY', col=buy?'34,197,94':'248,113,113', gap=5;
-          ctx.save(); ctx.beginPath();
-          if(buy){ var ty=py+gap; ctx.moveTo(px,ty); ctx.lineTo(px-half,ty+half*1.5); ctx.lineTo(px+half,ty+half*1.5); }
-          else   { var tb=py-gap; ctx.moveTo(px,tb); ctx.lineTo(px-half,tb-half*1.5); ctx.lineTo(px+half,tb-half*1.5); }
-          ctx.closePath();
-          ctx.fillStyle='rgba('+col+','+alpha+')';
-          ctx.strokeStyle='rgba('+col+',1)'; ctx.lineWidth=1;
-          ctx.fill(); ctx.stroke(); ctx.restore();
-          var cy=buy?py+gap+half:py-gap-half;
-          chart._sigHits.push({x:px,y:cy,r:half+7,sig:s,sym:ds.label,color:ds.borderColor});
-        });
-      });
-    }
-  };
+  // (Discrete BUY/SELL triangle markers were removed — the percentile line itself is
+  // the read: top = buy zone, bottom = sell zone. The `signals` table is kept in the
+  // DB but no longer drawn on the chart.)
 
   var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   var dualAxisPlugin = {
@@ -721,6 +707,7 @@
     var xMin = cutoff!=null ? cutoff : (earliest!==Infinity ? earliest : nowMs-30*86400000);
     var xMax = nowMs;
     var datasets=state.tokens.map(function(t){
+      var sorted=tokenSortedScores(t.id);   // FULL fixed history → percentile is window-invariant
       var rows=(state.readingsByToken[t.id]||[]).filter(function(r){
         var ms=new Date(r.fetched_at).getTime();
         return cutoff==null || ms>=cutoff;
@@ -731,9 +718,12 @@
         borderColor:t.color,
         backgroundColor:t.color,
         borderWidth:2,
-        // blended score → percentage (0–100), reblended live from active pillars
-        data:rows.map(function(r){ var b=blendRow(r); return {x:new Date(r.fetched_at).getTime(), y:b==null?null:b*10}; })
-                 .filter(function(p){ return p.y!=null; }),
+        // y = historical percentile (0–100) of the day's absolute score vs this token's
+        // whole history; `abs` keeps the underlying absolute score for the hover.
+        data:rows.map(function(r){
+               var abs=blendRow(r), pct=percentileOf(sorted, abs);
+               return {x:new Date(r.fetched_at).getTime(), y:pct==null?null:Math.round(pct*10)/10, abs:abs};
+             }).filter(function(p){ return p.y!=null; }),
         tension:0.4, pointRadius:0, pointHitRadius:8, spanGaps:true, hidden:!!state.hidden[t.id]
       };
     });
@@ -757,12 +747,12 @@
         plugins:{
           legend:{display:false},
           tooltip:{
-            enabled:false,   // off for now — tap/zoom no longer pops the readings overlay
+            enabled:true,   // shows the historical percentile AND the absolute score
             backgroundColor:'#15171f', borderColor:'#1e2130', borderWidth:1,
             titleColor:'#a1a1aa', bodyColor:'#f4f4f5', padding:10, displayColors:true,
             callbacks:{
               title:function(items){ return new Date(items[0].parsed.x).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); },
-              label:function(it){ return it.dataset.label+': '+Math.round(Number(it.parsed.y))+'%'; }
+              label:function(it){ var abs=it.raw&&it.raw.abs; return it.dataset.label+' · percentil '+Math.round(Number(it.parsed.y))+'% · score '+(abs==null?'—':Number(abs).toFixed(1)); }
             }
           },
           // Pinch (mobile) / wheel (desktop) zoom + drag-pan on both axes. Constrained
@@ -774,42 +764,8 @@
           }
         }
       },
-      plugins:[greenZonePlugin, signalMarkerPlugin, dualAxisPlugin]
+      plugins:[greenZonePlugin, dualAxisPlugin]
     });
-    // Keep the double-tap "fit to data" framing across rebuilds (legend/pillar/range
-    // toggles all recreate the chart) — re-fit to whatever is now visible.
-    if(state.fitY) fitChartY(state.chart);
-    setupSignalHover();
-  }
-
-  // Tap/hover a signal marker → floating detail card. Bound once to the canvas
-  // (which persists across chart rebuilds); reads the live chart's hit boxes.
-  function setupSignalHover(){
-    var cv=document.getElementById('chart'); if(!cv || cv._sigBound) return; cv._sigBound=true;
-    var tip=document.getElementById('signal-tip');
-    function fmtHist(h){ return h==null?'—':Number(h).toFixed(4); }
-    function hitAt(ox,oy){
-      var hits=(state.chart&&state.chart._sigHits)||[]; var best=null,bd=Infinity;
-      for(var i=0;i<hits.length;i++){ var dx=hits[i].x-ox, dy=hits[i].y-oy, d=dx*dx+dy*dy;
-        if(d<=hits[i].r*hits[i].r && d<bd){ bd=d; best=hits[i]; } }
-      return best;
-    }
-    function show(h){
-      var s=h.sig, buy=s.side==='BUY', col=buy?'#22c55e':'#f87171';
-      var date=new Date(s.signal_date).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
-      tip.innerHTML=
-        '<div class="st-h" style="color:'+col+'">'+h.sym+' · '+s.side+' · '+(s.strength||'')+'</div>'+
-        '<div class="st-row">Confiança: <b>'+Number(s.confidence).toFixed(1)+'/10</b></div>'+
-        '<div class="st-row">RSI <b>'+(s.rsi_at_signal==null?'—':s.rsi_at_signal)+'</b> · StochRSI <b>'+(s.stochrsi_at_signal==null?'—':s.stochrsi_at_signal)+'</b></div>'+
-        '<div class="st-row">MACD hist <b>'+fmtHist(s.macd_hist_at_signal)+'</b></div>'+
-        '<div class="st-row">Confirmadores: <b>'+(s.confirmers||'RSI')+'</b></div>'+
-        '<div class="st-row">'+date+'</div>';
-      tip.style.left=h.x+'px'; tip.style.top=(h.y-8)+'px'; tip.style.display='block';
-    }
-    function hide(){ tip.style.display='none'; }
-    cv.addEventListener('pointermove',function(e){ var h=hitAt(e.offsetX,e.offsetY); if(h) show(h); else hide(); });
-    cv.addEventListener('pointerdown',function(e){ var h=hitAt(e.offsetX,e.offsetY); if(h){ show(h); e.stopPropagation(); } else hide(); });
-    cv.addEventListener('pointerleave',hide);
   }
 
   // ── legend chips ──────────────────────────────────────────────────────────────
@@ -1293,45 +1249,22 @@
 
   function renderAll(){ renderHeader(); renderPillars(); renderRanges(); renderChart(); renderLegend(); renderRankList(); renderManage(); }
 
-  // ── Double-tap to frame the data ──────────────────────────────────────────────
-  // Fit the y-axis to the lowest/highest plotted point currently in view, so the
-  // bottom point sits at the chart floor and the top point at the ceiling. Double-
-  // tap again restores the full 0–100% view. Uses the current visible x-window, so
-  // it respects any pinch/pan zoom already applied.
-  function fitChartY(chart){
-    var xs=chart.scales.x; if(!xs) return;
-    var xmin=xs.min, xmax=xs.max, lo=Infinity, hi=-Infinity;
-    chart.data.datasets.forEach(function(ds,i){
-      if(chart.getDatasetMeta(i).hidden) return;
-      ds.data.forEach(function(p){
-        if(!p||p.y==null||p.x<xmin||p.x>xmax) return;
-        if(p.y<lo) lo=p.y; if(p.y>hi) hi=p.y;
-      });
-    });
-    if(lo===Infinity) return;
-    if(hi-lo<1){ lo-=1; hi+=1; }            // flat line → give it a little height
-    var pad=(hi-lo)*0.03;                    // hair of breathing room so lines aren't clipped
-    // Snap bounds to whole percents so the y-axis never shows fractional ticks.
-    chart.options.scales.y.min=Math.max(0, Math.floor(lo-pad));
-    chart.options.scales.y.max=Math.min(100, Math.ceil(hi+pad));
-    state.fitY=true; chart.update('none');
-  }
-  function resetChartY(chart){
-    chart.options.scales.y.min=0; chart.options.scales.y.max=100;
-    state.fitY=false; chart.update('none');
-  }
-  function toggleChartFit(){ var c=state.chart; if(!c) return; state.fitY?resetChartY(c):fitChartY(c); }
+  // ── Double-tap to reset zoom/pan ──────────────────────────────────────────────
+  // The y-axis is FIXED at 0–100 percentile and is never rescaled by the view — that
+  // (window-dependent y-fit) was the old "wiggle in the past". Double-tap/dbl-click
+  // just clears any pinch/pan zoom back to the full window.
+  function resetChartView(){ var c=state.chart; if(c && c.resetZoom) c.resetZoom(); }
 
   (function attachChartGestures(){
     var cv=document.getElementById('chart');
     if(!cv) return;
-    cv.addEventListener('dblclick', function(e){ e.preventDefault(); toggleChartFit(); });
+    cv.addEventListener('dblclick', function(e){ e.preventDefault(); resetChartView(); });
     var lt=0, lx=0, ly=0;   // double-tap detector that ignores pinch/pan (single clean tap only)
     cv.addEventListener('touchend', function(e){
       if(e.changedTouches.length!==1 || e.touches.length!==0) return;
       var t=e.changedTouches[0], now=Date.now();
       if(now-lt<300 && Math.abs(t.clientX-lx)<30 && Math.abs(t.clientY-ly)<30){
-        e.preventDefault(); toggleChartFit(); lt=0;
+        e.preventDefault(); resetChartView(); lt=0;
       } else { lt=now; lx=t.clientX; ly=t.clientY; }
     }, {passive:false});
   })();
