@@ -11,7 +11,7 @@ import { fetchTokenInputs } from '../lib/sources.js';
 import { fetchActivityRaw } from '../lib/activity.js';
 import { buildReading, scoreActivity, round1 } from '../lib/scoring.js';
 import { detectLiveSignal } from '../lib/signals.js';
-import { getBtcDailySeries, classifyPhase } from '../lib/cycle.js';
+import { getBtcDailySeries, classifyLatest } from '../lib/cycle.js';
 
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL;
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     if (btc.length) {
       const prices = btc.map((p) => p.price);
       const i = prices.length - 1;
-      const { phase, indicators } = classifyPhase(prices, i);
+      const { phase, indicators } = classifyLatest(prices);   // 4-indicator consensus + hysteresis
       currentPhase = phase;
       await sbUpsert(base, serviceKey, 'market_cycle', [{
         cycle_date: new Date(btc[i].ts).toISOString().slice(0, 10),

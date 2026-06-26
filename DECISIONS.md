@@ -231,16 +231,38 @@ noted it here.
 - **NOT implemented (tested & rejected upstream):** fixed stop-loss, confidence-sizing,
   strategy-switching regime detector, automatic Elliott Wave. Guardrail respected.
 
-## Phase 2 — prepared, not implemented (needs data that accrues)
-- **MVRV Z-Score / NUPL detector** to replace the price/MA placeholder. Candidate free
-  sources to investigate: Coinglass / bitcoin-data.com style public endpoints, blockchain
-  on-chain providers' free tiers; none wired yet (most gate MVRV behind keys). Document &
-  swap in when a reliable keyless source is confirmed. Optional: global M2 as a liquidity
-  confirmer.
+## Phase 2 — robust price-only cycle detector (IMPLEMENTED; replaces the placeholder)
+- **No paid MVRV.** Literal MVRV needs on-chain realized cap (paid). Instead `cycle.js` now
+  combines FOUR indicators computed entirely from BTC daily price — measuring the same
+  "price vs cycle cost-basis / over-under-valuation":
+  1. **Mayer Multiple** = price / 200d MA (<0.8 cheap, 1.0–2.4 normal, >2.4 hot top).
+  2. **200-week MA** (1400d Bull Market Support Band) — `ma200w_partial=true` honestly when
+     <1400d of history exists (today we only have ~365d → it's the longest-available avg).
+  3. **ATH drawdown** = (price − running ATH)/ATH (the Oct-2025 top is inside the 365d
+     window, so drawdown is meaningful).
+  4. **Price percentile** (point-in-time, expanding window — no lookahead).
+- **Consensus, not one indicator.** The 2025 top printed Mayer ~2.2 (below the classic
+  2.4) — institutionalization/ETFs made it less euphoric — so a single-indicator detector
+  would miss it. Phase = consensus of the four (see `rawPhase`).
+- **Hysteresis** — a phase only flips after the new condition holds ≥3 consecutive days
+  (no day-to-day flip-flop). **Confidence (0–1)** from how extreme the dominant Mayer is,
+  stored in `market_cycle.indicator_values.phase_confidence` and shown in the banner.
+- **The Phase-1 gate is unchanged** (accumulation=buys / euphoria+correction=sells; correction
+  still hard-blocks buys regardless of confidence). The detector only got smarter.
+- **Honest limits.** 200W MA is `partial` until ~4 years of BTC accrue; price percentile is
+  over the available window (~1yr), not all-time; the 2018/2021/2022 milestones can't be
+  reproduced (out of the 365d window) — only the 2025 top + today are in range. A degenerate
+  flat/at-ATH series reads euphoria (correct for real tops; not a concern for the current
+  −52%-from-ATH market, which reads correction/accumulation).
+- **Frontend.** Cycle chart adds a faint 200W-MA guide line (base-100); banner shows the
+  current phase + confidence + Mayer.
+
+## Phase 2 remainder — still prepared, NOT implemented (awaiting go)
 - **Asset survivorship filter** — down-weight/exclude assets in prolonged structural
   decline (below a falling MA200 for many months) to avoid "ONDOs".
 - **Phase-based sizing + DCA** — larger size in accumulation, smaller in rise; staged DCA
   in accumulation; partial (non-binary) realization in euphoria.
+- Optional: global M2 as a liquidity confirmer.
 - **Honest warnings.** (a) The long-term/cycle view only becomes reliable with YEARS of
   history; today there's ~1 year — it's built now and matures over time. (b) MVRV/NUPL are
   BTC = a GLOBAL traffic light, not per-asset. (c) The 4-year cycle is changing

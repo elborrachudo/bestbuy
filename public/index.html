@@ -816,14 +816,18 @@
     var box=document.getElementById('regime'); if(!box) return;
     var cur=state.cycle.length? state.cycle[state.cycle.length-1] : null;
     var ph=cur? cur.phase : null;
+    var iv=cur && cur.indicator_values ? cur.indicator_values : null;
+    var conf=iv && iv.phase_confidence!=null ? Math.round(Number(iv.phase_confidence)*100) : null;
+    var confTxt=conf!=null ? ' · confiança '+conf+'%' : '';
+    var mayerTxt=iv && iv.mayer!=null ? ' · Mayer '+Number(iv.mayer).toFixed(2) : '';
     if(state.view==='long'){
       var chips=Object.keys(PHASE_PT).map(function(k){ return '<span style="color:'+PHASE_COL[k]+';font-weight:700">●</span> '+PHASE_PT[k]; }).join(' &nbsp; ');
-      box.innerHTML='Fases: '+chips+(ph? ' &nbsp;·&nbsp; <b>agora: <span class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph]+'</span></b>':'')+
-        ' &nbsp;·&nbsp; BTC e ativos em base-100 (eixo log) para serem comparáveis.';
+      box.innerHTML='Fases: '+chips+(ph? ' &nbsp;·&nbsp; <b>agora: <span class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph]+'</span>'+confTxt+mayerTxt+'</b>':'')+
+        ' &nbsp;·&nbsp; BTC base-100 (eixo log); detetor: Mayer + 200W MA + drawdown + percentil.';
     } else {
       var pa=portfolioAlpha(); var aTxt=pa==null?'':' &nbsp;·&nbsp; Carteira: <b>'+(pa>=0?'+':'')+pa.toFixed(0)+'pp</b> vs segurar';
       box.innerHTML=ph
-        ? 'Ciclo: <b class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph].toUpperCase()+'</b> — sinais condicionados: '+PHASE_RULE[ph]+'.'+aTxt
+        ? 'Ciclo: <b class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph].toUpperCase()+'</b>'+confTxt+' — sinais condicionados: '+PHASE_RULE[ph]+'.'+aTxt
         : 'Ciclo de mercado: a aguardar dados (Fase 1).'+aTxt;
     }
   }
@@ -863,6 +867,9 @@
       label:'BTC', data:btcData, borderColor:'#9aa', borderWidth:2.4, pointRadius:0, tension:0.25, spanGaps:true,
       segment:{ borderColor:function(c){ var ph=c.p0.raw&&c.p0.raw.phase; return PHASE_COL[ph]||'#9aa'; } }
     }];
+    // 200W MA (Bull Market Support Band) guide line, base-100 (faint; partial when <1400d)
+    var maData=cyc.map(function(r){ var iv=r.indicator_values||{}; return {x:new Date(r.cycle_date).getTime(), y:(btc0&&iv.ma200w!=null)?Number(iv.ma200w)/btc0*100:null}; });
+    if(maData.some(function(p){return p.y!=null;})) datasets.push({ label:'200W MA', data:maData, borderColor:'#64748b', borderWidth:1.2, borderDash:[2,3], pointRadius:0, tension:0.25, spanGaps:true });
     // asset overlays (those currently selected) — base-100 over their own history, dashed
     state.tokens.forEach(function(t){
       if(state.hidden[t.id]) return;
