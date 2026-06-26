@@ -462,6 +462,17 @@
 
   function renderChart(){
     var cutoff=rangeCutoff();
+    // Bound the x-axis explicitly so it never sprawls into random future years when
+    // no points are visible (all tokens hidden, or an empty range). max = now; min =
+    // the range cutoff, or — for "all" — the earliest reading we have.
+    var nowMs=Date.now(), earliest=Infinity;
+    Object.keys(state.readingsByToken).forEach(function(tid){
+      (state.readingsByToken[tid]||[]).forEach(function(r){
+        var ms=new Date(r.fetched_at).getTime(); if(ms<earliest) earliest=ms;
+      });
+    });
+    var xMin = cutoff!=null ? cutoff : (earliest!==Infinity ? earliest : nowMs-30*86400000);
+    var xMax = nowMs;
     var datasets=state.tokens.map(function(t){
       var rows=(state.readingsByToken[t.id]||[]).filter(function(r){
         var ms=new Date(r.fetched_at).getTime();
@@ -490,7 +501,7 @@
         layout:{padding:{bottom:34, top:4, left:2, right:6}},
         interaction:{mode:'nearest',intersect:false},
         scales:{
-          x:{ type:'linear', min:cutoff==null?undefined:cutoff, grid:{display:false},
+          x:{ type:'linear', min:xMin, max:xMax, grid:{display:false},
               ticks:{display:false}, border:{display:false} },
           y:{ min:0, max:100, grid:{color:'rgba(255,255,255,0.05)'},
               border:{display:false},
