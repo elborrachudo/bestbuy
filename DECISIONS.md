@@ -192,6 +192,60 @@ noted it here.
 - **Hover** shows both numbers: e.g. `AVAX · percentil 82% · score 6.4`, so the absolute
   reading isn't lost. Score and pillar math are untouched — only how the line is plotted.
 
+## Market-cycle phase + phase-conditioned signals (Phase 1)
+- **What it is.** A GLOBAL market-cycle detector (via BTC, not per-asset) classifying the
+  market into 4 phases — `accumulation`, `rise`, `euphoria`, `correction` — stored in
+  `market_cycle` (date, btc_price, phase, indicator_values), updated by the cron.
+- **Phase 1 detector is a PLACEHOLDER (price/MA).** `lib/cycle.js`: long MA (200d where
+  available, else longest window), distance above/below it, and 30d momentum:
+  - `euphoria`: >40% above the long MA AND >10% 30d momentum.
+  - `rise`: at/above the long MA.
+  - `correction`: below the long MA and 30d momentum < 0 (still falling).
+  - `accumulation`: below the long MA but momentum ≥ 0 (stabilizing).
+  The reliable version (Phase 2) is **MVRV Z-Score / NUPL** — see below. The phase is a
+  probabilistic CONTEXT, never a calendar/certainty.
+- **Signal conditioning (the biggest lever).** The contrarian signals (RSI≤22/≥78 +
+  cooldown + StochRSI/MACD confluence) are unchanged in nature, but a phase gate now
+  decides whether a triggered candidate fires:
+  - `accumulation` → BUYs only (sells suppressed)
+  - `rise` → both
+  - `euphoria` → SELLs only (buys suppressed)
+  - `correction` → SELLs only — **buys suppressed** (stop buying the falling knife: this
+    is what kept the system buying ONDO/AVAX into a structural decline)
+  "Início de rise → só BUYs" from the brief is folded into `rise → both` for now
+  (placeholder); refine with the MVRV detector in Phase 2. Each signal records its
+  `cycle_phase` (audit).
+- **Signal state machine fix.** A SELL now fires only when a position is OPEN (a prior
+  BUY not yet closed) — no more orphan sells (13 tokens previously opened with a context-
+  less SELL). A BUY opens/holds the position; a SELL closes it. Cooldown/position advance
+  only on EMITTED signals (a phase-suppressed candidate doesn't reset them).
+- **Alpha vs buy&hold** is the headline metric (preservation strategy): per asset and
+  portfolio, strategy return − buy&hold return (pp), shown in the UI ("protegeu +Xpp vs
+  segurar"). Strategy = $50 per BUY, sell all on SELL, open units marked at last price;
+  benchmark = same capital bought at the first BUY and held.
+- **Two charts** (tap the title): *Sinais de entrada* (the percentile line + buy/sell
+  zones, no triangles) and *Ciclo de mercado* (BTC base-100 colored by phase + phase
+  background bands + asset overlays base-100 on a log axis so BTC and altcoins are
+  comparable). A discrete text regime banner states how the current phase conditions the
+  signals.
+- **NOT implemented (tested & rejected upstream):** fixed stop-loss, confidence-sizing,
+  strategy-switching regime detector, automatic Elliott Wave. Guardrail respected.
+
+## Phase 2 — prepared, not implemented (needs data that accrues)
+- **MVRV Z-Score / NUPL detector** to replace the price/MA placeholder. Candidate free
+  sources to investigate: Coinglass / bitcoin-data.com style public endpoints, blockchain
+  on-chain providers' free tiers; none wired yet (most gate MVRV behind keys). Document &
+  swap in when a reliable keyless source is confirmed. Optional: global M2 as a liquidity
+  confirmer.
+- **Asset survivorship filter** — down-weight/exclude assets in prolonged structural
+  decline (below a falling MA200 for many months) to avoid "ONDOs".
+- **Phase-based sizing + DCA** — larger size in accumulation, smaller in rise; staged DCA
+  in accumulation; partial (non-binary) realization in euphoria.
+- **Honest warnings.** (a) The long-term/cycle view only becomes reliable with YEARS of
+  history; today there's ~1 year — it's built now and matures over time. (b) MVRV/NUPL are
+  BTC = a GLOBAL traffic light, not per-asset. (c) The 4-year cycle is changing
+  (institutionalization/ETFs) — probabilistic context, never a deterministic calendar.
+
 ## Excel export
 - Client-side **SheetJS** (CDN, buildless). One sheet per token + a consolidated
   **Todos** + a **Legenda** first sheet. Activity cells are left BLANK (never 0)

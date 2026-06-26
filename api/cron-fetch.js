@@ -4,13 +4,14 @@
 // inputs it has and nulls the rest.
 
 import {
-  getActiveTokens, sbInsert, recentReadingExists, getPrevActivitySnapshot,
+  getActiveTokens, sbInsert, sbUpsert, recentReadingExists, getPrevActivitySnapshot,
   getPrevReadingForSignals, getLastSignalDates,
 } from '../lib/tokens.js';
 import { fetchTokenInputs } from '../lib/sources.js';
 import { fetchActivityRaw } from '../lib/activity.js';
 import { buildReading, scoreActivity, round1 } from '../lib/scoring.js';
 import { detectLiveSignal } from '../lib/signals.js';
+import { getBtcDailySeries, classifyPhase } from '../lib/cycle.js';
 
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL;
@@ -36,6 +37,24 @@ export default async function handler(req, res) {
   const now = new Date();
   const fetchedAt = now.toISOString();
   const summary = [];
+
+  // Global market-cycle phase (via BTC) — computed once per run, conditions every
+  // token's signal and is recorded in market_cycle. Best-effort: if BTC fetch fails,
+  // the phase stays null and signals fall back to unconditioned behavior.
+  let currentPhase = null;
+  try {
+    const btc = await getBtcDailySeries(365, cgKey);
+    if (btc.length) {
+      const prices = btc.map((p) => p.price);
+      const i = prices.length - 1;
+      const { phase, indicators } = classifyPhase(prices, i);
+      currentPhase = phase;
+      await sbUpsert(base, serviceKey, 'market_cycle', [{
+        cycle_date: new Date(btc[i].ts).toISOString().slice(0, 10),
+        btc_price: prices[i], phase, indicator_values: indicators, updated_at: fetchedAt,
+      }], 'cycle_date');
+    }
+  } catch (e) { summary.push({ cycle_error: e.message }); }
 
   let tokens;
   try {
@@ -136,10 +155,10 @@ export default async function handler(req, res) {
         };
         const prevR = await getPrevReadingForSignals(base, serviceKey, t.id, fetchedAt);
         const last = await getLastSignalDates(base, serviceKey, t.id);
-        const sig = detectLiveSignal(cur, prevR, last.BUY, last.SELL, fetchedAt);
+        const sig = detectLiveSignal(cur, prevR, last.BUY, last.SELL, fetchedAt, currentPhase);
         if (sig) {
           await sbInsert(base, serviceKey, 'signals', [{ ...sig, token_id: t.id, is_backfill: false }]);
-          firedSignal = { side: sig.side, confidence: sig.confidence, strength: sig.strength };
+          firedSignal = { side: sig.side, confidence: sig.confidence, strength: sig.strength, phase: sig.cycle_phase };
         }
       } catch (e) { firedSignal = { error: e.message }; }
 

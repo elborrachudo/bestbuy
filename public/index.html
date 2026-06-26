@@ -30,6 +30,11 @@
   .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:16px;}
   .chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px;}
   .chart-head .lbl{font-size:14px;font-weight:600;color:var(--text);padding-top:4px;}
+  .lbl-toggle{background:none;border:none;cursor:pointer;font-family:inherit;letter-spacing:0.01em;}
+  .lbl-toggle:hover{color:var(--accent);}
+  .regime{font-size:11px;color:var(--muted);margin:0 0 6px;line-height:1.4;}
+  .regime b{color:var(--text);font-weight:600;}
+  .regime .ph{font-weight:700;}
   .head-controls{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
   /* Bare pillar toggle icons (no pill/border/label) */
   .pillars{display:flex;gap:14px;justify-content:flex-end;align-items:center;}
@@ -66,6 +71,7 @@
   .tok .nm{color:var(--muted);font-size:12.5px;margin-top:2px;}
   .tok .nm .price{color:var(--text);font-weight:600;}
   .flag{color:var(--muted);font-style:italic;font-size:11px;margin-top:3px;}
+  .alpha{font-size:11px;font-weight:600;margin-top:3px;}
   /* Collapsed-row score bar (black track, green fill = blended %) */
   .score-bar{width:62px;height:6px;background:#000;border-radius:3px;overflow:hidden;flex:none;}
   .score-bar > span{display:block;height:100%;background:var(--good);border-radius:3px;}
@@ -345,12 +351,13 @@
   <!-- Score progression chart ON TOP -->
   <div class="card">
     <div class="chart-head">
-      <span class="lbl">Score — percentil histórico</span>
+      <button class="lbl lbl-toggle" id="view-toggle" title="Tocar para alternar vista">Sinais de entrada ⤢</button>
       <div class="head-controls">
         <div class="pillars" id="pillars"></div>
         <div class="ranges" id="ranges"></div>
       </div>
     </div>
+    <div class="regime" id="regime"></div>
     <div class="chart-box"><canvas id="chart"></canvas><div id="signal-tip"></div></div>
     <div class="legend" id="legend"></div>
   </div>
@@ -420,8 +427,18 @@
   ];
   var PILLAR_W = { fundamentals:45, technicals:35, activity:20 };
 
-  var state = { tokens:[], readingsByToken:{}, signalsByToken:{}, range:DEFAULT_RANGE, hidden:{}, openRow:null, chart:null,
+  var state = { tokens:[], readingsByToken:{}, signalsByToken:{}, cycle:[], view:'short', range:DEFAULT_RANGE, hidden:{}, openRow:null, chart:null,
     pillars:{ fundamentals:true, technicals:true, activity:true } };
+
+  // Market-cycle phase palette + how each phase conditions the contrarian signals.
+  var PHASE_COL = { accumulation:'#22c55e', rise:'#3b82f6', euphoria:'#f59e0b', correction:'#a855f7' };
+  var PHASE_PT = { accumulation:'Acumulação', rise:'Subida', euphoria:'Euforia', correction:'Correção' };
+  var PHASE_RULE = {
+    accumulation:'só compras (vendas suprimidas)',
+    rise:'compras e vendas',
+    euphoria:'só vendas (compras suprimidas)',
+    correction:'só vendas — compras suprimidas (não apanhar a faca)'
+  };
 
   // Blend a reading from its stored pillar scores over the currently-active pillars.
   // Mirrors the server blend: null pillars drop and weights renormalize. Returns 0–10.
@@ -519,7 +536,8 @@
     Promise.all([
       sbGet('tracked_tokens?active=eq.true&select=*&order=created_at.asc'),
       sbGetAll('score_readings?select=*&order=fetched_at.asc'),
-      sbGet('signals?select=*&order=signal_date.asc').catch(function(){ return []; })
+      sbGet('signals?select=*&order=signal_date.asc').catch(function(){ return []; }),
+      sbGet('market_cycle?select=*&order=cycle_date.asc').catch(function(){ return []; })
     ]).then(function(res){
       state.tokens = res[0];
       var byTok = {};
@@ -528,6 +546,7 @@
       var sigTok = {};
       (res[2]||[]).forEach(function(s){ (sigTok[s.token_id]=sigTok[s.token_id]||[]).push(s); });
       state.signalsByToken = sigTok;
+      state.cycle = res[3] || [];
       renderAll();
     }).catch(function(e){
       document.getElementById('ranklist').innerHTML = '<div class="err">Failed to load: '+e.message+'</div>';
@@ -694,6 +713,8 @@
   }
 
   function renderChart(){
+    renderRegime();
+    if(state.view==='long'){ renderCycleChart(); return; }
     var cutoff=rangeCutoff();
     // Bound the x-axis explicitly so it never sprawls into random future years when
     // no points are visible (all tokens hidden, or an empty range). max = now; min =
@@ -765,6 +786,106 @@
         }
       },
       plugins:[greenZonePlugin, dualAxisPlugin]
+    });
+  }
+
+  // ── Alpha vs buy&hold (preservation metric) ───────────────────────────────────
+  // Strategy: buy $50 on each BUY (units += 50/price); on each SELL sell ALL units.
+  // Open units marked at last price. Benchmark = same capital bought at the first BUY
+  // and held. alpha (pp) = strategy return − buy&hold return.
+  function alphaForToken(tid){
+    var sigs=(state.signalsByToken[tid]||[]).slice().sort(function(a,b){ return new Date(a.signal_date)-new Date(b.signal_date); });
+    var rows=state.readingsByToken[tid]||[]; if(!rows.length) return null;
+    var lastPrice=Number(rows[rows.length-1].price);
+    var units=0, invested=0, cash=0, firstBuyPrice=null;
+    sigs.forEach(function(s){ var p=Number(s.price_at_signal); if(!(p>0)) return;
+      if(s.side==='BUY'){ units+=50/p; invested+=50; if(firstBuyPrice==null) firstBuyPrice=p; }
+      else if(s.side==='SELL' && units>0){ cash+=units*p; units=0; } });
+    if(invested<=0||firstBuyPrice==null||!(lastPrice>0)) return null;
+    var stratVal=cash+units*lastPrice, stratRet=(stratVal-invested)/invested, bhRet=lastPrice/firstBuyPrice-1;
+    return { stratRet:stratRet, bhRet:bhRet, alphaPP:(stratRet-bhRet)*100, stratPnl:stratVal-invested, invested:invested };
+  }
+  function portfolioAlpha(){
+    var ds=0, db=0, cap=0;
+    state.tokens.forEach(function(t){ var a=alphaForToken(t.id); if(a){ ds+=a.stratRet*a.invested; db+=a.bhRet*a.invested; cap+=a.invested; } });
+    if(cap<=0) return null; return ((ds-db)/cap)*100;
+  }
+
+  // ── Regime banner (text, per view) ────────────────────────────────────────────
+  function renderRegime(){
+    var box=document.getElementById('regime'); if(!box) return;
+    var cur=state.cycle.length? state.cycle[state.cycle.length-1] : null;
+    var ph=cur? cur.phase : null;
+    if(state.view==='long'){
+      var chips=Object.keys(PHASE_PT).map(function(k){ return '<span style="color:'+PHASE_COL[k]+';font-weight:700">●</span> '+PHASE_PT[k]; }).join(' &nbsp; ');
+      box.innerHTML='Fases: '+chips+(ph? ' &nbsp;·&nbsp; <b>agora: <span class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph]+'</span></b>':'')+
+        ' &nbsp;·&nbsp; BTC e ativos em base-100 (eixo log) para serem comparáveis.';
+    } else {
+      var pa=portfolioAlpha(); var aTxt=pa==null?'':' &nbsp;·&nbsp; Carteira: <b>'+(pa>=0?'+':'')+pa.toFixed(0)+'pp</b> vs segurar';
+      box.innerHTML=ph
+        ? 'Ciclo: <b class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph].toUpperCase()+'</b> — sinais condicionados: '+PHASE_RULE[ph]+'.'+aTxt
+        : 'Ciclo de mercado: a aguardar dados (Fase 1).'+aTxt;
+    }
+  }
+
+  // ── Long-term cycle chart (BTC colored by phase + phase bands + asset overlays) ─
+  function hexA(hex,a){ var n=parseInt(hex.slice(1),16); return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
+  var phaseBandPlugin = {
+    id:'phaseBands',
+    beforeDatasetsDraw:function(chart){
+      var cyc=state.cycle||[]; if(!cyc.length) return;
+      var ctx=chart.ctx, ca=chart.chartArea, xs=chart.scales.x; if(!ca||!xs) return;
+      ctx.save(); var i=0;
+      while(i<cyc.length){
+        var ph=cyc[i].phase, j=i; while(j+1<cyc.length && cyc[j+1].phase===ph) j++;
+        var x0=xs.getPixelForValue(new Date(cyc[i].cycle_date).getTime());
+        var x1=xs.getPixelForValue(new Date(cyc[j].cycle_date).getTime()+86400000);
+        var L=Math.max(ca.left,Math.min(x0,x1)), R=Math.min(ca.right,Math.max(x0,x1));
+        if(R>L){ ctx.fillStyle=hexA(PHASE_COL[ph]||'#888',0.10); ctx.fillRect(L,ca.top,R-L,ca.bottom-ca.top); }
+        i=j+1;
+      }
+      ctx.restore();
+    }
+  };
+  function renderCycleChart(){
+    var ctx=document.getElementById('chart').getContext('2d');
+    if(state.chart){ state.chart.destroy(); state.chart=null; }
+    var cyc=(state.cycle||[]).filter(function(r){ return r.btc_price!=null; });
+    if(!cyc.length){
+      var cv=ctx.canvas; ctx.clearRect(0,0,cv.width,cv.height);
+      ctx.fillStyle='#a1a1aa'; ctx.font='13px -apple-system,sans-serif'; ctx.textAlign='center';
+      ctx.fillText('Ciclo de mercado: sem dados ainda (corre /api/backfill-cycle).', cv.clientWidth/2, 110);
+      return;
+    }
+    var btc0=Number(cyc[0].btc_price);
+    var btcData=cyc.map(function(r){ return {x:new Date(r.cycle_date).getTime(), y:btc0?Number(r.btc_price)/btc0*100:null, phase:r.phase}; });
+    var datasets=[{
+      label:'BTC', data:btcData, borderColor:'#9aa', borderWidth:2.4, pointRadius:0, tension:0.25, spanGaps:true,
+      segment:{ borderColor:function(c){ var ph=c.p0.raw&&c.p0.raw.phase; return PHASE_COL[ph]||'#9aa'; } }
+    }];
+    // asset overlays (those currently selected) — base-100 over their own history, dashed
+    state.tokens.forEach(function(t){
+      if(state.hidden[t.id]) return;
+      var rows=(state.readingsByToken[t.id]||[]).filter(function(r){ return r.price!=null; });
+      if(!rows.length) return;
+      var p0=Number(rows[0].price);
+      datasets.push({ label:t.symbol, borderColor:t.color, borderWidth:1.3, borderDash:[4,3], pointRadius:0, tension:0.25, spanGaps:true,
+        data:rows.map(function(r){ return {x:new Date(r.fetched_at).getTime(), y:p0?Number(r.price)/p0*100:null}; }) });
+    });
+    var xMin=btcData[0].x, xMax=Date.now();
+    state.chart=new Chart(ctx,{ type:'line', data:{datasets:datasets},
+      options:{ animation:false, responsive:true, maintainAspectRatio:false,
+        layout:{padding:{bottom:34,top:4,left:2,right:6}}, interaction:{mode:'nearest',intersect:false},
+        scales:{ x:{type:'linear',min:xMin,max:xMax,grid:{display:false},ticks:{display:false},border:{display:false}},
+                 y:{type:'logarithmic',grid:{color:'rgba(255,255,255,0.05)'},border:{display:false},
+                    ticks:{color:'#52525b',font:{size:10}}} },
+        plugins:{ legend:{display:false},
+          tooltip:{ enabled:true, backgroundColor:'#15171f', borderColor:'#1e2130', borderWidth:1, titleColor:'#a1a1aa', bodyColor:'#f4f4f5', padding:10,
+            callbacks:{ title:function(it){ return new Date(it[0].parsed.x).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}); },
+              label:function(it){ return it.dataset.label+': base-100 = '+Math.round(it.parsed.y); } } },
+          zoom:{ limits:{x:{min:'original',max:'original'}}, pan:{enabled:true,mode:'x'}, zoom:{wheel:{enabled:true},pinch:{enabled:true},mode:'x'} } }
+      },
+      plugins:[phaseBandPlugin, dualAxisPlugin]
     });
   }
 
@@ -883,6 +1004,12 @@
         tok.appendChild(el('div','flag', noCov
           ? 'sem cobertura de Fundamentals · Technicals + Atividade'
           : 'market-only · sem dados de Fundamentals'));
+      }
+      var alpha=alphaForToken(t.id);
+      if(alpha){
+        var aEl=el('div','alpha', (alpha.alphaPP>=0?'protegeu +':'')+alpha.alphaPP.toFixed(0)+'pp vs segurar');
+        aEl.style.color = alpha.alphaPP>=0 ? 'var(--good)' : '#f87171';
+        tok.appendChild(aEl);
       }
       btn.appendChild(tok);
 
@@ -1270,6 +1397,12 @@
   })();
 
   document.getElementById('export-btn').onclick=exportExcel;
+  // Tap the chart title to switch between the two views.
+  (function(){ var b=document.getElementById('view-toggle'); if(b) b.onclick=function(){
+    state.view = state.view==='long' ? 'short' : 'long';
+    b.textContent = state.view==='long' ? 'Ciclo de mercado ⤢' : 'Sinais de entrada ⤢';
+    renderChart();
+  }; })();
   document.getElementById('logo').onclick=openReport;
   document.getElementById('report-x').onclick=closeReport;
   document.getElementById('report-back').onclick=function(e){ if(e.target===this) closeReport(); };
