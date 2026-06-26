@@ -548,8 +548,13 @@
 
   // ── ranked list + expand ──────────────────────────────────────────────────────
   // reading-panel field definitions; higherBetter drives the ▲/▼ improved colour.
-  function readingFields(latest, prev){
-    var rew = latest.reweighted;
+  // Which value metric each category is scored on (drives the expand-panel label).
+  var FUND_CATEGORY = {
+    defi:'tvl-rev', rwa:'tvl-rev', yield:'rev-tvl',
+    'ai-agent':'rev', infra:'rev', l1:'chain-fees',
+    payment:'none', uncovered:'none'
+  };
+  function readingFields(latest, prev, token){
     function delta(curKey, higherBetter){
       var cur=latest[curKey], pr=prev?prev[curKey]:null;
       if(cur==null||pr==null||isNaN(cur)||isNaN(pr)||Number(pr)===0) return {txt:'n/a',cls:'na'};
@@ -559,17 +564,40 @@
       var arrow = pct>0?'▲':'▼';
       return {txt:arrow+' '+Math.abs(pct).toFixed(1)+'%', cls:improved?'up':'down'};
     }
+    // Category-aware Fundamentals metric. The value metric (TVL / revenue / chain
+    // fees) is chosen by the token's category and normalized via a valuation
+    // multiple (MC ÷ annual value). payment/uncovered have no honest source.
+    var cat = (token && token.category) || 'defi';
+    var kind = FUND_CATEGORY[cat] || 'tvl-rev';
+    var rev = latest.holders_revenue, tvl = latest.tvl;
+    var mcap = (latest.price!=null && latest.circ_supply!=null) ? Number(latest.price)*Number(latest.circ_supply) : null;
+    var mult = (mcap!=null && rev!=null && Number(rev)>0) ? Math.round(mcap/Number(rev)) : null;
+    var multTxt = mult!=null ? ' · '+mult+'x' : '';
+    var revVal = (rev==null) ? 'a recolher' : fmtUsd(rev)+multTxt;
+    var fund;
+    if(kind==='none'){
+      fund=[{k:'Fundamentals', val:'sem cobertura', d:{txt:'Technicals + Atividade', cls:'na'}}];
+    } else if(kind==='chain-fees'){
+      fund=[{k:'Chain fees (ann.)', val:revVal, d:delta('holders_revenue',true)}];
+    } else if(kind==='rev'){
+      fund=[{k:'Receita (ann.)', val:revVal, d:delta('holders_revenue',true)}];
+    } else if(kind==='rev-tvl'){
+      fund=[{k:'Receita (ann.)', val:revVal, d:delta('holders_revenue',true)},
+            {k:'TVL', val:fmtUsd(tvl), d:delta('tvl',true)}];
+    } else { // tvl-rev (defi/rwa)
+      fund=[{k:'TVL', val:fmtUsd(tvl), d:delta('tvl',true)},
+            {k:'Receita (ann.)', val:revVal, d:delta('holders_revenue',true)}];
+    }
     return [
       {k:'Price vs MAs',        val:fmtScore(r1(latest.score_price_ma)), d:delta('score_price_ma',true)},
       {k:'Below 1-year high',    val:fmtScore(r1(latest.score_below_high)), d:delta('score_below_high',true)},
-      {k:'RSI (14d)',           val:fmtNum(latest.rsi_14,1), d:delta('rsi_14',false)},
-      {k:'TVL trend',           val:rew?'—':fmtUsd(latest.tvl),            d:rew?{txt:'n/a',cls:'na'}:delta('tvl',true)},
-      {k:'Holders rev (ann.)',  val:rew?'—':fmtUsd(latest.holders_revenue),d:rew?{txt:'n/a',cls:'na'}:delta('holders_revenue',true)},
+      {k:'RSI (14d)',           val:fmtNum(latest.rsi_14,1), d:delta('rsi_14',false)}
+    ].concat(fund).concat([
       {k:'Inflation (annual)',  val:latest.emissions_rate==null?'n/a':fmtPct(latest.emissions_rate)+' / yr', d:delta('emissions_rate',false)},
       {k:'Endereços ativos',    val:fmtCount(latest.active_addresses), d:delta('active_addresses',true)},
       {k:'Holders (on-chain)',  val:fmtCount(latest.holder_count),     d:delta('holder_count',true)},
       {k:'Transferências',      val:fmtCount(latest.transfer_count),   d:delta('transfer_count',true)}
-    ];
+    ]);
   }
   // On-chain counts: "a recolher" while empty (live-only, accumulating) — never 0.
   function fmtCount(n){ return (n==null||isNaN(n))?'a recolher':Number(n).toLocaleString('pt-PT'); }
@@ -606,7 +634,12 @@
       nm.appendChild(document.createTextNode(t.name+' · '));
       nm.appendChild(el('span','price',fmtPrice(latest.price)));
       tok.appendChild(nm);
-      if(latest.reweighted) tok.appendChild(el('div','flag','market-only · fundamentals from emissions'));
+      if(latest.reweighted){
+        var noCov = (t.category==='payment' || t.category==='uncovered');
+        tok.appendChild(el('div','flag', noCov
+          ? 'sem cobertura de Fundamentals · Technicals + Atividade'
+          : 'market-only · sem dados de Fundamentals'));
+      }
       btn.appendChild(tok);
 
       var bar=el('div','score-bar'); var fill=el('span'); fill.style.width=pct+'%'; bar.appendChild(fill); btn.appendChild(bar);
@@ -626,7 +659,7 @@
       var cols=el('div','panel-cols');
 
       var left=el('div','panel-readings');
-      readingFields(latest, prev).forEach(function(f){
+      readingFields(latest, prev, t).forEach(function(f){
         var r=el('div','reading');
         r.appendChild(el('div','k',f.k));
         var vbox=el('div','v');
@@ -791,7 +824,9 @@
       ['O que cada coluna significa:'],
       ['  Preço — preço USD no momento da leitura (eixo para correlação).'],
       ['  Score Final — nota 0–10 (mistura Fundamentals 45% / Technicals 35% / Atividade 20%).'],
-      ['  Fundamentals — TVL/receita + emissões (com fator de cobertura quando só há 1 componente).'],
+      ['  Fundamentals — métrica de valor por categoria (TVL+receita p/ DeFi/RWA, receita p/ AI/infra,'],
+      ['    chain-fees p/ L1s) normalizada por múltiplo de avaliação (MC÷valor) + emissões. payment/'],
+      ['    uncovered não têm cobertura → pontuados só por Technicals + Atividade.'],
       ['  Technicals — preço vs médias, distância ao topo de 1 ano, RSI.'],
       ['  Atividade — adoção on-chain: endereços ativos, crescimento de holders, transferências.'],
       ['  TVL — valor depositado no protocolo (USD).'],

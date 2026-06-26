@@ -123,6 +123,48 @@ noted it here.
   Activity-vs-Price) is analysable months from now. `tracked_tokens` carries
   `chain`/`chain_id`/`contract_address` for the on-chain fetch.
 
+## Category-aware Fundamentals (valuation multiple) — supersedes the TVL-universal pillar
+- **Problem:** the old pillar assumed TVL is every token's value metric, so a token that
+  earns real revenue but holds ~0 TVL (VIRTUAL: TVL=$0, revenue=$3.86M) scored dead on
+  Fundamentals even though it has a genuine economic-value signal. The TVL-based
+  components (TVL-trend, MC/TVL) were structurally null for it.
+- **Fix:** `tracked_tokens.category` selects the value metric per token, and every metric
+  is normalized to the SAME 0–10 axis via a **valuation multiple** = `market_cap ÷ annual
+  value`. Low multiple = cheap vs. what it generates = high score — comparable across a
+  DEX, an AI agent, and an L1.
+  - `defi` (AERO/CRV/CAKE/HYPE), `rwa` (ONDO): TVL **and** revenue (mean of both).
+  - `yield` (CVX): revenue + TVL (same as defi; revenue-led in practice).
+  - `ai-agent` (VIRTUAL), `infra` (LINK): **revenue only** — TVL ignored (it's ~0/irrelevant).
+  - `l1` (ETH/SOL/AVAX): **chain fees** (annualized) as the native token's value; the
+    chain's third-party DeFi TVL is NOT the token's, so it isn't attributed.
+  - `payment` (XRP), `uncovered` (TRAC): **null** — no honest free source; the pillar
+    reweight hands scoring to Technicals (+ Activity). XRP's real value (settlement
+    volume) lives in the Activity pillar; TRAC's publishing fees have no free feed.
+- **Valuation-multiple thresholds** (`scoreValuationMultiple`, log-scaled because crypto
+  multiples span ~5x to >1000x): `x = clamp(log10(mcap/annualValue), 1, 3)`, then
+  `score = clamp(10 − (x−1)·5, 0, 10)` → **≤10x → 10** (very cheap), **100x → 5** (fair),
+  **≥1000x → 0** (expensive). Chosen so the current book (most tokens 7–50x revenue) lands
+  in a sensible 7–10 band while a 1000x froth multiple zeroes out; revisit if the mix
+  shifts. The TVL half (`scoreTvl`) keeps the existing 30d-trend (50%) + MC/TVL cheapness
+  (50%), with revenue moved out to the multiple to avoid double-counting.
+- **Emissions blend unchanged in shape:** `blendWithEmissions` keeps value 60 / emissions
+  40 and the coverage factor (`5 + (raw−5)·present/2`). NOTE this **revises** the earlier
+  "emissions-only capped at neutral 5.0" rule above: an emissions-only pillar now shrinks
+  *halfway* toward neutral (e.g. emissions 9 → 7.0) rather than being hard-capped at 5.0.
+  Rationale: with the category rule, value-less-but-covered tokens (e.g. LINK before its
+  revenue is fetched) are rare and transient, and the symmetric shrink is simpler and
+  consistent with how below-neutral inflation already passes through.
+- **VIRTUAL before/after** (live snapshot, projected from stored raw): Fundamentals
+  **4.5 → 7.1** (90x revenue multiple now drives it; value sub-score 1.0 → 5.2), final
+  **5.1 → 6.5**. L1s rescored on chain fees gain +2.1–3.0 on Fundamentals. XRP/TRAC →
+  Fundamentals null, score from Technicals.
+- **LINK caveat:** historically stored with no `defillama_slug`, so no revenue is in the
+  archive → it scores emissions-only (~5.8) until the `chainlink` slug is added and a
+  fetch/backfill populates revenue; thereafter it is revenue-scored as `infra`.
+- **History recompute** runs from stored raw (`tvl`, `holders_revenue`, `mcap = price ×
+  circ_supply`, `emissions_rate`) — only `score_tvl_rev`/`score_fundamentals`/
+  `final_score`/`reweighted` change, so the progression chart has no discontinuity.
+
 ## Excel export
 - Client-side **SheetJS** (CDN, buildless). One sheet per token + a consolidated
   **Todos** + a **Legenda** first sheet. Activity cells are left BLANK (never 0)
