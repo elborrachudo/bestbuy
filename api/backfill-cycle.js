@@ -36,11 +36,17 @@ export default async function handler(req, res) {
   try {
     const btc = await getBtcDailySeries(365, cgKey);
     const prices = btc.map((p) => p.price);
-    const rows = btc.map((p, i) => {
+    // CoinGecko can return two points on the same UTC date (e.g. the trailing current
+    // price). Dedupe by date — keep the last — so one upsert batch never touches a row
+    // twice (which Postgres rejects with 21000).
+    const byDate = new Map();
+    btc.forEach((p, i) => {
       const { phase, indicators } = classifyPhase(prices, i);
-      phaseDist[phase] = (phaseDist[phase] || 0) + 1;
-      return { cycle_date: new Date(p.ts).toISOString().slice(0, 10), btc_price: p.price, phase, indicator_values: indicators };
+      byDate.set(new Date(p.ts).toISOString().slice(0, 10),
+        { cycle_date: new Date(p.ts).toISOString().slice(0, 10), btc_price: p.price, phase, indicator_values: indicators });
     });
+    const rows = [...byDate.values()];
+    rows.forEach((r) => { phaseDist[r.phase] = (phaseDist[r.phase] || 0) + 1; });
     for (let i = 0; i < rows.length; i += 200) await sbUpsert(base, serviceKey, 'market_cycle', rows.slice(i, i + 200), 'cycle_date');
     phaseByDate = phaseByDateFromBtc(btc);
     cycleRows = rows.length;
