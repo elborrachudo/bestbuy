@@ -46,7 +46,10 @@
   #signal-tip .st-row{color:var(--muted);}
   #signal-tip .st-row b{color:var(--text);font-weight:600;}
   /* Legend chips */
-  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;align-items:center;}
+  /* select-all / clear-all eye toggle — icon only, no chip background or border,
+     matching the data-category (pillar) icon size, white outline. */
+  .legend-eye{font-size:21px;line-height:1;cursor:pointer;color:#fff;display:inline-flex;align-items:center;}
   .chip{display:inline-flex;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--line);
     border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:600;cursor:pointer;user-select:none;}
   .chip .swatch{width:10px;height:10px;border-radius:50%;}
@@ -812,6 +815,16 @@
   // ── legend chips ──────────────────────────────────────────────────────────────
   function renderLegend(){
     var box=document.getElementById('legend'); box.innerHTML='';
+    // Eye toggle before the first token: open = all selected, closed = chart cleared.
+    var allVisible = state.tokens.length>0 && state.tokens.every(function(t){ return !state.hidden[t.id]; });
+    var eye=el('i','legend-eye ti '+(allVisible?'ti-eye':'ti-eye-off'));
+    eye.title = allVisible ? 'Limpar gráfico (esconder todos)' : 'Selecionar todos';
+    eye.onclick=function(){
+      var hideAll = allVisible;                 // if everything is shown, clear; else select all
+      state.tokens.forEach(function(t){ state.hidden[t.id]=hideAll; });
+      renderLegend(); renderChart();
+    };
+    box.appendChild(eye);
     state.tokens.forEach(function(t){
       var chip=el('span','chip'+(state.hidden[t.id]?' off':''));
       var sw=el('span','swatch'); sw.style.background=t.color; chip.appendChild(sw);
