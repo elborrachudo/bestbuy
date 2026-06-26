@@ -128,8 +128,202 @@
   .report-line .n{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums;}
   .report-disc{color:var(--muted);font-size:11.5px;font-style:italic;line-height:1.5;margin-top:18px;}
 </style>
+
+<!-- ===== PJDC266 PIN gate — decorative overlay (see commit note; NOT real security) =====
+     CSS is inlined here (not an external file) and the unlock check runs before paint, so the
+     gate is on-screen the instant the body parses and an already-authenticated tab never flashes
+     the gate. Everything is namespaced `pjdc266-` so it can't collide with the dashboard. -->
+<style id="pjdc266-gate-style">
+  /* Blur the real dashboard while locked; transition makes the reveal smooth. */
+  .wrap,.modal-back{transition:filter 0.77s cubic-bezier(.4,0,.2,1);}
+  html:not(.pjdc266-unlocked) .wrap,
+  html:not(.pjdc266-unlocked) .modal-back{filter:blur(9px) brightness(0.5);pointer-events:none;}
+  html:not(.pjdc266-unlocked) body{overflow:hidden;}
+  /* Once unlocked, the gate layers are gone entirely. */
+  html.pjdc266-unlocked #pjdc266-matrix,
+  html.pjdc266-unlocked #pjdc266-scan,
+  html.pjdc266-unlocked #pjdc266-gate,
+  html.pjdc266-unlocked #pjdc266-flash{display:none !important;}
+
+  #pjdc266-matrix{position:fixed;inset:0;overflow:hidden;z-index:999997;opacity:0.55;font-family:'Courier New',monospace;}
+  .pjdc266-codepanel{position:absolute;font-size:10px;line-height:1.35;color:#1f9e5a;white-space:pre;text-shadow:0 0 6px rgba(31,158,90,0.5);background:rgba(2,8,5,0.55);border:0.5px solid rgba(31,158,90,0.25);border-radius:4px;padding:8px 10px;animation:pjdc266-flicker 4s infinite;}
+  .pjdc266-q{position:absolute;font-size:11px;color:#37d67a;white-space:nowrap;text-shadow:0 0 8px rgba(55,214,122,0.6);animation:pjdc266-floatUp linear infinite;opacity:0;}
+  @keyframes pjdc266-floatUp{0%{transform:translateY(40px);opacity:0;}10%{opacity:0.9;}85%{opacity:0.9;}100%{transform:translateY(-120px);opacity:0;}}
+  @keyframes pjdc266-flicker{0%,100%{opacity:0.85;}48%{opacity:0.85;}50%{opacity:0.35;}52%{opacity:0.85;}}
+  #pjdc266-scan{position:fixed;left:0;right:0;height:2px;z-index:999998;background:linear-gradient(90deg,transparent,rgba(55,214,122,0.7),transparent);animation:pjdc266-scanline 5s linear infinite;}
+  @keyframes pjdc266-scanline{0%{top:-5%;}100%{top:105%;}}
+
+  #pjdc266-gate{position:fixed;inset:0;z-index:999999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 22px;text-align:center;background:radial-gradient(ellipse at center, rgba(4,10,7,0.55) 0%, rgba(2,5,4,0.86) 100%);font-family:'Courier New',monospace;}
+  .pjdc266-crest{width:62px;height:62px;margin-bottom:20px;border-radius:50%;border:2px solid rgba(55,214,122,0.6);display:flex;align-items:center;justify-content:center;color:#37d67a;font-size:26px;box-shadow:0 0 24px rgba(55,214,122,0.35);animation:pjdc266-pulse 2.4s ease-in-out infinite;}
+  @keyframes pjdc266-pulse{0%,100%{box-shadow:0 0 18px rgba(55,214,122,0.25);}50%{box-shadow:0 0 34px rgba(55,214,122,0.6);}}
+  .pjdc266-seized{font-family:-apple-system,Arial,sans-serif;font-size:13px;letter-spacing:0.14em;text-transform:uppercase;color:#e6edf0;line-height:1.7;max-width:340px;margin-bottom:8px;font-weight:600;}
+  .pjdc266-prompt{font-size:13px;color:#9fb3a8;letter-spacing:0.06em;margin-bottom:18px;min-height:20px;}
+  .pjdc266-cursor{display:inline-block;width:8px;background:#37d67a;animation:pjdc266-blink 1s steps(1) infinite;}
+  @keyframes pjdc266-blink{50%{opacity:0;}}
+  .pjdc266-pins{display:flex;gap:12px;margin-bottom:22px;}
+  .pjdc266-pin{width:52px;height:64px;border-radius:8px;background:rgba(8,18,12,0.8);border:1px solid rgba(55,214,122,0.35);color:#37d67a;font-size:28px;text-align:center;line-height:64px;caret-color:#37d67a;outline:none;font-family:'Courier New',monospace;transition:border-color 0.2s, box-shadow 0.2s;}
+  .pjdc266-pin:focus{border-color:#37d67a;box-shadow:0 0 16px rgba(55,214,122,0.45);}
+  .pjdc266-pin.pjdc266-ok{border-color:#37d67a;box-shadow:0 0 20px rgba(55,214,122,0.7);}
+  .pjdc266-pin.pjdc266-err{border-color:#ff4d4d;box-shadow:0 0 16px rgba(255,77,77,0.6);animation:pjdc266-shake 0.4s;}
+  @keyframes pjdc266-shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-7px);}75%{transform:translateX(7px);}}
+  .pjdc266-status{font-size:11px;letter-spacing:0.1em;min-height:16px;color:#6b7d74;}
+  .pjdc266-status.pjdc266-bad{color:#ff6b6b;}
+  .pjdc266-status.pjdc266-good{color:#37d67a;}
+  .pjdc266-valbar{width:200px;height:3px;margin-top:14px;border-radius:3px;overflow:hidden;background:rgba(55,214,122,0.15);opacity:0;transition:opacity 0.25s;}
+  .pjdc266-valbar.pjdc266-on{opacity:1;}
+  .pjdc266-valfill{width:0%;height:100%;border-radius:3px;background:linear-gradient(90deg,#1f9e5a,#37d67a);box-shadow:0 0 10px rgba(55,214,122,0.7);}
+  #pjdc266-gate.pjdc266-unlocking{animation:pjdc266-gatePulse 0.5s ease-out;}
+  @keyframes pjdc266-gatePulse{0%{transform:scale(1);}40%{transform:scale(1.02);}100%{transform:scale(1);}}
+  #pjdc266-flash{position:fixed;inset:0;z-index:1000000;background:#dfffe9;opacity:0;pointer-events:none;}
+  .pjdc266-foot{position:absolute;bottom:16px;font-size:9px;letter-spacing:0.18em;color:#2f4339;text-transform:uppercase;}
+</style>
+<script>
+  /* Pre-paint unlock check: if this session already entered the PIN, mark the document
+     unlocked BEFORE the body renders so the gate never flashes. sessionStorage is wrapped
+     because it throws in some privacy modes — on any error we simply leave the gate up. */
+  try{ if(sessionStorage.getItem('pjdc266_ok')==='1') document.documentElement.classList.add('pjdc266-unlocked'); }catch(e){}
+</script>
 </head>
 <body>
+
+<!-- ===== PJDC266 PIN gate markup (first in <body> so it paints before the dashboard) ===== -->
+<div id="pjdc266-matrix"></div>
+<div id="pjdc266-scan"></div>
+<div id="pjdc266-gate">
+  <div class="pjdc266-crest">⚠</div>
+  <div class="pjdc266-seized">A página a que tentou aceder foi apreendida por irregularidades</div>
+  <div style="height:18px"></div>
+  <div class="pjdc266-prompt" id="pjdc266-prompt"></div>
+  <div class="pjdc266-pins" id="pjdc266-pins">
+    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="dígito 1">
+    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="dígito 2">
+    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="dígito 3">
+    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="dígito 4">
+  </div>
+  <div class="pjdc266-status" id="pjdc266-status">a aguardar autenticação…</div>
+  <div class="pjdc266-valbar" id="pjdc266-valbar"><div class="pjdc266-valfill" id="pjdc266-valfill"></div></div>
+  <div class="pjdc266-foot">PJDC266 · acesso restrito · sessão monitorizada</div>
+</div>
+<div id="pjdc266-flash"></div>
+<script>
+(function(){
+  try{
+    var html=document.documentElement;
+    // Already authenticated this session → head script hid the gate already; do nothing.
+    if(html.classList.contains('pjdc266-unlocked')) return;
+
+    /* ---- code panels + floating queries (CSI dressing) ---- */
+    var matrix=document.getElementById('pjdc266-matrix');
+    var snippets=[
+"> TRACE 81.42.* :: PORT 443\nSCAN packet[0x4f] ... OK\nDECRYPT layer/3 ........ 67%\nnode{xrpl}.sync = TRUE\nhash=9af3e1c0b27d",
+"SELECT * FROM access_log\n WHERE ip LIKE '194.65.%'\n AND ts > now()-interval'1h';\n>> 412 rows flagged",
+"[crawler] indexing assets...\n chunk 0x1a → 0x9c\n entropy 0.88 :: ANOMALY\n routing → forensic queue",
+"ssh -i id_rsa root@10.0.*\nauth ........... bypass\npriv-esc ....... granted\ndumping /var/state ...",
+"MATCH (n:Wallet)-[:TX]->(m)\n WHERE m.flag='SUSPECT'\n RETURN n.addr, sum(m.val)\n>> compiling subgraph..."
+    ];
+    var queries=["geolocating origin IP…","cross-referencing case PJDC266…","decrypting TLS handshake…","matching biometric token…","querying interpol node…","tracing TOR exit relay…","parsing ledger 0x4f2a…","flagging anomaly cluster…","compiling evidence hash…"];
+    var positions=[{top:'6%',left:'4%'},{top:'12%',right:'4%'},{bottom:'20%',left:'5%'},{bottom:'10%',right:'6%'},{top:'40%',left:'2%'}];
+    positions.forEach(function(pos,i){
+      var el=document.createElement('div'); el.className='pjdc266-codepanel';
+      Object.assign(el.style,pos); el.style.animationDelay=(i*0.5)+'s';
+      el.textContent=snippets[i%snippets.length]; matrix.appendChild(el);
+    });
+    var qTimer=setInterval(function(){
+      var q=document.createElement('div'); q.className='pjdc266-q';
+      q.textContent='» '+queries[Math.floor(Math.random()*queries.length)];
+      q.style.left=(8+Math.random()*60)+'%'; q.style.bottom='-20px';
+      q.style.animationDuration=(4+Math.random()*3)+'s';
+      matrix.appendChild(q); setTimeout(function(){ q.remove(); },7500);
+    },900);
+
+    /* ---- typewriter prompt ---- */
+    var promptEl=document.getElementById('pjdc266-prompt');
+    var msg='Se é investigador da equipa PJDC266, insira o código pin';
+    var idx=0;
+    (function type(){
+      if(idx<=msg.length){ promptEl.innerHTML=msg.slice(0,idx)+'<span class="pjdc266-cursor">&nbsp;</span>'; idx++; setTimeout(type,38); }
+      else { promptEl.innerHTML=msg+'<span class="pjdc266-cursor">&nbsp;</span>'; }
+    })();
+
+    /* ---- PIN logic ---- */
+    var PIN='0211';
+    var pins=[].slice.call(document.querySelectorAll('.pjdc266-pin'));
+    var status=document.getElementById('pjdc266-status');
+
+    pins.forEach(function(p,i){
+      p.addEventListener('input',function(){
+        p.value=p.value.replace(/[^0-9]/g,'');
+        if(p.value && i<3) pins[i+1].focus();
+        check();
+      });
+      p.addEventListener('keydown',function(e){
+        if(e.key==='Backspace' && !p.value && i>0) pins[i-1].focus();
+      });
+    });
+
+    function runValidation(){
+      var gate=document.getElementById('pjdc266-gate');
+      var flash=document.getElementById('pjdc266-flash');
+      var valbar=document.getElementById('pjdc266-valbar');
+      var valfill=document.getElementById('pjdc266-valfill');
+      var scan=document.getElementById('pjdc266-scan');
+      var content=[document.querySelector('.wrap'),document.querySelector('.modal-back')].filter(Boolean);
+
+      var steps=[['» a validar credenciais…',22],['» a desencriptar sessão…',55],['» a libertar conteúdo…',82],['✓ ACESSO CONCEDIDO',100]];
+      status.className='pjdc266-status pjdc266-good';
+      valbar.classList.add('pjdc266-on');
+      clearInterval(qTimer);
+
+      var i=0;
+      (function next(){
+        if(i<steps.length){
+          status.textContent=steps[i][0];
+          valfill.style.transition='width 0.31s cubic-bezier(.4,0,.2,1)';
+          valfill.style.width=steps[i][1]+'%';
+          i++; setTimeout(next,300);
+        } else {
+          gate.classList.add('pjdc266-unlocking');
+          flash.style.transition='opacity 0.13s'; flash.style.opacity='0.5';
+          setTimeout(function(){ flash.style.opacity='0'; },125);
+          // reveal the real dashboard (inline filter overrides the locked-state CSS blur, animates)
+          content.forEach(function(el){ el.style.transition='filter 0.77s cubic-bezier(.4,0,.2,1)'; el.style.filter='blur(0) brightness(1)'; el.style.pointerEvents='auto'; });
+          [matrix,scan].forEach(function(el){ if(el){ el.style.transition='opacity 0.63s'; el.style.opacity='0'; } });
+          gate.style.transition='opacity 0.63s ease';
+          setTimeout(function(){ gate.style.opacity='0'; },155);
+          setTimeout(function(){
+            try{ sessionStorage.setItem('pjdc266_ok','1'); }catch(e){}
+            html.classList.add('pjdc266-unlocked');               // consistent end state; hides gate layers
+            content.forEach(function(el){ el.style.filter=''; el.style.transition=''; el.style.pointerEvents=''; });
+          },840);
+        }
+      })();
+    }
+
+    function check(){
+      var code=pins.map(function(p){return p.value;}).join('');
+      if(code.length<4){ status.textContent='a aguardar autenticação…'; status.className='pjdc266-status'; return; }
+      if(code===PIN){
+        pins.forEach(function(p){ p.classList.remove('pjdc266-err'); p.classList.add('pjdc266-ok'); p.blur(); });
+        runValidation();
+      } else {
+        pins.forEach(function(p){ p.classList.add('pjdc266-err'); });
+        status.textContent='✗ CÓDIGO INVÁLIDO · tentativa registada';
+        status.className='pjdc266-status pjdc266-bad';
+        setTimeout(function(){
+          pins.forEach(function(p){ p.classList.remove('pjdc266-err'); p.value=''; });
+          pins[0].focus();
+          status.textContent='a aguardar autenticação…';
+          status.className='pjdc266-status';
+        },1100);
+      }
+    }
+  }catch(e){
+    // Fail-safe: a gag must never lock anyone out over a script error — reveal the site.
+    try{ document.documentElement.classList.add('pjdc266-unlocked'); }catch(_){}
+  }
+})();
+</script>
+
 <div class="wrap">
   <header>
     <div>
