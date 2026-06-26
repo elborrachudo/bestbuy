@@ -63,7 +63,8 @@ export default async function handler(req, res) {
       // On-chain Activity (live only). Snapshot the raw counts, then score the FLOW
       // against the previous live snapshot. No prior snapshot → score stays null
       // (no fabricated history); the raw counts are still stored to seed the next.
-      const actRaw = await fetchActivityRaw(t);
+      const act = await fetchActivityRaw(t);
+      const actRaw = act.raw;
       let activityScore = null;
       if (actRaw) {
         const prev = await getPrevActivitySnapshot(base, serviceKey, t.id);
@@ -101,6 +102,7 @@ export default async function handler(req, res) {
         active_addresses: actRaw ? actRaw.active_addresses : null,
         holder_count: actRaw ? actRaw.holder_count : null,
         transfer_count: actRaw ? actRaw.transfer_count : null,
+        activity_error: act.error,
         reweighted: r.reweighted,
         is_backfill: false,
       };
@@ -120,6 +122,7 @@ export default async function handler(req, res) {
         activity: r.score_activity,
         holders: row.holder_count,
         transfers: row.transfer_count,
+        activity_error: act.error || undefined,
         failures: inputs._failures.length ? inputs._failures : undefined,
       });
     } catch (e) {
