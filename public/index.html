@@ -518,6 +518,9 @@
       },
       plugins:[greenZonePlugin, dualAxisPlugin]
     });
+    // Keep the double-tap "fit to data" framing across rebuilds (legend/pillar/range
+    // toggles all recreate the chart) — re-fit to whatever is now visible.
+    if(state.fitY) fitChartY(state.chart);
   }
 
   // ── legend chips ──────────────────────────────────────────────────────────────
@@ -977,13 +980,13 @@
     // Snap bounds to whole percents so the y-axis never shows fractional ticks.
     chart.options.scales.y.min=Math.max(0, Math.floor(lo-pad));
     chart.options.scales.y.max=Math.min(100, Math.ceil(hi+pad));
-    chart._fitted=true; chart.update('none');
+    state.fitY=true; chart.update('none');
   }
   function resetChartY(chart){
     chart.options.scales.y.min=0; chart.options.scales.y.max=100;
-    chart._fitted=false; chart.update('none');
+    state.fitY=false; chart.update('none');
   }
-  function toggleChartFit(){ var c=state.chart; if(!c) return; c._fitted?resetChartY(c):fitChartY(c); }
+  function toggleChartFit(){ var c=state.chart; if(!c) return; state.fitY?resetChartY(c):fitChartY(c); }
 
   (function attachChartGestures(){
     var cv=document.getElementById('chart');
