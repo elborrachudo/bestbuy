@@ -39,7 +39,7 @@ export default async function handler(req, res) {
     const prices = btc.map((p) => p.price);
     const cls = classifySeries(prices);   // 4-indicator consensus + hysteresis, per day
     // M2 liquidity confirmer (best-effort; attached per-day as-of).
-    let m2series = null; try { m2series = await getM2Monthly(); } catch (e) { /* no M2 → cycle still fine */ }
+    let m2series = null; try { m2series = await getM2Monthly(); } catch (e) { console.warn('m2 fetch failed:', e.message); }
     // CoinGecko can return two points on the same UTC date (e.g. the trailing current
     // price). Dedupe by date — keep the last — so one upsert batch never touches a row
     // twice (which Postgres rejects with 21000).
