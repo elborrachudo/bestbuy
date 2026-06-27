@@ -13,6 +13,7 @@ import { buildReading, scoreActivity, round1 } from '../lib/scoring.js';
 import { detectLiveSignal } from '../lib/signals.js';
 import { getBtcDailySeries, classifyLatest } from '../lib/cycle.js';
 import { fetchGlobalM2Inputs, globalM2MetricsAsOf } from '../lib/globalm2.js';
+import { rollIntraday } from '../lib/btcintraday.js';
 
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL;
@@ -68,6 +69,11 @@ export default async function handler(req, res) {
       }], 'cycle_date');
     }
   } catch (e) { summary.push({ cycle_error: e.message }); }
+
+  // Roll the intraday charting tiers (btc_1h top-up, btc_1m last-7-days). Best-effort —
+  // never blocks the token run if Bitstamp is unreachable.
+  try { const roll = await rollIntraday(base, serviceKey); summary.push({ intraday: roll }); }
+  catch (e) { summary.push({ intraday_error: e.message }); }
 
   let tokens;
   try {
