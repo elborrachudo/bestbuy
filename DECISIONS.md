@@ -332,6 +332,30 @@ noted it here.
   log with phase ribbon + halvings + all 5 indicator overlays; the live screen uses the full
   daily series. Screen A and Phases 1-3 untouched.
 
+## Charting v3 — configurable oscillators + pane titles + snap-to-height (IMPLEMENTED)
+- **Migrated to Lightweight Charts v5** (native multi-pane); Screen B now does:
+- **Oscillators computed CLIENT-SIDE, parameterizable.** RSI / StochRSI / MACD are computed in
+  the browser from the BTC close series (inline standard formulas — not read pre-computed from the
+  backend, and deliberately NOT the deepentropy `lightweight-charts-indicators` lib, which has no
+  clean v5-standalone buildless CDN build). Each oscillator has a persisted config
+  (`sessionStorage.wk_oscCfg`, defaults = classic): RSI {length, ob, os, color, width}, StochRSI
+  {length, k, d, ob, os, colors, width}, MACD {fast, slow, signal, colors, width}, Mayer/Percentil
+  {ref levels, color, width}. Changing a param recomputes + redraws just that pane in place (same
+  pane index → no reordering).
+- **Tiny pane titles + double-tap → configurator.** Each pane shows a tiny UPPERCASE white title
+  (BTC / RSI / STOCH RSI / MACD / MAYER / PERCENTIL) as an HTML overlay positioned over the pane's
+  top-left via cumulative `pane.getHeight()`. Double-tap an oscillator title opens a mobile
+  bottom-sheet configurator (period(s), OB/OS levels, colors, width) with Aplicar / Repor / Fechar.
+- **Snap-to-height.** `autoSize:true` + the container snaps to the available viewport height
+  (`dvh`-based: measured from the chart's top to the bottom of the screen) and panes split it via
+  `setStretchFactor` (price 3, each oscillator 1). A minimum legible height per oscillator
+  (`OSC_MIN`) is guaranteed; only when they can't all fit does the container grow and the page
+  scroll. Recomputes on resize/orientationchange.
+- **Verified** headless (real 5,428-pt series, 0 errors): 3 oscillators fit a 932px screen (chart
+  842px); titles positioned per pane; configurator opens on double-tap; RSI length 14→21 recomputes,
+  persists, and relabels the menu; all 5 oscillators + Mayer/Percentil configurators build.
+  Periods, LOG/LIN, phases, PINs, Screen A untouched.
+
 ## Phase 3 — long BTC history (complete 200W MA + 3-cycle validation) (IMPLEMENTED)
 - **What:** imported BTC daily OHLC since **2011-08-18** (5,428 days) into a new
   `btc_history` table, and the cycle detector now computes the 200-week MA / Mayer /
