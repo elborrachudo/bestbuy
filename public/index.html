@@ -440,7 +440,7 @@
   .wk-per-item{font-size:12px;color:#cdd5e0;padding:7px 10px;border-radius:7px;cursor:pointer;text-align:center;}
   .wk-per-item:hover{background:rgba(91,140,255,.12);}
   .wk-per-item.on{background:rgba(91,140,255,.20);color:#8fd1ff;font-weight:600;}
-  #wk-chart{height:380px;width:100%;border-radius:0;overflow:hidden;position:relative;}
+  #wk-chart{height:min(72vh,620px);height:min(72svh,620px);width:100%;border-radius:0;overflow:hidden;position:relative;}
   .wk-modetog{position:absolute;left:8px;bottom:8px;z-index:6;display:flex;flex-direction:column;gap:2px;background:rgba(13,16,22,.8);border:1px solid #1f2430;border-radius:8px;padding:2px;}
   .wk-mode-b{width:28px;height:24px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#5a6273;cursor:pointer;border-radius:6px;padding:0;}
   .wk-mode-b.on{background:rgba(91,140,255,.22);color:#a9c2ff;}
@@ -449,7 +449,7 @@
   .wk-sub{font-size:11px;color:#8a93a3;margin-top:8px;line-height:1.5;}
   .wk-attribution{font-size:9px;color:#5a6273;text-align:right;margin-top:5px;}
   .wk-attribution a{color:#5a6273;}
-  .wk-loading{display:flex;align-items:center;justify-content:center;height:380px;color:#5a6273;font-size:13px;}
+  .wk-loading{display:flex;align-items:center;justify-content:center;height:min(72vh,620px);height:min(72svh,620px);color:#5a6273;font-size:13px;}
 </style>
 <div id="screenB">
   <div class="wk-wrap">
@@ -1610,7 +1610,7 @@
   }
 
   function showScreen(s){
-    if(s==='B'){ bodyEl.classList.add('wk-b'); try{sessionStorage.setItem('waka_screen','B');}catch(e){} initChart(); if(chart){ try{chart.applyOptions({width:document.getElementById('wk-chart').clientWidth,height:380});}catch(e){} } }
+    if(s==='B'){ bodyEl.classList.add('wk-b'); try{sessionStorage.setItem('waka_screen','B');}catch(e){} initChart(); if(chart){ relayout(); } }
     else { bodyEl.classList.remove('wk-b'); try{sessionStorage.setItem('waka_screen','A');}catch(e){} }
     window.scrollTo(0,0);
   }
@@ -1641,6 +1641,7 @@
     var el=document.getElementById('wk-chart'); L=window.LightweightCharts;
     if(!L){ document.getElementById('wk-loading').textContent='Lightweight Charts não carregou.'; return; }
     chart=L.createChart(el,{
+      autoSize:true,
       layout:{background:{color:'#0d1016'},textColor:'#8a93a3',attributionLogo:false,fontSize:10,
               panes:{enableResize:true,separatorColor:'#262c3a',separatorHoverColor:'#3a4150'}},
       grid:{vertLines:{color:'rgba(255,255,255,.04)'},horzLines:{color:'rgba(255,255,255,.04)'}},
@@ -1674,24 +1675,38 @@
       leg.innerHTML='<b>'+key+'</b> · BTC <b>$'+Math.round(d.c).toLocaleString()+'</b> · '+PHPT[d.p]; leg.style.display='block';
     });
 
-    try{ new ResizeObserver(function(){ chart.applyOptions({width:el.clientWidth}); }).observe(el); }catch(e){}
+    // autoSize:true handles width+height from the container's own ResizeObserver; we only
+    // recompute the container's px height on rotation/resize when oscillator panes are open
+    // (the n===0 case is pure CSS vh and reflows by itself).
+    try{ window.addEventListener('resize', function(){ if(bodyEl.classList.contains('wk-b')) relayout(); }); }catch(e){}
+    try{ window.addEventListener('orientationchange', function(){ setTimeout(function(){ if(bodyEl.classList.contains('wk-b')) relayout(); }, 220); }); }catch(e){}
     relayout(); wireToolbar(); applyInitialPeriod();
-    setInterval(function(){ if(bodyEl.classList.contains('wk-b') && Object.keys(oscReg).length) savePaneHeights(); }, 2500);
   }
 
   // ── pane / oscillator machinery (v5) ──────────────────────────────────────────
-  var OSCH=120;  // default oscillator pane height (px)
-  function relayout(){ if(!chart) return; var n=Object.keys(oscReg).length; var H=360+OSCH*n; var el=document.getElementById('wk-chart'); el.style.height=H+'px'; chart.applyOptions({width:el.clientWidth,height:H}); }
-  function savedPaneHeight(id){ try{ var m=JSON.parse(sessionStorage.getItem('wk_paneH')||'{}'); return m[id]; }catch(e){ return null; } }
-  function savePaneHeights(){ try{ var m={}; Object.keys(oscReg).forEach(function(id){ try{ m[id]=Math.round(oscReg[id].pane.getHeight()); }catch(e){} }); sessionStorage.setItem('wk_paneH', JSON.stringify(m)); }catch(e){} }
+  // Height is divided by STRETCH FACTORS (autoSize fills the container, the panes split it):
+  // the price pane dominates (PRICE_STRETCH) and each oscillator gets 1 — so opening more
+  // oscillators distributes proportionally instead of crushing the price. We also grow the
+  // container so every oscillator keeps a minimum legible height (OSC_MIN); past that the
+  // page scrolls rather than squeezing. enableResize separators stay draggable.
+  var OSC_MIN=104;      // minimum legible height per oscillator pane (px)
+  var PRICE_STRETCH=3;  // price pane dominance vs 1 per oscillator
+  function baseChartH(){ return Math.min(Math.round((window.innerHeight||700)*0.72), 620); }
+  function applyStretch(){ if(!chart) return; try{ var ps=chart.panes(); if(ps[0]) ps[0].setStretchFactor(PRICE_STRETCH); for(var i=1;i<ps.length;i++) ps[i].setStretchFactor(1); }catch(e){} }
+  function relayout(){ if(!chart) return; var n=Object.keys(oscReg).length; var el=document.getElementById('wk-chart');
+    if(n===0){ el.style.height=''; }                                  // fall back to CSS fluid min(72vh,620px)
+    else { el.style.height=Math.max(baseChartH(), OSC_MIN*(PRICE_STRETCH+n))+'px'; }
+    applyStretch(); }
   function addOsc(id){ if(oscReg[id]||!OSC[id]) return; var paneIdx=chart.panes().length; var built=OSC[id].build(paneIdx);
     // oscillator panes are LINEAR (the chart-level log mode would break MACD's negatives)
     try{ built[0].priceScale().applyOptions({mode:0,borderColor:'#1f2430',scaleMargins:{top:0.14,bottom:0.1}}); }catch(e){}
-    var pane=chart.panes()[paneIdx]; oscReg[id]={series:built,pane:pane}; relayout(); var h=savedPaneHeight(id); try{ pane.setHeight(h||OSCH); }catch(e){} }
+    var pane=chart.panes()[paneIdx]; oscReg[id]={series:built,pane:pane}; relayout(); }
   function removeOsc(id){ var r=oscReg[id]; if(!r) return; var pi=null; try{ pi=r.pane.paneIndex(); }catch(e){} r.series.forEach(function(s){ try{ chart.removeSeries(s); }catch(e){} }); try{ if(pi!=null && r.pane.getSeries().length===0) chart.removePane(pi); }catch(e){} delete oscReg[id]; relayout(); }
   var OSC={
     rsi:{build:function(p){ var s=mkLine('#5b8cff',p,{autoscaleInfoProvider:fix(0,100)}); s.setData(arrData(COMP.rsi)); s.createPriceLine({price:70,color:'#3a4150',lineStyle:2,lineWidth:1,axisLabelVisible:false}); s.createPriceLine({price:30,color:'#3a4150',lineStyle:2,lineWidth:1,axisLabelVisible:false}); return [s]; }},
-    stoch:{build:function(p){ var k=mkLine('#22d3ee',p,{autoscaleInfoProvider:fix(0,100)}); k.setData(arrData(COMP.stochK)); var d=mkLine('#f59e0b',p); d.setData(arrData(COMP.stochD)); k.createPriceLine({price:80,color:'#3a4150',lineStyle:2,axisLabelVisible:false}); k.createPriceLine({price:20,color:'#3a4150',lineStyle:2,axisLabelVisible:false}); return [k,d]; }},
+    // StochRSI is the fastest oscillator — over 5,400 daily points it fills the pane solid in
+    // ALL; thinner (1px) + softened opacity keeps it readable and resolves on zoom (data intact).
+    stoch:{build:function(p){ var k=mkLine('rgba(34,211,238,.78)',p,{lineWidth:1,autoscaleInfoProvider:fix(0,100)}); k.setData(arrData(COMP.stochK)); var d=mkLine('rgba(245,158,11,.72)',p,{lineWidth:1}); d.setData(arrData(COMP.stochD)); k.createPriceLine({price:80,color:'#3a4150',lineStyle:2,axisLabelVisible:false}); k.createPriceLine({price:20,color:'#3a4150',lineStyle:2,axisLabelVisible:false}); return [k,d]; }},
     macd:{build:function(p){ var h=chart.addSeries(L.HistogramSeries,{priceLineVisible:false,lastValueVisible:false},p); h.setData(DATA.series.map(function(d,i){ var v=COMP.hist[i]; return (v==null)?null:{time:d.t,value:v,color:v>=0?'rgba(34,197,94,.55)':'rgba(244,63,94,.55)'}; }).filter(Boolean)); var m=mkLine('#5b8cff',p); m.setData(arrData(COMP.macd)); var sg=mkLine('#f59e0b',p); sg.setData(arrData(COMP.signal)); return [h,m,sg]; }},
     mayer:{build:function(p){ var s=mkLine('#a78bfa',p); s.setData(arrData(DATA.series.map(function(d){ return d.mayer; }))); s.createPriceLine({price:1,color:'#3a4150',lineStyle:2,axisLabelVisible:false}); s.createPriceLine({price:2.4,color:'rgba(244,63,94,.5)',lineStyle:3,axisLabelVisible:false}); return [s]; }},
     pct:{build:function(p){ var s=mkLine('#22d3ee',p,{autoscaleInfoProvider:fix(0,100)}); s.setData(arrData(DATA.series.map(function(d){ return d.pct; }))); return [s]; }},
@@ -1734,7 +1749,7 @@
     if(k==='halving') return updateHalvings();
     if(k==='phases') return setPhases(on);
     if(k==='ma200w') return on?addMa():rmMa();
-    if(['rsi','stoch','macd','mayer','pct'].indexOf(k)>=0){ if(on) addOsc(k); else removeOsc(k); savePaneHeights(); }
+    if(['rsi','stoch','macd','mayer','pct'].indexOf(k)>=0){ if(on) addOsc(k); else removeOsc(k); }
   }
 
   function wireToolbar(){
