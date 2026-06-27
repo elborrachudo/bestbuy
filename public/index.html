@@ -152,6 +152,7 @@
   /* Blur the real dashboard while locked; transition makes the reveal smooth. */
   .wrap,.modal-back{transition:filter 0.77s cubic-bezier(.4,0,.2,1);}
   html:not(.pjdc266-unlocked) .wrap,
+  html:not(.pjdc266-unlocked) #screenB,
   html:not(.pjdc266-unlocked) .modal-back{filter:blur(9px) brightness(0.5);pointer-events:none;}
   html:not(.pjdc266-unlocked) body{overflow:hidden;}
   /* Once unlocked, the gate layers are gone entirely. */
@@ -260,8 +261,9 @@
       else { promptEl.innerHTML=msg+'<span class="pjdc266-cursor">&nbsp;</span>'; }
     })();
 
-    /* ---- PIN logic ---- */
-    var PIN='0211';
+    /* ---- PIN logic (two codes route the ENTRY screen; decorative, not security) ----
+       0211 → Ecrã A (dashboard) · 0222 → Ecrã B (charting de ciclo). */
+    var PIN_A='0211', PIN_B='0222';
     var pins=[].slice.call(document.querySelectorAll('.pjdc266-pin'));
     var status=document.getElementById('pjdc266-status');
 
@@ -309,6 +311,7 @@
             try{ sessionStorage.setItem('pjdc266_ok','1'); }catch(e){}
             html.classList.add('pjdc266-unlocked');               // consistent end state; hides gate layers
             content.forEach(function(el){ el.style.filter=''; el.style.transition=''; el.style.pointerEvents=''; });
+            try{ if(window.WAKA) window.WAKA.applyEntry(); }catch(_){}  // route to the PIN's entry screen (0211→A, 0222→B)
           },840);
         }
       })();
@@ -317,7 +320,8 @@
     function check(){
       var code=pins.map(function(p){return p.value;}).join('');
       if(code.length<4){ status.textContent='a aguardar autenticação…'; status.className='pjdc266-status'; return; }
-      if(code===PIN){
+      if(code===PIN_A || code===PIN_B){
+        try{ sessionStorage.setItem('waka_screen', code===PIN_B ? 'B' : 'A'); }catch(e){}
         pins.forEach(function(p){ p.classList.remove('pjdc266-err'); p.classList.add('pjdc266-ok'); p.blur(); });
         runValidation();
       } else {
@@ -394,6 +398,86 @@
   </div>
 </div>
 
+<!-- ===== Screen B — professional cycle charting (Lightweight Charts) ===== -->
+<style id="wk-style">
+  #screenB{display:none;padding:14px 12px;}
+  body.wk-b .wrap{display:none;}
+  body.wk-b .modal-back{display:none;}
+  body.wk-b #screenB{display:block;}
+  .wk-wrap{max-width:560px;margin:0 auto;}
+  .wk-card{background:#11141b;border:1px solid #1f2430;border-radius:18px;padding:12px;}
+  .wk-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;}
+  .wk-title{font-size:18px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:7px;cursor:pointer;color:#e8ecf2;}
+  .wk-title:active{opacity:.6;}
+  .wk-title .wk-arrow{font-size:13px;color:#5a6273;}
+  .wk-phasetag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:8px;background:rgba(167,139,250,.14);color:#c4b5fd;white-space:nowrap;}
+  .wk-phasetag .wk-sw{width:8px;height:8px;border-radius:50%;background:#a78bfa;}
+  .wk-toolbar{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+  .wk-ind-wrap{position:relative;}
+  .wk-ind-btn{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;border:1px solid #1f2430;border-radius:9px;padding:7px 11px;color:#c4b5fd;background:rgba(167,139,250,.10);cursor:pointer;}
+  .wk-ind-menu{position:absolute;top:42px;left:0;z-index:30;width:235px;background:#13161e;border:1px solid #1f2430;border-radius:12px;padding:6px;box-shadow:0 12px 40px rgba(0,0,0,.5);display:none;}
+  .wk-ind-menu.open{display:block;}
+  .wk-ind-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:#e8ecf2;}
+  .wk-ind-radio{width:34px;height:20px;border-radius:11px;background:#2a3040;position:relative;transition:.2s;flex-shrink:0;}
+  .wk-ind-radio::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#5a6273;transition:.2s;}
+  .wk-ind-item.on .wk-ind-radio{background:rgba(91,140,255,.4);}
+  .wk-ind-item.on .wk-ind-radio::after{transform:translateX(14px);background:#a9c2ff;}
+  .wk-ind-item .wk-nm{flex:1;}
+  .wk-ind-item .wk-csw{width:10px;height:10px;border-radius:2px;}
+  .wk-ind-sep{height:1px;background:#1f2430;margin:5px 8px;}
+  .wk-ind-head{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#5a6273;padding:6px 10px 3px;}
+  .wk-spacer{flex:1;}
+  .wk-ranges{display:flex;gap:5px;}
+  .wk-rng{font-size:11px;color:#8a93a3;padding:6px 9px;border-radius:8px;background:#161a23;cursor:pointer;}
+  .wk-rng.on{color:#8fd1ff;border:1px solid rgba(91,180,255,.4);}
+  .wk-scaletoggle{font-size:11px;font-weight:600;color:#8fd1ff;border:1px solid rgba(91,180,255,.4);border-radius:8px;padding:6px 9px;background:#161a23;cursor:pointer;}
+  #wk-chart{height:380px;width:100%;border-radius:10px;overflow:hidden;position:relative;}
+  .wk-legend{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;color:#cdd5e0;background:rgba(13,16,22,.72);border:1px solid #1f2430;border-radius:7px;padding:5px 8px;pointer-events:none;line-height:1.5;display:none;}
+  .wk-legend b{color:#fff;font-weight:600;}
+  .wk-sub{font-size:11px;color:#8a93a3;margin-top:8px;line-height:1.5;}
+  .wk-attribution{font-size:9px;color:#5a6273;text-align:right;margin-top:5px;}
+  .wk-attribution a{color:#5a6273;}
+  .wk-loading{display:flex;align-items:center;justify-content:center;height:380px;color:#5a6273;font-size:13px;}
+</style>
+<div id="screenB">
+  <div class="wk-wrap">
+    <div class="wk-card">
+      <div class="wk-head">
+        <div class="wk-title" id="wk-title">WAKAWAKA charting <span class="wk-arrow">⇄</span></div>
+        <span class="wk-phasetag" id="wk-phasetag"><span class="wk-sw" id="wk-phasesw"></span><span id="wk-phasetxt">—</span></span>
+      </div>
+      <div class="wk-toolbar">
+        <div class="wk-ind-wrap">
+          <div class="wk-ind-btn" id="wk-indBtn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 3 4-6"/></svg>
+            Indicadores ▾
+          </div>
+          <div class="wk-ind-menu" id="wk-indMenu">
+            <div class="wk-ind-head">Detetor de ciclo</div>
+            <div class="wk-ind-item on" data-ind="phases"><span class="wk-ind-radio"></span><span class="wk-nm">Fases do ciclo</span><span class="wk-csw" style="background:linear-gradient(90deg,#22c55e,#fb923c)"></span></div>
+            <div class="wk-ind-item on" data-ind="halving"><span class="wk-ind-radio"></span><span class="wk-nm">Halvings</span><span class="wk-csw" style="background:#8a93a3"></span></div>
+            <div class="wk-ind-sep"></div>
+            <div class="wk-ind-head">Preço (lidos de market_cycle)</div>
+            <div class="wk-ind-item" data-ind="ma200w"><span class="wk-ind-radio"></span><span class="wk-nm">200W MA</span><span class="wk-csw" style="background:#f59e0b"></span></div>
+            <div class="wk-ind-item" data-ind="mayer"><span class="wk-ind-radio"></span><span class="wk-nm">Mayer Multiple</span><span class="wk-csw" style="background:#5b8cff"></span></div>
+            <div class="wk-ind-item" data-ind="percentile"><span class="wk-ind-radio"></span><span class="wk-nm">Percentil histórico</span><span class="wk-csw" style="background:#22d3ee"></span></div>
+          </div>
+        </div>
+        <div class="wk-spacer"></div>
+        <div class="wk-ranges" id="wk-ranges">
+          <div class="wk-rng" data-y="1">1A</div>
+          <div class="wk-rng" data-y="4">4A</div>
+          <div class="wk-rng on" data-y="0">Tudo</div>
+        </div>
+        <div class="wk-scaletoggle" id="wk-scaleToggle">LOG</div>
+      </div>
+      <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div></div>
+      <div class="wk-sub" id="wk-sub">BTC/USD · escala log · fases do detetor de ciclo (Mayer + 200W MA + drawdown + percentil) sobre 10+ anos.</div>
+      <div class="wk-attribution"><a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a></div>
+    </div>
+  </div>
+</div>
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
@@ -1438,18 +1522,135 @@
   })();
 
   document.getElementById('export-btn').onclick=exportExcel;
-  // Tap the chart title to switch between the two views.
-  (function(){ var b=document.getElementById('view-toggle'); if(b) b.onclick=function(){
-    state.view = state.view==='long' ? 'short' : 'long';
-    b.textContent = state.view==='long' ? 'Ciclo de mercado ⤢' : 'Sinais de entrada ⤢';
-    renderChart();
-  }; })();
+  // Tap the chart title (Screen A) → open the pro charting screen (Screen B). Screen A keeps
+  // the signals view; the long/cycle view now lives in the Lightweight-Charts Screen B.
+  (function(){ var b=document.getElementById('view-toggle'); if(b){
+    state.view='short'; b.textContent='Ciclo de mercado ⤢';
+    b.onclick=function(){ if(window.WAKA) window.WAKA.showScreen('B'); };
+  } })();
   document.getElementById('logo').onclick=openReport;
   document.getElementById('report-x').onclick=closeReport;
   document.getElementById('report-back').onclick=function(e){ if(e.target===this) closeReport(); };
   document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeReport(); });
 
   load();
+})();
+</script>
+
+<!-- ===== Screen B controller: Lightweight Charts cycle screen + A/B navigation ===== -->
+<script>
+(function(){
+  "use strict";
+  var bodyEl=document.body;
+  var PHC={accu:'#22c55e',rise:'#3a7bd5',euph:'#fb923c',corr:'#a78bfa'};
+  var PHPT={accu:'Acumulação',rise:'Subida',euph:'Euforia',corr:'Correção'};
+  var FULL={accumulation:'accu',rise:'rise',euphoria:'euph',correction:'corr'};
+  var HALV=['2012-11-28','2016-07-09','2020-05-11','2024-04-19'];
+  var inited=false, chart=null, area=null, ribbon=null, ma=null, mayerS=null, pctS=null;
+  var DATA=null, byTime={}, isLog=true;
+  var ind={phases:true,halving:true,ma200w:false,mayer:false,percentile:false};
+
+  function hexRgb(h){ h=h.replace('#',''); return parseInt(h.slice(0,2),16)+','+parseInt(h.slice(2,4),16)+','+parseInt(h.slice(4,6),16); }
+
+  function showScreen(s){
+    if(s==='B'){ bodyEl.classList.add('wk-b'); try{sessionStorage.setItem('waka_screen','B');}catch(e){} initChart(); if(chart){ try{chart.applyOptions({width:document.getElementById('wk-chart').clientWidth,height:380});}catch(e){} } }
+    else { bodyEl.classList.remove('wk-b'); try{sessionStorage.setItem('waka_screen','A');}catch(e){} }
+    window.scrollTo(0,0);
+  }
+  function applyEntry(){ var s='A'; try{ s=sessionStorage.getItem('waka_screen')||'A'; }catch(e){} showScreen(s==='B'?'B':'A'); }
+  window.WAKA={showScreen:showScreen, applyEntry:applyEntry};
+
+  var ttl=document.getElementById('wk-title'); if(ttl) ttl.onclick=function(){ showScreen('A'); };
+
+  function setPhaseTag(cur){
+    if(!cur) return;
+    var pc=FULL[cur.phase]||'corr', txt=PHPT[pc];
+    if(cur.confidence!=null) txt+=' · '+cur.confidence+'%';
+    if(cur.mayer!=null) txt+=' · Mayer '+Number(cur.mayer).toFixed(2);
+    document.getElementById('wk-phasesw').style.background=PHC[pc];
+    document.getElementById('wk-phasetxt').textContent=txt;
+    var tag=document.getElementById('wk-phasetag'); tag.style.background='rgba('+hexRgb(PHC[pc])+',.16)'; tag.style.color=PHC[pc];
+    if(cur.m2_value!=null){
+      var sub=document.getElementById('wk-sub');
+      sub.innerHTML='BTC/USD · escala log · fases sobre 10+ anos. &nbsp;·&nbsp; Liquidez M2 global ≈ $'+Number(cur.m2_value).toFixed(1)+' tri · '+(cur.m2_expanding?'a expandir':'a contrair')+(cur.m2_yoy_pct!=null?(' '+(cur.m2_yoy_pct>=0?'+':'')+Number(cur.m2_yoy_pct).toFixed(1)+'% YoY'):'');
+    }
+  }
+
+  function initChart(){
+    if(inited) return; inited=true;
+    fetch('/api/cycle-series').then(function(r){return r.json();}).then(function(j){
+      if(!j||!j.ok||!j.series||!j.series.length){ document.getElementById('wk-loading').textContent='sem dados (corre /api/backfill-cycle).'; return; }
+      DATA=j; render(j);
+    }).catch(function(e){ var l=document.getElementById('wk-loading'); if(l) l.textContent='erro a carregar: '+e.message; });
+  }
+
+  function render(j){
+    var el=document.getElementById('wk-chart'), lc=window.LightweightCharts;
+    if(!lc){ document.getElementById('wk-loading').textContent='Lightweight Charts não carregou.'; return; }
+    chart=lc.createChart(el,{
+      layout:{background:{color:'#0d1016'},textColor:'#8a93a3',attributionLogo:false},
+      grid:{vertLines:{color:'rgba(255,255,255,.04)'},horzLines:{color:'rgba(255,255,255,.04)'}},
+      rightPriceScale:{borderColor:'#1f2430',mode:1},
+      timeScale:{borderColor:'#1f2430',timeVisible:false},
+      crosshair:{mode:1}, handleScroll:true, handleScale:true,
+    });
+    var lo=document.getElementById('wk-loading'); if(lo) lo.style.display='none';
+    var ser=j.series;
+    ser.forEach(function(d){ byTime[d.t]={c:d.c,mayer:d.mayer,pct:d.pct,p:d.p}; });
+
+    ribbon=chart.addHistogramSeries({priceScaleId:'wk-phase',priceLineVisible:false,lastValueVisible:false});
+    ribbon.setData(ser.map(function(d){ return {time:d.t,value:1,color:PHC[d.p]||'#a78bfa'}; }));
+    chart.priceScale('wk-phase').applyOptions({scaleMargins:{top:0.9,bottom:0}});
+
+    area=chart.addAreaSeries({lineColor:'#a78bfa',topColor:'rgba(167,139,250,.18)',bottomColor:'rgba(167,139,250,0)',lineWidth:2,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}});
+    area.setData(ser.map(function(d){ return {time:d.t,value:d.c}; }));
+
+    applyHalvings(); setPhaseTag(j.current);
+
+    var leg=document.getElementById('wk-legend');
+    chart.subscribeCrosshairMove(function(param){
+      if(!param||!param.time){ leg.style.display='none'; return; }
+      var key=param.time; if(typeof key==='object'&&key.year){ key=key.year+'-'+String(key.month).padStart(2,'0')+'-'+String(key.day).padStart(2,'0'); }
+      var d=byTime[key]; if(!d){ leg.style.display='none'; return; }
+      var html='<b>'+key+'</b> · BTC <b>$'+Math.round(d.c).toLocaleString()+'</b> · '+PHPT[d.p];
+      if(ind.mayer&&d.mayer!=null) html+=' · Mayer <b>'+d.mayer.toFixed(2)+'</b>';
+      if(ind.percentile&&d.pct!=null) html+=' · pct <b>'+Math.round(d.pct)+'%</b>';
+      leg.innerHTML=html; leg.style.display='block';
+    });
+
+    chart.timeScale().fitContent();
+    try{ new ResizeObserver(function(){ chart.applyOptions({width:el.clientWidth,height:380}); }).observe(el); }catch(e){}
+    chart.applyOptions({width:el.clientWidth,height:380});
+    wireToolbar();
+  }
+
+  function applyHalvings(){ if(area) area.setMarkers(ind.halving ? HALV.map(function(t){ return {time:t,position:'aboveBar',color:'#8a93a3',shape:'arrowDown',text:'⛏'}; }) : []); }
+
+  function lineData(field){ return DATA.series.filter(function(d){return d[field]!=null;}).map(function(d){return {time:d.t,value:d[field]};}); }
+  function toggleInd(k,on){
+    ind[k]=on;
+    if(k==='halving') return applyHalvings();
+    if(k==='phases'){ if(ribbon) ribbon.applyOptions({visible:on}); return; }
+    if(k==='ma200w'){ if(on){ if(!ma){ ma=chart.addLineSeries({color:'#f59e0b',lineWidth:1,priceLineVisible:false,lastValueVisible:false}); ma.setData(lineData('ma200w')); } } else if(ma){ chart.removeSeries(ma); ma=null; } return; }
+    if(k==='mayer'){ if(on){ if(!mayerS){ mayerS=chart.addLineSeries({color:'#5b8cff',lineWidth:1,priceScaleId:'wk-mayer',priceLineVisible:false,lastValueVisible:false}); mayerS.setData(lineData('mayer')); } } else if(mayerS){ chart.removeSeries(mayerS); mayerS=null; } return; }
+    if(k==='percentile'){ if(on){ if(!pctS){ pctS=chart.addLineSeries({color:'#22d3ee',lineWidth:1,priceScaleId:'wk-pct',priceLineVisible:false,lastValueVisible:false}); pctS.setData(lineData('pct')); } } else if(pctS){ chart.removeSeries(pctS); pctS=null; } return; }
+  }
+
+  function wireToolbar(){
+    var indBtn=document.getElementById('wk-indBtn'), indMenu=document.getElementById('wk-indMenu');
+    indBtn.onclick=function(e){ e.stopPropagation(); indMenu.classList.toggle('open'); };
+    document.addEventListener('click',function(e){ if(!e.target.closest('.wk-ind-wrap')) indMenu.classList.remove('open'); });
+    Array.prototype.forEach.call(document.querySelectorAll('.wk-ind-item'),function(it){ it.onclick=function(){ var on=!it.classList.contains('on'); it.classList.toggle('on',on); toggleInd(it.dataset.ind,on); }; });
+    Array.prototype.forEach.call(document.querySelectorAll('.wk-rng'),function(r){ r.onclick=function(){
+      Array.prototype.forEach.call(document.querySelectorAll('.wk-rng'),function(x){x.classList.remove('on');}); r.classList.add('on');
+      var y=+r.dataset.y, ser=DATA.series, last=ser[ser.length-1].t;
+      if(y===0){ chart.timeScale().fitContent(); } else { var d=new Date(last); d.setFullYear(d.getFullYear()-y); chart.timeScale().setVisibleRange({from:d.toISOString().slice(0,10),to:last}); }
+    }; });
+    var st=document.getElementById('wk-scaleToggle');
+    st.onclick=function(){ isLog=!isLog; st.textContent=isLog?'LOG':'LIN'; chart.priceScale('right').applyOptions({mode:isLog?1:0}); };
+  }
+
+  if(document.readyState!=='loading') applyEntry(); else document.addEventListener('DOMContentLoaded',applyEntry);
 })();
 </script>
 </body>
