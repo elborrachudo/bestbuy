@@ -414,6 +414,11 @@
   .wk-phasetag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:8px;background:rgba(167,139,250,.14);color:#c4b5fd;white-space:nowrap;}
   .wk-phasetag .wk-sw{width:8px;height:8px;border-radius:50%;background:#a78bfa;}
   .wk-toolbar{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+  .wk-layers{display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px;}
+  .wk-layer{font-size:11px;font-weight:600;color:#8a93a3;border:1px solid #1f2430;background:rgba(255,255,255,.02);border-radius:8px;padding:5px 9px;cursor:pointer;line-height:1;}
+  .wk-layer.on{background:rgba(91,140,255,.18);border-color:#3a4d80;color:#a9c2ff;}
+  .wk-layer-soon{opacity:.45;}
+  .wk-layer[data-layer="halvings"].on{background:rgba(200,164,21,.18);border-color:#7a6512;color:#e4c64a;}
   .wk-ind-wrap{position:relative;}
   .wk-ind-btn{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;border:1px solid #1f2430;border-radius:9px;padding:7px 11px;color:#c4b5fd;background:rgba(167,139,250,.10);cursor:pointer;}
   .wk-ind-menu{position:absolute;top:42px;left:0;z-index:30;width:235px;background:#13161e;border:1px solid #1f2430;border-radius:12px;padding:6px;box-shadow:0 12px 40px rgba(0,0,0,.5);display:none;}
@@ -546,6 +551,13 @@
           </div>
         </div>
         <div class="wk-scaletoggle" id="wk-scaleToggle">LOG</div>
+      </div>
+      <div class="wk-layers" id="wk-layers">
+        <button class="wk-layer" data-layer="phases">Fases</button>
+        <button class="wk-layer" data-layer="halvings">Halvings</button>
+        <button class="wk-layer wk-layer-soon" data-layer="manip">Manip.</button>
+        <button class="wk-layer wk-layer-soon" data-layer="maw">MA 50/200W</button>
+        <button class="wk-layer wk-layer-soon" data-layer="mad">MA 50/200D</button>
       </div>
       <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div>
         <div class="wk-modetog" id="wk-modetog">
@@ -1629,8 +1641,16 @@
   var PHC={accu:'#22c55e',rise:'#3a7bd5',euph:'#fb923c',corr:'#a78bfa'};
   var PHPT={accu:'Acumulação',rise:'Subida',euph:'Euforia',corr:'Correção'};
   var FULL={accumulation:'accu',rise:'rise',euphoria:'euph',correction:'corr'};
-  var HALV=['2012-11-28','2016-07-09','2020-05-11','2024-04-19'];
-  var inited=false, chart=null, L=null, area=null, candle=null, ma=null, halvMk=null, phasePrim=null;
+  // Halvings — exact block times (UTC): #210000 2012-11-28 15:24 · #420000 2016-07-09 16:46 ·
+  // #630000 2020-05-11 19:23 · #840000 2024-04-20 00:09.
+  var HALVINGS=[
+    {year:2012, date:'2012-11-28', dm:'28/11', hm:'15:24'},
+    {year:2016, date:'2016-07-09', dm:'09/07', hm:'16:46'},
+    {year:2020, date:'2020-05-11', dm:'11/05', hm:'19:23'},
+    {year:2024, date:'2024-04-20', dm:'20/04', hm:'00:09'},
+  ];
+  var HALV_COLOR='#C8A415';
+  var inited=false, chart=null, L=null, area=null, candle=null, ma=null, halvPrim=null, halvAttached=false, phasePrim=null;
   var DATA=null, byTime={}, isLog=true, mode='line';
   var CLOSE=[], oscReg={};   // CLOSE: active close series · oscReg: id -> {series:[…],pane,priceLines:[…],kind}
   // ── candle-size tiers (price granularity) ─────────────────────────────────────
@@ -1649,7 +1669,18 @@
   var CS_WIN={'1m':0.25,'5m':1,'15m':3,'1H':14,'4H':60,'1D':90,'1W':365,'1M':1460,'3M':2920,'6M':0,'1A':0,'2A':0};  // default visible window (days); 0=ALL
   var DAILY_ONLY=['ma200w','mayer','pct'];   // cycle indicators valid only on daily-family buckets
   var INTRADAY_WINDOW_DAYS=60;               // rolling minute window (must match lib/btcintraday.js)
-  var CS_GUARD_MSG='1m/5m/15m disponível só nos últimos '+INTRADAY_WINDOW_DAYS+' dias';
+  // top toggle bar: independent layers, persisted. phases/halvings are live; manip/maw/mad are
+  // placeholders for Fases III/IV (present but inactive — they just persist + hint for now).
+  var LAYER_DEFAULTS={phases:true, halvings:true, manip:false, maw:false, mad:false};
+  function loadLayers(){ var b=Object.assign({},LAYER_DEFAULTS); try{ var s=JSON.parse(sessionStorage.getItem('wk_layers')||'{}'); Object.keys(s).forEach(function(k){ if(k in b) b[k]=!!s[k]; }); }catch(e){} return b; }
+  var layers=loadLayers();
+  function saveLayers(){ try{ sessionStorage.setItem('wk_layers', JSON.stringify(layers)); }catch(e){} }
+  // shared easing engine (~0.5s ease-out via rAF), reused by auto-fit + intraday auto-adjust
+  var ANIM_MS=500, _anims={};
+  function easeOut(p){ return 1-Math.pow(1-p,3); }
+  function animate(key, ms, fn, done){ if(_anims[key]) cancelAnimationFrame(_anims[key]); var t0=performance.now();
+    function step(now){ var p=Math.min(1,(now-t0)/ms); fn(easeOut(p)); if(p<1){ _anims[key]=requestAnimationFrame(step); } else { delete _anims[key]; if(done) done(); } }
+    _anims[key]=requestAnimationFrame(step); }
   var ind={phases:true,halving:true,ma200w:false,rsi:false,stoch:false,macd:false,mayer:false,pct:false};
   var cfgId=null;            // oscillator id currently open in the configurator
 
@@ -1699,6 +1730,75 @@
         runs.forEach(function(run){ if(run.to<vf||run.from>vt) return; var x0=(run.from<=vf)?0:ts.timeToCoordinate(run.from); var x1=(run.to>=vt)?(W/hpr):ts.timeToCoordinate(run.to); if(x0==null) x0=0; if(x1==null) x1=W/hpr; var bx0=Math.round(x0*hpr),bx1=Math.round(x1*hpr); if(bx1<=bx0) return; ctx.fillStyle=phaseBg(run.p); ctx.fillRect(bx0,0,bx1-bx0,H); }); }); } };
     return { attached:function(pp){ ch=pp.chart; }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'bottom'; }, renderer:function(){ return renderer; } } ]; } };
   }
+
+  // ── halvings: dotted burnt-yellow full-height lines + H<year> box (custom v5 primitive) ──
+  // Drawn on the price pane (pane 0). Skipped at intraday resolutions (halvings are years apart,
+  // outside the 60-day intraday window). Replaces the old arrow/pickaxe markers.
+  function makeHalvingPrimitive(){
+    var ch=null;
+    var renderer={ draw:function(target){ if(!ch || !layers.halvings || isIntra()) return;
+      var ts=ch.timeScale();
+      target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height;
+        HALVINGS.forEach(function(hv,i){ var x; try{ x=ts.timeToCoordinate(hv.date); }catch(e){ x=null; } if(x==null || x<-2 || x>W+2) return;
+          var xl=Math.round(x)+0.5;
+          ctx.save();
+          ctx.strokeStyle=HALV_COLOR; ctx.lineWidth=1; ctx.setLineDash([2,3]);
+          ctx.beginPath(); ctx.moveTo(xl,0); ctx.lineTo(xl,H); ctx.stroke(); ctx.setLineDash([]);
+          var t1='H'+hv.year, t2=hv.dm+' '+hv.hm;
+          ctx.font='700 10px -apple-system,system-ui,sans-serif'; var w1=ctx.measureText(t1).width;
+          ctx.font='700 8px -apple-system,system-ui,sans-serif';  var w2=ctx.measureText(t2).width;
+          var bw=Math.max(w1,w2)+8, bh=23, bx=x+3; if(bx+bw>W) bx=x-bw-3; if(bx<2) bx=2;
+          var by=1+(i%2)*(bh+3);   // stagger adjacent boxes so they never overlap when halvings are close
+          ctx.fillStyle=HALV_COLOR; ctx.fillRect(bx,by,bw,bh);
+          ctx.fillStyle='#000'; ctx.textBaseline='top';
+          ctx.font='700 10px -apple-system,system-ui,sans-serif'; ctx.fillText(t1, bx+4, by+2);
+          ctx.font='700 8px -apple-system,system-ui,sans-serif';  ctx.fillText(t2, bx+4, by+13);
+          ctx.restore();
+        });
+      });
+    } };
+    return { attached:function(p){ ch=p.chart; }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'top'; }, renderer:function(){ return renderer; } } ]; } };
+  }
+  function applyHalvLayer(){ try{ if(!halvPrim) return; if(layers.halvings && !halvAttached){ area.attachPrimitive(halvPrim); halvAttached=true; } else if(!layers.halvings && halvAttached){ area.detachPrimitive(halvPrim); halvAttached=false; } }catch(e){} }
+
+  // ── top toggle bar (layers) ───────────────────────────────────────────────────
+  function syncLayerUI(){ try{
+    Array.prototype.forEach.call(document.querySelectorAll('.wk-layer'),function(b){ b.classList.toggle('on', !!layers[b.dataset.layer]); });
+    var pf=document.querySelector('.wk-ind-item[data-ind="phases"]'); if(pf) pf.classList.toggle('on', !!layers.phases);
+    var hv=document.querySelector('.wk-ind-item[data-ind="halving"]'); if(hv) hv.classList.toggle('on', !!layers.halvings);
+  }catch(e){} }
+  function wireLayers(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-layer'),function(b){ b.onclick=function(){ var k=b.dataset.layer;
+    if(k==='phases'){ setPhases(!layers.phases); }
+    else if(k==='halvings'){ setHalvings(!layers.halvings); }
+    else { layers[k]=!layers[k]; saveLayers(); b.classList.toggle('on',layers[k]); notify('Camada "'+b.textContent.trim()+'" chega numa fase futura'); }
+  }; }); syncLayerUI(); }
+
+  // ── double-click a pane → animated vertical auto-fit (0.5s, that pane only, LOG respected) ──
+  function paneIndexAtY(clientY){ if(!chart) return 0; var el=document.getElementById('wk-chart'); var top=0; try{ top=el.getBoundingClientRect().top; }catch(e){} var y=clientY-top; var ps=chart.panes(); var acc=0; for(var i=0;i<ps.length;i++){ var h=0; try{ h=ps[i].getHeight(); }catch(e){} if(y<acc+h+1) return i; acc+=h+1; } return ps.length-1; }
+  function priceScaleOfPane(idx){ if(idx===0) return area.priceScale(); var id=null; Object.keys(oscReg).forEach(function(k){ try{ if(oscReg[k].pane.paneIndex()===idx) id=k; }catch(e){} }); if(id && oscReg[id].series[0]) return oscReg[id].series[0].priceScale(); return null; }
+  function autofitPane(idx){ var ps=priceScaleOfPane(idx); if(!ps) return; var sm={top:0.1,bottom:0.1}; try{ var o=ps.options(); if(o&&o.scaleMargins) sm=o.scaleMargins; }catch(e){}
+    try{ ps.applyOptions({autoScale:true}); }catch(e){}
+    var t0=sm.top, b0=sm.bottom, t1=0.04, b1=(idx===0?0.06:0.08);
+    animate('autofit'+idx, ANIM_MS, function(e){ try{ ps.applyOptions({scaleMargins:{top:t0+(t1-t0)*e, bottom:b0+(b1-b0)*e}}); }catch(_){} }); }
+
+  // ── momentum pan (inertia): release with lateral velocity → slide + ease to a stop ─────────
+  var _pan={tracking:false, samples:[], raf:null};
+  function cancelMomentum(){ if(_pan.raf){ cancelAnimationFrame(_pan.raf); _pan.raf=null; } }
+  function panDown(){ cancelMomentum(); _pan.tracking=true; _pan.samples=[]; }
+  function panMove(){ if(!_pan.tracking||!chart) return; try{ var sp=chart.timeScale().scrollPosition(); _pan.samples.push({p:sp,t:performance.now()}); if(_pan.samples.length>6) _pan.samples.shift(); }catch(e){} }
+  function panUp(){ if(!_pan.tracking) return; _pan.tracking=false; var s=_pan.samples; if(s.length<2) return; var a=s[0], b=s[s.length-1], dt=b.t-a.t; if(dt<=0) return;
+    var vel=(b.p-a.p)/dt; if(!isFinite(vel) || Math.abs(vel)<0.004) return;   // bars per ms
+    var pos; try{ pos=chart.timeScale().scrollPosition(); }catch(e){ return; } var last=performance.now();
+    function frame(now){ var d=now-last; last=now; if(d>64) d=64; pos+=vel*d; vel*=Math.pow(0.94, d/16.67);
+      try{ chart.timeScale().scrollToPosition(pos, false); }catch(e){}
+      if(Math.abs(vel)>0.004){ _pan.raf=requestAnimationFrame(frame); } else { _pan.raf=null; } }
+    _pan.raf=requestAnimationFrame(frame); }
+
+  // ── intraday (a)/(b) helpers — replace the old "warn + fallback 1D" ────────────────────────
+  function toEpoch(t){ if(t==null) return null; if(typeof t==='number') return t; if(typeof t==='object'&&t.year) return Math.floor(Date.UTC(t.year,t.month-1,t.day)/1000); return Math.floor(Date.parse(t+'T00:00:00Z')/1000); }
+  function visibleEpochRange(){ if(!chart) return null; try{ var r=chart.timeScale().getVisibleRange(); if(!r) return null; return {from:toEpoch(r.from), to:toEpoch(r.to)}; }catch(e){ return null; } }
+  function animateToFull(){ var ts=chart.timeScale(); var start; try{ start=ts.getVisibleLogicalRange(); }catch(e){ start=null; } if(!start){ try{ ts.fitContent(); }catch(e){} return; } var N=ACTIVE.length, tf=-1, tt=N+2;
+    animate('range', ANIM_MS, function(e){ try{ ts.setVisibleLogicalRange({from:start.from+(tf-start.from)*e, to:start.to+(tt-start.to)*e}); }catch(_){} }); }
 
   function showScreen(s){
     if(s==='B'){ bodyEl.classList.add('wk-b'); try{sessionStorage.setItem('waka_screen','B');}catch(e){} initChart(); if(chart){ relayout(); } }
@@ -1754,8 +1854,10 @@
     area.setData(ACTIVE.map(function(d){ return {time:d.time,value:d.close}; }));
     candle=chart.addSeries(L.CandlestickSeries,{upColor:'#22c55e',downColor:'#f43f5e',wickUpColor:'#22c55e',wickDownColor:'#f43f5e',borderVisible:false,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
     candle.setData(ACTIVE.map(function(d){ return {time:d.time,open:d.open,high:d.high,low:d.low,close:d.close}; }));
-    try{ phasePrim=makePhasePrimitive(buildRuns(ACTIVE)); area.attachPrimitive(phasePrim); }catch(e){}
-    halvMk=L.createSeriesMarkers(area, []); updateHalvings();
+    // phase bands + halving lines as custom v5 primitives on pane 0 (init from persisted layers)
+    ind.phases=layers.phases; ind.halving=layers.halvings;
+    try{ phasePrim=makePhasePrimitive(buildRuns(ACTIVE)); if(layers.phases) area.attachPrimitive(phasePrim); }catch(e){}
+    try{ halvPrim=makeHalvingPrimitive(); if(layers.halvings){ area.attachPrimitive(halvPrim); halvAttached=true; } }catch(e){}
 
     setMode(initialMode());
     setPhaseTag(j.current);
@@ -1779,8 +1881,12 @@
     try{ window.addEventListener('resize', function(){ if(bodyEl.classList.contains('wk-b')) relayout(); }); }catch(e){}
     try{ window.addEventListener('orientationchange', function(){ setTimeout(function(){ if(bodyEl.classList.contains('wk-b')) relayout(); }, 220); }); }catch(e){}
     try{ el.addEventListener('pointerup', function(){ setTimeout(positionTitles,40); }); }catch(e){}   // reposition titles after a manual separator drag
+    // double-click a pane → animated vertical auto-fit (ignore the oscillator titles + chrome)
+    try{ el.addEventListener('dblclick', function(e){ if(e.target.closest('.wk-ptitle')||e.target.closest('.wk-layers')||e.target.closest('.wk-modetog')) return; autofitPane(paneIndexAtY(e.clientY)); }); }catch(e){}
+    // momentum pan: track scroll velocity during drag, glide to a stop on release; new touch cancels
+    try{ el.addEventListener('pointerdown', panDown); el.addEventListener('pointermove', panMove, {passive:true}); el.addEventListener('pointerup', panUp); el.addEventListener('pointercancel', function(){ _pan.tracking=false; }); }catch(e){}
     wireTitles(); wireConfigurator(); updateMenuLabels();
-    relayout(); wireToolbar(); applyInitialPeriod(); applyInitialCandleSize();
+    relayout(); wireToolbar(); wireLayers(); applyInitialPeriod(); applyInitialCandleSize();
   }
 
   // ── pane / oscillator machinery (v5) — snap-to-height + stretch factors ─────────
@@ -1860,8 +1966,9 @@
     set('rsi','RSI ('+oscCfg.rsi.length+')'); set('stoch','StochRSI ('+oscCfg.stoch.length+')'); set('macd','MACD ('+oscCfg.macd.fast+','+oscCfg.macd.slow+','+oscCfg.macd.signal+')'); }catch(e){} }
   function addMa(){ if(ma) return; ma=chart.addSeries(L.LineSeries,{color:'#f59e0b',lineWidth:1,priceLineVisible:false,lastValueVisible:false},0); ma.setData(arrData(ACTIVE.map(function(d){ return d.ma200w; }))); }
   function rmMa(){ if(ma){ try{ chart.removeSeries(ma); }catch(e){} ma=null; } }
-  function updateHalvings(){ if(!halvMk) return; halvMk.setMarkers((!isIntra() && ind.halving) ? HALV.map(function(t){ return {time:t,position:'aboveBar',color:'#8a93a3',shape:'arrowDown',text:'⛏'}; }) : []); }
-  function setPhases(on){ ind.phases=on; try{ if(on) area.attachPrimitive(phasePrim); else area.detachPrimitive(phasePrim); }catch(e){} }
+  function updateHalvings(){ applyHalvLayer(); }   // primitive redraws itself; this just manages attach state
+  function setPhases(on){ ind.phases=on; layers.phases=on; saveLayers(); try{ if(on) area.attachPrimitive(phasePrim); else area.detachPrimitive(phasePrim); }catch(e){} syncLayerUI(); }
+  function setHalvings(on){ ind.halving=on; layers.halvings=on; saveLayers(); applyHalvLayer(); syncLayerUI(); }
 
   // ── candle-size tiers: load tier · aggregate OHLC on the fly · apply ───────────
   function isIntra(){ return CSPEC[CSIZE] && CSPEC[CSIZE].kind==='intra'; }
@@ -1877,7 +1984,7 @@
     if(grp==='2Y'){ return (y-(y%2))+'-01-01'; } return dstr; }
   function aggDay(cands, grp){ var out=[],cur=null,key=null,i; for(i=0;i<cands.length;i++){ var c=cands[i]; var k=dayKey(c.t,grp); if(k!==key){ if(cur)out.push(cur); cur={time:k,open:c.o,high:c.h,low:c.l,close:c.c,value:c.c,p:c.p,mayer:c.mayer,ma200w:c.ma200w,pct:c.pct}; key=k; } else { if(c.h>cur.high)cur.high=c.h; if(c.l<cur.low)cur.low=c.l; cur.close=c.c; cur.value=c.c; cur.p=c.p; cur.mayer=c.mayer; cur.ma200w=c.ma200w; cur.pct=c.pct; } } if(cur)out.push(cur); return out; }
   function buildActive(size){ var spec=CSPEC[size]||CSPEC['1D']; var cands=tierCache[spec.tier]||[]; return spec.kind==='intra' ? aggIntra(cands, spec.sec) : aggDay(cands, spec.grp); }
-  function loadTier(tier, cb){ if(tierCache[tier]){ cb(tierCache[tier]); return; } notify('a carregar velas '+tier+'…'); fetch('/api/btc-candles?tier='+tier).then(function(r){return r.json();}).then(function(j){ tierCache[tier]=(j&&j.ok&&j.candles)?j.candles:[]; cb(tierCache[tier]); }).catch(function(){ tierCache[tier]=[]; cb([]); }); }
+  function loadTier(tier, cb){ if(tierCache[tier]){ cb(tierCache[tier]); return; } fetch('/api/btc-candles?tier='+tier).then(function(r){return r.json();}).then(function(j){ tierCache[tier]=(j&&j.ok&&j.candles)?j.candles:[]; cb(tierCache[tier]); }).catch(function(){ tierCache[tier]=[]; cb([]); }); }
 
   function rebuildPhase(){ try{ if(phasePrim) area.detachPrimitive(phasePrim); }catch(e){} try{ phasePrim=makePhasePrimitive(buildRuns(ACTIVE)); if(ind.phases) area.attachPrimitive(phasePrim); }catch(e){} }
   function rebuildOpenOscillators(){ Object.keys(oscReg).forEach(function(id){ rebuildOsc(id); }); }
@@ -1889,13 +1996,11 @@
       else { var dt=new Date(last+'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate()-days); var from=dt.toISOString().slice(0,10); if(from<ACTIVE[0].time) from=ACTIVE[0].time; chart.timeScale().setVisibleRange({from:from,to:last}); }
     }catch(e){ try{ chart.timeScale().fitContent(); }catch(e2){} } }
 
-  var _guardSub=null;
-  function disarmGuard(){ if(_guardSub){ try{ chart.timeScale().unsubscribeVisibleRangeChange(_guardSub); }catch(e){} _guardSub=null; } }
-  function armMinuteGuard(cands){ disarmGuard(); if(!cands.length) return; var firstT=cands[0].t; _guardSub=function(r){ if(!r) return; var from=(typeof r.from==='number')?r.from:null; if(from!=null && from < firstT-3600){ notify(CS_GUARD_MSG); disarmGuard(); applyCandleSize('1D'); } }; try{ chart.timeScale().subscribeVisibleRangeChange(_guardSub); }catch(e){} }
-
-  function applyCandleSize(size, opt){ var spec=CSPEC[size]; if(!spec) return; opt=opt||{}; disarmGuard();
+  function applyCandleSize(size, opt){ var spec=CSPEC[size]; if(!spec) return; opt=opt||{};
+    var pre=visibleEpochRange();   // capture the current window (epoch) for the intraday (b) keep-in-place case
     loadTier(spec.tier, function(cands){
-      if(spec.kind==='intra' && (!cands || !cands.length)){ notify(CS_GUARD_MSG); if(size!=='1D') applyCandleSize('1D'); return; }
+      // intraday tier unavailable (network) → silent fallback to 1D (no toast); never an empty chart
+      if(spec.kind==='intra' && (!cands || !cands.length)){ if(size!=='1D') applyCandleSize('1D', {keepRange:true}); return; }
       CSIZE=size; try{ sessionStorage.setItem('wk_csize', size); }catch(e){}
       ACTIVE=buildActive(size); CLOSE=ACTIVE.map(function(d){ return d.close; });
       var intra=spec.kind==='intra';
@@ -1905,8 +2010,19 @@
       updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators();
       var lab=document.getElementById('wk-csLabel'); if(lab) lab.textContent=size;
       Array.prototype.forEach.call(document.querySelectorAll('.wk-cs-item'),function(it){ it.classList.toggle('on', it.dataset.cs===size); });
-      if(!opt.keepRange) setRangeDays(CS_WIN[size]);
-      if(intra && spec.tier==='1m') armMinuteGuard(cands);
+      if(opt.keepRange){ /* keep current view */ }
+      else if(intra){
+        // Fase II intraday (a)/(b): if the current window is already inside the 60-day intraday
+        // window → swap resolution IN PLACE (keep the exact view); else → silently auto-adjust
+        // (animated 0.5s) to the last 60 days. No toast, never empty.
+        var lastE=ACTIVE.length ? ACTIVE[ACTIVE.length-1].time : null;
+        var winStart=(lastE!=null) ? lastE - INTRADAY_WINDOW_DAYS*86400 : null;
+        if(pre && pre.from!=null && winStart!=null && pre.from >= winStart-3600){
+          try{ chart.timeScale().setVisibleRange({from:Math.max(pre.from, ACTIVE[0].time), to:Math.min(pre.to||lastE, lastE)}); }   // (b) in place
+          catch(e){ try{ chart.timeScale().fitContent(); }catch(e2){} }
+        } else { animateToFull(); }   // (a) wide/outside → animate to the window
+      }
+      else { setRangeDays(CS_WIN[size]); }
     });
   }
   function applyInitialCandleSize(){ var s='1D'; try{ s=sessionStorage.getItem('wk_csize')||'1D'; }catch(e){} if(!CSPEC[s]) s='1D';
@@ -1942,7 +2058,7 @@
 
   function toggleInd(k,on){
     ind[k]=on;
-    if(k==='halving') return updateHalvings();
+    if(k==='halving') return setHalvings(on);
     if(k==='phases') return setPhases(on);
     if(k==='ma200w') return on?addMa():rmMa();
     if(['rsi','stoch','macd','mayer','pct'].indexOf(k)>=0){ if(on) addOsc(k); else removeOsc(k); }

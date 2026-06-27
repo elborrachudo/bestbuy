@@ -332,6 +332,30 @@ noted it here.
   log with phase ribbon + halvings + all 5 indicator overlays; the live screen uses the full
   daily series. Screen A and Phases 1-3 untouched.
 
+## Charting Fase II — interação + intraday a/b + toggle bar + halvings redesenhados (IMPLEMENTED)
+Frontend-only on Screen B. Shared **easing engine** (~0.5s ease-out, rAF) reused by auto-fit and
+the intraday auto-adjust.
+- **Momentum pan (inertia):** track `timeScale().scrollPosition()` velocity during drag; on release,
+  glide via `scrollToPosition` with friction until it stops; a new pointer-down cancels. Touch + mouse.
+- **Double-click a pane → animated vertical auto-fit (0.5s):** `paneIndexAtY` resolves the pane, its
+  price scale gets `autoScale:true` and `scaleMargins` animated so the extremes nearly touch top/bottom;
+  only that pane; LOG respected. (Guarded against the oscillator-title double-tap.)
+- **Intraday (a)/(b) replaces the old "warn + fallback 1D":** picking 1m/5m/15m — if the current window
+  is inside the 60-day intraday window → **swap resolution in place** (keep the exact view, epoch range
+  preserved); else → **silently** animate (eased) to the last 60 days. No toast (loading toast removed
+  too). Tier-empty (network) → silent fallback to 1D. `INTRADAY_WINDOW_DAYS` stays the single source.
+- **Top toggle bar (layers), independent + persisted (`wk_layers`):** Fases + Halvings are live and
+  stay in sync with the Indicadores dropdown; Manip. / MA 50/200W / MA 50/200D are present-but-inactive
+  placeholders for Fases III/IV (toggle persists + "chega numa fase futura" hint).
+- **Halvings redesigned:** removed the arrow/pickaxe markers; each halving is now a **1px dotted
+  burnt-yellow (`#C8A415`) full-height line** on the price pane + a burnt-yellow box with black text
+  (`H<year>` / tiny `dd/mm hh:mm`), boxes staggered so adjacent ones never overlap. Skipped at intraday
+  (years apart, outside the 60-day window). **Exact block times (UTC):** #210000 2012-11-28 15:24 ·
+  #420000 2016-07-09 16:46 · #630000 2020-05-11 19:23 · #840000 2024-04-20 00:09.
+- **Verified** headless (real daily + synthetic intraday tiers, 0 errors): toggle bar + sync, halving
+  redesign + stagger, intraday (a) silent auto-adjust & (b) keep-in-place, double-click auto-fit,
+  momentum pan all run clean. Screen A, PINs, detector, phase bands, oscillators untouched.
+
 ## Charting Fase 7 / Bloco 5 — 60-day 1m window + real daily OHLC (IMPLEMENTED)
 - **1m window 7→60 days, single param:** `INTRADAY_WINDOW_DAYS=60` in `lib/btcintraday.js` is the
   one source of truth — the seed `since` + page count (`api/import-btc-intraday.js`), the
