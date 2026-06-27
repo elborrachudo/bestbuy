@@ -840,7 +840,13 @@
     if(iv && iv.m2_expanding!=null){
       var exp=iv.m2_expanding===true||iv.m2_expanding==='true';
       var yoy=iv.m2_yoy_pct!=null?(' '+(Number(iv.m2_yoy_pct)>=0?'+':'')+Number(iv.m2_yoy_pct).toFixed(1)+'% YoY'):'';
-      m2Txt=' &nbsp;·&nbsp; Liquidez M2: <b style="color:'+(exp?'#22c55e':'#f59e0b')+'">'+(exp?'a expandir (vento a favor)':'a contrair (vento contra)')+'</b>'+yoy;
+      var lvl=iv.m2_value!=null?(' ≈ $'+Number(iv.m2_value).toFixed(1)+' tri'):'';
+      var parts=[];
+      if(iv.m2_us!=null) parts.push('EUA $'+Number(iv.m2_us).toFixed(1));
+      if(iv.m2_eu!=null) parts.push('Zona Euro $'+Number(iv.m2_eu).toFixed(1));
+      if(iv.m2_cn!=null) parts.push('China $'+Number(iv.m2_cn).toFixed(1));
+      var bd=parts.length?(' <span style="opacity:.7">('+parts.join(' · ')+' tri)</span>'):'';
+      m2Txt=' &nbsp;·&nbsp; Liquidez M2 global'+lvl+': <b style="color:'+(exp?'#22c55e':'#f59e0b')+'">'+(exp?'a expandir (vento a favor)':'a contrair (vento contra)')+'</b>'+yoy+bd;
     }
     if(state.view==='long'){
       var chips=Object.keys(PHASE_PT).map(function(k){ return '<span style="color:'+PHASE_COL[k]+';font-weight:700">●</span> '+PHASE_PT[k]; }).join(' &nbsp; ');

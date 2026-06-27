@@ -280,20 +280,35 @@ noted it here.
   The regime banner shows the current sizing (e.g. "sizing 1.5× (fundo)").
 - This does NOT change the signal generator/state machine or the confluence grading.
 
-## Phase 2.1 — M2 liquidity confirmer (IMPLEMENTED)
-- **Source:** US **M2** money supply from FRED's **keyless public CSV**
-  (`fredgraph.csv?id=M2SL`) — no API key, no paid source — used as the global-liquidity
-  proxy (the dominant crypto-liquidity driver; true global M2 would need aggregating
-  multiple central banks, which isn't keyless). Server-side fetch (egress), best-effort:
-  a FRED failure never blocks the cycle row.
+## Phase 2.1 — GLOBAL M2 liquidity confirmer (IMPLEMENTED)
+- **What:** a true **global M2** = **US + Euro area + China** money supply, each converted
+  to **USD** via ECB reference FX and summed monthly (~$94T as of 2026-06). The dominant
+  crypto-liquidity driver. `lib/globalm2.js`.
+- **Why not FRED:** the original plan used FRED's keyless `fredgraph.csv?id=M2SL`, but the
+  St. Louis Fed **blocks cloud/datacenter IPs** (the fetch fails to connect from Vercel),
+  and DBnomics **discontinued its FRED mirror**. So M2 never populated. The fix sources each
+  region from a feed that *is* reachable from serverless, and upgrades US-only → genuinely
+  global (what the metric is meant to represent).
+- **Sources (all KEYLESS, server-side, reachable from Vercel):**
+  - 🇺🇸 **US M2 (SA)** — Federal Reserve **H.6 Data Download Program** CSV
+    (`datadownload/Output.aspx?rel=H6&series=798e2796…`), full monthly history, billions USD.
+    (`federalreserve.gov` is reachable even though the `fred.stlouisfed.org` mirror is not.)
+  - 🇪🇺 **Euro-area M2** — **ECB Data Portal** BSI dataflow
+    (`BSI/M.U2.Y.V.M20.X.1.U2.2300.Z01.E`), millions EUR. CSV is CRLF — split on `\r?\n`.
+  - 🇨🇳 **China M2** — **PBoC** English "Financial Statistics Report" monthly articles
+    (parses "broad money supply (M2) stood at RMB X trillion, rising by Y percent"). History
+    is short (~from 2025-10, the months the index lists).
+  - 💱 **FX** — **ECB** EXR (`USD/EUR`, `CNY/EUR` → `USD/CNY`).
 - **Metrics** (stored per market_cycle day in `indicator_values`, as-of, no lookahead):
-  `m2_value`, `m2_yoy_pct`, `m2_expanding` (vs 3 months prior).
-- **Use:** a displayed **CONFIRMER** only — the banner shows "Liquidez M2: a expandir
-  (vento a favor) / a contrair (vento contra) · ±X% YoY". It does **not** change the phase
-  gate or signal generation (kept safe/auditable); it qualifies the regime as a tailwind or
-  headwind for dip-buys.
-- **Populates:** on the next cron run (current value) and on a `backfill-cycle` re-run
-  (per-day history). Degrades gracefully (banner simply omits M2 until data exists).
+  `m2_value` (global, USD T), `m2_yoy_pct` (size-weighted across regions — China's USD YoY =
+  its stated CNY YoY compounded with the CNY→USD FX change, so it needs no long China
+  history), `m2_expanding` (YoY > 0), per-region `m2_us`/`m2_eu`/`m2_cn` (USD T), and
+  `m2_coverage` (e.g. `UEC`; degrades to `UE` for dates before China's history starts).
+- **Use:** a displayed **CONFIRMER** only — banner shows "Liquidez M2 global ≈ $94.1 tri:
+  a expandir (vento a favor) / a contrair (vento contra) · ±X% YoY (EUA · Zona Euro · China)".
+  It does **not** change the phase gate or signal generation (kept safe/auditable).
+- **Best-effort:** any source failing never blocks the cycle row (logged via `console.warn`).
+  Populates on the next cron run (current) and a `backfill-cycle` re-run (per-day history).
 
 ## Phase 2 — complete
 All Phase-2 items (robust detector, survivorship filter, phase sizing, M2 confirmer) are

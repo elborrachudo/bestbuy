@@ -11,7 +11,8 @@
 import { getActiveTokens, sbSelect, sbInsert, sbDelete, sbUpsert } from '../lib/tokens.js';
 import { stochRsiSeries, macdSeries } from '../lib/scoring.js';
 import { generateSignals } from '../lib/signals.js';
-import { getBtcDailySeries, classifySeries, getM2Monthly, m2MetricsAsOf } from '../lib/cycle.js';
+import { getBtcDailySeries, classifySeries } from '../lib/cycle.js';
+import { fetchGlobalM2Inputs, globalM2MetricsAsOf } from '../lib/globalm2.js';
 import { structuralDeclineSeries } from '../lib/survivorship.js';
 
 const N = (x) => (x == null ? null : Number(x));
@@ -38,8 +39,8 @@ export default async function handler(req, res) {
     const btc = await getBtcDailySeries(365, cgKey);
     const prices = btc.map((p) => p.price);
     const cls = classifySeries(prices);   // 4-indicator consensus + hysteresis, per day
-    // M2 liquidity confirmer (best-effort; attached per-day as-of).
-    let m2series = null; try { m2series = await getM2Monthly(); } catch (e) { console.warn('m2 fetch failed:', e.message); }
+    // Global M2 liquidity confirmer (best-effort; attached per-day as-of).
+    let g2 = null; try { g2 = await fetchGlobalM2Inputs(); } catch (e) { console.warn('global m2 failed:', e.message); }
     // CoinGecko can return two points on the same UTC date (e.g. the trailing current
     // price). Dedupe by date — keep the last — so one upsert batch never touches a row
     // twice (which Postgres rejects with 21000).
@@ -47,7 +48,7 @@ export default async function handler(req, res) {
     btc.forEach((p, i) => {
       const day = new Date(p.ts).toISOString().slice(0, 10);
       const iv = cls[i].indicators;
-      if (m2series) { const m2 = m2MetricsAsOf(m2series, day); if (m2) Object.assign(iv, m2); }
+      if (g2) { const m2 = globalM2MetricsAsOf(g2, day); if (m2) Object.assign(iv, m2); }
       byDate.set(day, { cycle_date: day, btc_price: p.price, phase: cls[i].phase, indicator_values: iv });
       phaseByDate[day] = cls[i].phase;
     });
