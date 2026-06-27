@@ -441,7 +441,7 @@
   .wk-per-item:hover{background:rgba(91,140,255,.12);}
   .wk-per-item.on{background:rgba(91,140,255,.20);color:#8fd1ff;font-weight:600;}
   #wk-chart{height:380px;width:100%;border-radius:0;overflow:hidden;position:relative;}
-  .wk-modetog{position:absolute;left:52px;bottom:8px;z-index:6;display:flex;flex-direction:column;gap:2px;background:rgba(13,16,22,.8);border:1px solid #1f2430;border-radius:8px;padding:2px;}
+  .wk-modetog{position:absolute;left:8px;bottom:8px;z-index:6;display:flex;flex-direction:column;gap:2px;background:rgba(13,16,22,.8);border:1px solid #1f2430;border-radius:8px;padding:2px;}
   .wk-mode-b{width:28px;height:24px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#5a6273;cursor:pointer;border-radius:6px;padding:0;}
   .wk-mode-b.on{background:rgba(91,140,255,.22);color:#a9c2ff;}
   .wk-legend{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;color:#cdd5e0;background:rgba(13,16,22,.72);border:1px solid #1f2430;border-radius:7px;padding:5px 8px;pointer-events:none;line-height:1.5;display:none;}
@@ -1641,7 +1641,7 @@
     var el=document.getElementById('wk-chart'); L=window.LightweightCharts;
     if(!L){ document.getElementById('wk-loading').textContent='Lightweight Charts não carregou.'; return; }
     chart=L.createChart(el,{
-      layout:{background:{color:'#0d1016'},textColor:'#8a93a3',attributionLogo:true,fontSize:10,
+      layout:{background:{color:'#0d1016'},textColor:'#8a93a3',attributionLogo:false,fontSize:10,
               panes:{enableResize:true,separatorColor:'#262c3a',separatorHoverColor:'#3a4150'}},
       grid:{vertLines:{color:'rgba(255,255,255,.04)'},horzLines:{color:'rgba(255,255,255,.04)'}},
       rightPriceScale:{borderColor:'#1f2430',mode:1,entireTextOnly:true},
