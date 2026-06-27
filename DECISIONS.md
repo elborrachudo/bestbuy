@@ -332,6 +332,23 @@ noted it here.
   log with phase ribbon + halvings + all 5 indicator overlays; the live screen uses the full
   daily series. Screen A and Phases 1-3 untouched.
 
+## Charting Fase 7 / Bloco 5 — 60-day 1m window + real daily OHLC (IMPLEMENTED)
+- **1m window 7→60 days, single param:** `INTRADAY_WINDOW_DAYS=60` in `lib/btcintraday.js` is the
+  one source of truth — the seed `since` + page count (`api/import-btc-intraday.js`), the
+  `rollIntraday` prune, and the frontend (`INTRADAY_WINDOW_DAYS` + `CS_GUARD_MSG`) all read it.
+  Change to 30/90 in one place. **Re-seeded:** `btc_1m` = **86,400 rows / exactly 60.0 days**
+  (16 MB). Charting tiers total ≈ 19.4 MB; whole DB 49 MB (free tier 500 MB).
+- **Cron writes REAL daily OHLC (fixes "vela de hoje flat"):** `cron-fetch` now runs `rollIntraday`
+  first (fresh `btc_1h`) then `closeDailyCandle()`, which aggregates the live day's hourly candles
+  (open=first, high=max, low=min, close=live, volume=sum) and upserts `btc_history`. **Only the
+  live day is written;** past days keep their Bitstamp OHLC (verified: 2026-06-27 → distinct OHLC
+  `open 60021 / high 60850 / low 59767 / close 59969`, source `cron-1h-agg`; 2026-06-26/25 and the
+  2021/2017 milestones unchanged, source `bitstamp`). Falls back to close-only if no hourly data.
+- **Out-of-window guard = Option B** (owner decision): warn + auto-fallback to 1D; **no Binance
+  on-demand** (Binance is 451 from Vercel; would be client-side and unnecessary). Toast now reads
+  "1m/5m/15m disponível só nos últimos 60 dias" via the shared constant. Never an empty chart.
+- **Untouched:** Screen A, PINs, navigation, cycle detector, phase bands, oscillators.
+
 ## Charting tiers — 3-tier BTC storage + candle-size dropdown 1m→2A (IMPLEMENTED)
 - **3 storage tiers (Supabase):** `btc_history` (daily, 2011→today, reused as the daily tier),
   new `btc_1h` (hourly, ~2y rolling — 17,521 rows) and `btc_1m` (minute, last 7 days — 10,081
