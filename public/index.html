@@ -431,6 +431,14 @@
   .wk-rng{font-size:11px;color:#8a93a3;padding:6px 9px;border-radius:8px;background:#161a23;cursor:pointer;}
   .wk-rng.on{color:#8fd1ff;border:1px solid rgba(91,180,255,.4);}
   .wk-scaletoggle{font-size:11px;font-weight:600;color:#8fd1ff;border:1px solid rgba(91,180,255,.4);border-radius:8px;padding:6px 9px;background:#161a23;cursor:pointer;}
+  .wk-per-wrap{position:relative;}
+  .wk-per-btn{font-size:11px;font-weight:600;color:#8fd1ff;border:1px solid rgba(91,180,255,.4);border-radius:8px;padding:6px 10px;background:#161a23;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;}
+  .wk-per-caret{color:#5a6273;}
+  .wk-per-menu{position:absolute;top:36px;right:0;z-index:30;width:92px;background:#13161e;border:1px solid #1f2430;border-radius:10px;padding:5px;box-shadow:0 12px 40px rgba(0,0,0,.5);display:none;}
+  .wk-per-menu.open{display:block;}
+  .wk-per-item{font-size:12px;color:#cdd5e0;padding:7px 10px;border-radius:7px;cursor:pointer;text-align:center;}
+  .wk-per-item:hover{background:rgba(91,140,255,.12);}
+  .wk-per-item.on{background:rgba(91,140,255,.20);color:#8fd1ff;font-weight:600;}
   #wk-chart{height:380px;width:100%;border-radius:10px;overflow:hidden;position:relative;}
   .wk-legend{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;color:#cdd5e0;background:rgba(13,16,22,.72);border:1px solid #1f2430;border-radius:7px;padding:5px 8px;pointer-events:none;line-height:1.5;display:none;}
   .wk-legend b{color:#fff;font-weight:600;}
@@ -464,10 +472,20 @@
           </div>
         </div>
         <div class="wk-spacer"></div>
-        <div class="wk-ranges" id="wk-ranges">
-          <div class="wk-rng" data-y="1">1A</div>
-          <div class="wk-rng" data-y="4">4A</div>
-          <div class="wk-rng on" data-y="0">Tudo</div>
+        <div class="wk-per-wrap">
+          <div class="wk-per-btn" id="wk-perBtn"><span id="wk-perLabel">90D</span> <span class="wk-per-caret">▾</span></div>
+          <div class="wk-per-menu" id="wk-perMenu">
+            <div class="wk-per-item" data-d="1">1D</div>
+            <div class="wk-per-item" data-d="7">7D</div>
+            <div class="wk-per-item" data-d="15">15D</div>
+            <div class="wk-per-item" data-d="30">30D</div>
+            <div class="wk-per-item" data-d="60">60D</div>
+            <div class="wk-per-item on" data-d="90">90D</div>
+            <div class="wk-per-item" data-d="182">6M</div>
+            <div class="wk-per-item" data-d="365">1A</div>
+            <div class="wk-per-item" data-d="1460">4A</div>
+            <div class="wk-per-item" data-d="0">ALL</div>
+          </div>
         </div>
         <div class="wk-scaletoggle" id="wk-scaleToggle">LOG</div>
       </div>
@@ -1591,7 +1609,7 @@
       layout:{background:{color:'#0d1016'},textColor:'#8a93a3',attributionLogo:false},
       grid:{vertLines:{color:'rgba(255,255,255,.04)'},horzLines:{color:'rgba(255,255,255,.04)'}},
       rightPriceScale:{borderColor:'#1f2430',mode:1},
-      timeScale:{borderColor:'#1f2430',timeVisible:false},
+      timeScale:{borderColor:'#1f2430',timeVisible:false,minBarSpacing:0.02,rightOffset:3},
       crosshair:{mode:1}, handleScroll:true, handleScale:true,
     });
     var lo=document.getElementById('wk-loading'); if(lo) lo.style.display='none';
@@ -1618,10 +1636,26 @@
       leg.innerHTML=html; leg.style.display='block';
     });
 
-    chart.timeScale().fitContent();
     try{ new ResizeObserver(function(){ chart.applyOptions({width:el.clientWidth,height:380}); }).observe(el); }catch(e){}
     chart.applyOptions({width:el.clientWidth,height:380});
     wireToolbar();
+    applyInitialPeriod();
+  }
+
+  var PERIODS=[{d:1,k:'1D'},{d:7,k:'7D'},{d:15,k:'15D'},{d:30,k:'30D'},{d:60,k:'60D'},{d:90,k:'90D'},{d:182,k:'6M'},{d:365,k:'1A'},{d:1460,k:'4A'},{d:0,k:'ALL'}];
+  function applyPeriod(d,label){
+    if(!chart||!DATA||!DATA.series.length) return;
+    var ser=DATA.series, last=ser[ser.length-1].t;
+    if(d===0){ chart.timeScale().fitContent(); }
+    else { var dt=new Date(last); dt.setDate(dt.getDate()-d); var from=dt.toISOString().slice(0,10); if(from<ser[0].t) from=ser[0].t; try{ chart.timeScale().setVisibleRange({from:from,to:last}); }catch(e){ chart.timeScale().fitContent(); } }
+    if(label){ var pl=document.getElementById('wk-perLabel'); if(pl) pl.textContent=label; }
+    Array.prototype.forEach.call(document.querySelectorAll('.wk-per-item'),function(it){ it.classList.toggle('on', +it.dataset.d===d); });
+    try{ sessionStorage.setItem('wk_period', String(d)); }catch(e){}
+  }
+  function applyInitialPeriod(){
+    var pd=90; try{ var s=sessionStorage.getItem('wk_period'); if(s!==null && s!=='') pd=+s; }catch(e){}
+    var pe=PERIODS.filter(function(p){return p.d===pd;})[0]||PERIODS[5];
+    applyPeriod(pe.d, pe.k);
   }
 
   function applyHalvings(){ if(area) area.setMarkers(ind.halving ? HALV.map(function(t){ return {time:t,position:'aboveBar',color:'#8a93a3',shape:'arrowDown',text:'⛏'}; }) : []); }
@@ -1641,11 +1675,10 @@
     indBtn.onclick=function(e){ e.stopPropagation(); indMenu.classList.toggle('open'); };
     document.addEventListener('click',function(e){ if(!e.target.closest('.wk-ind-wrap')) indMenu.classList.remove('open'); });
     Array.prototype.forEach.call(document.querySelectorAll('.wk-ind-item'),function(it){ it.onclick=function(){ var on=!it.classList.contains('on'); it.classList.toggle('on',on); toggleInd(it.dataset.ind,on); }; });
-    Array.prototype.forEach.call(document.querySelectorAll('.wk-rng'),function(r){ r.onclick=function(){
-      Array.prototype.forEach.call(document.querySelectorAll('.wk-rng'),function(x){x.classList.remove('on');}); r.classList.add('on');
-      var y=+r.dataset.y, ser=DATA.series, last=ser[ser.length-1].t;
-      if(y===0){ chart.timeScale().fitContent(); } else { var d=new Date(last); d.setFullYear(d.getFullYear()-y); chart.timeScale().setVisibleRange({from:d.toISOString().slice(0,10),to:last}); }
-    }; });
+    var perBtn=document.getElementById('wk-perBtn'), perMenu=document.getElementById('wk-perMenu');
+    perBtn.onclick=function(e){ e.stopPropagation(); perMenu.classList.toggle('open'); };
+    document.addEventListener('click',function(e){ if(!e.target.closest('.wk-per-wrap')) perMenu.classList.remove('open'); });
+    Array.prototype.forEach.call(document.querySelectorAll('.wk-per-item'),function(it){ it.onclick=function(){ applyPeriod(+it.dataset.d, it.textContent.trim()); perMenu.classList.remove('open'); }; });
     var st=document.getElementById('wk-scaleToggle');
     st.onclick=function(){ isLog=!isLog; st.textContent=isLog?'LOG':'LIN'; chart.priceScale('right').applyOptions({mode:isLog?1:0}); };
   }
