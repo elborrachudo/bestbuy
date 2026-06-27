@@ -1776,6 +1776,10 @@
     for(var i=0;i<panes.length;i++){ var ph=0; try{ ph=panes[i].getHeight(); }catch(e){} var id=i===0?'':(idByPane[i]||''); var txt=i===0?'BTC':(id&&OSC[id]?OSC[id].title:'');
       if(txt){ var div=document.createElement('div'); div.className='wk-ptitle'+(id?' wk-ptitle-osc':''); div.textContent=txt; div.style.top=(y+2)+'px'; div.dataset.osc=id; host.appendChild(div); }
       y+=ph+1; }
+    // pin the Line/Candles toggle to the BOTTOM-LEFT OF THE PRICE PANE (pane 0), never over an
+    // oscillator below it: bottom = (full chart height − price-pane height) lifts it above the
+    // first separator; with no oscillators that's just above the time axis.
+    var tg=document.getElementById('wk-modetog'); if(tg){ var cel=document.getElementById('wk-chart'), ch=cel?cel.clientHeight:0, ph0=0; try{ ph0=panes[0].getHeight(); }catch(e){} if(ch>0&&ph0>0) tg.style.bottom=Math.max(6,(ch-ph0+6))+'px'; }
   }
   function wireTitles(){ var host=document.getElementById('wk-titles'); if(!host) return; var lastT=0,lastEl=null;
     function open(t){ if(t&&t.dataset.osc) openCfg(t.dataset.osc); }
