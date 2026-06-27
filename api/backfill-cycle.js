@@ -8,7 +8,7 @@
 // Pure recompute from already-stored readings + freshly fetched BTC (no token refetch).
 // Idempotent. Protected by CRON_SECRET when set. Optional ?symbol= for one token.
 
-import { getActiveTokens, sbSelect, sbInsert, sbDelete, sbUpsert } from '../lib/tokens.js';
+import { getActiveTokens, sbSelect, sbSelectAll, sbInsert, sbDelete, sbUpsert } from '../lib/tokens.js';
 import { stochRsiSeries, macdSeries } from '../lib/scoring.js';
 import { generateSignals } from '../lib/signals.js';
 import { classifySeries } from '../lib/cycle.js';
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
   // (ma200w_partial=false) and the price percentile is over 10+ years, not ~1.
   let phaseByDate = {}, cycleRows = 0, phaseDist = {};
   try {
-    const hist = await sbSelect(base, serviceKey, 'btc_history?select=date,close&order=date.asc&limit=20000');
+    const hist = await sbSelectAll(base, serviceKey, 'btc_history?select=date,close&order=date.asc');
     const series = hist.map((r) => ({ day: r.date, price: N(r.close) })).filter((r) => Number.isFinite(r.price));
     if (series.length < 400) { res.status(409).json({ ok: false, error: `btc_history thin (${series.length}); run /api/import-btc-history first` }); return; }
     const prices = series.map((r) => r.price);
@@ -47,7 +47,8 @@ export default async function handler(req, res) {
     let g2 = null; try { g2 = await fetchGlobalM2Inputs(); } catch (e) { console.warn('global m2 failed:', e.message); }
     const rows = series.map((r, i) => {
       const iv = cls[i].indicators;
-      if (g2) { const m2 = globalM2MetricsAsOf(g2, r.day); if (m2) Object.assign(iv, m2); }
+      // M2 is a current-regime confirmer — attach only to recent rows (last ~2y), not all 5k.
+      if (g2 && r.day >= '2024-06-01') { const m2 = globalM2MetricsAsOf(g2, r.day); if (m2) Object.assign(iv, m2); }
       phaseByDate[r.day] = cls[i].phase;
       phaseDist[cls[i].phase] = (phaseDist[cls[i].phase] || 0) + 1;
       return { cycle_date: r.day, btc_price: r.price, phase: cls[i].phase, indicator_values: iv };

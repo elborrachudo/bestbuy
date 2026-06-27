@@ -4,7 +4,7 @@
 // inputs it has and nulls the rest.
 
 import {
-  getActiveTokens, sbInsert, sbUpsert, sbSelect, recentReadingExists, getPrevActivitySnapshot,
+  getActiveTokens, sbInsert, sbUpsert, sbSelectAll, recentReadingExists, getPrevActivitySnapshot,
   getPrevReadingForSignals, getLastSignalDates,
 } from '../lib/tokens.js';
 import { fetchTokenInputs } from '../lib/sources.js';
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
   try {
     // Long history (≥2011) from btc_history → complete 200-week MA. Append today's live price
     // and also persist it into btc_history so the long series stays current between imports.
-    const hist = await sbSelect(base, serviceKey, 'btc_history?select=date,close&order=date.asc&limit=20000');
+    const hist = await sbSelectAll(base, serviceKey, 'btc_history?select=date,close&order=date.asc');
     const prices = hist.map((r) => Number(r.close)).filter(Number.isFinite);
     const btc = await getBtcDailySeries(2, cgKey);
     let cycleDay = new Date().toISOString().slice(0, 10);
