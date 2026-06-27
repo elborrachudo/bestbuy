@@ -441,7 +441,7 @@
   .wk-per-item:hover{background:rgba(91,140,255,.12);}
   .wk-per-item.on{background:rgba(91,140,255,.20);color:#8fd1ff;font-weight:600;}
   #wk-chart{height:380px;width:100%;border-radius:0;overflow:hidden;position:relative;}
-  .wk-modetog{position:absolute;left:8px;bottom:32px;z-index:6;display:flex;flex-direction:column;gap:2px;background:rgba(13,16,22,.8);border:1px solid #1f2430;border-radius:8px;padding:2px;}
+  .wk-modetog{position:absolute;left:52px;bottom:8px;z-index:6;display:flex;flex-direction:column;gap:2px;background:rgba(13,16,22,.8);border:1px solid #1f2430;border-radius:8px;padding:2px;}
   .wk-mode-b{width:28px;height:24px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#5a6273;cursor:pointer;border-radius:6px;padding:0;}
   .wk-mode-b.on{background:rgba(91,140,255,.22);color:#a9c2ff;}
   .wk-legend{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;color:#cdd5e0;background:rgba(13,16,22,.72);border:1px solid #1f2430;border-radius:7px;padding:5px 8px;pointer-events:none;line-height:1.5;display:none;}
@@ -469,10 +469,15 @@
             <div class="wk-ind-item on" data-ind="phases"><span class="wk-ind-radio"></span><span class="wk-nm">Fases do ciclo</span><span class="wk-csw" style="background:linear-gradient(90deg,#22c55e,#fb923c)"></span></div>
             <div class="wk-ind-item on" data-ind="halving"><span class="wk-ind-radio"></span><span class="wk-nm">Halvings</span><span class="wk-csw" style="background:#8a93a3"></span></div>
             <div class="wk-ind-sep"></div>
-            <div class="wk-ind-head">Preço (lidos de market_cycle)</div>
+            <div class="wk-ind-head">Preço</div>
             <div class="wk-ind-item" data-ind="ma200w"><span class="wk-ind-radio"></span><span class="wk-nm">200W MA</span><span class="wk-csw" style="background:#f59e0b"></span></div>
-            <div class="wk-ind-item" data-ind="mayer"><span class="wk-ind-radio"></span><span class="wk-nm">Mayer Multiple</span><span class="wk-csw" style="background:#5b8cff"></span></div>
-            <div class="wk-ind-item" data-ind="percentile"><span class="wk-ind-radio"></span><span class="wk-nm">Percentil histórico</span><span class="wk-csw" style="background:#22d3ee"></span></div>
+            <div class="wk-ind-sep"></div>
+            <div class="wk-ind-head">Osciladores (painel próprio)</div>
+            <div class="wk-ind-item" data-ind="rsi"><span class="wk-ind-radio"></span><span class="wk-nm">RSI (14)</span><span class="wk-csw" style="background:#5b8cff"></span></div>
+            <div class="wk-ind-item" data-ind="stoch"><span class="wk-ind-radio"></span><span class="wk-nm">StochRSI</span><span class="wk-csw" style="background:#22d3ee"></span></div>
+            <div class="wk-ind-item" data-ind="macd"><span class="wk-ind-radio"></span><span class="wk-nm">MACD</span><span class="wk-csw" style="background:#5b8cff"></span></div>
+            <div class="wk-ind-item" data-ind="mayer"><span class="wk-ind-radio"></span><span class="wk-nm">Mayer Multiple</span><span class="wk-csw" style="background:#a78bfa"></span></div>
+            <div class="wk-ind-item" data-ind="pct"><span class="wk-ind-radio"></span><span class="wk-nm">Percentil histórico</span><span class="wk-csw" style="background:#22d3ee"></span></div>
           </div>
         </div>
         <div class="wk-spacer"></div>
@@ -498,12 +503,10 @@
           <button class="wk-mode-b on" data-mode="line" title="Linha" aria-label="Linha"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-6 4 3 6-8"/></svg></button>
           <button class="wk-mode-b" data-mode="candle" title="Velas" aria-label="Velas"><svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.5" fill="currentColor"><line x1="7" y1="3" x2="7" y2="21"/><rect x="5" y="8" width="4" height="8" rx="0.5"/><line x1="17" y1="5" x2="17" y2="19"/><rect x="15" y="10" width="4" height="6" rx="0.5"/></svg></button>
         </div></div>
-      <div class="wk-sub" id="wk-sub">BTC/USD · escala log · fases do detetor de ciclo (Mayer + 200W MA + drawdown + percentil) sobre 10+ anos.</div>
-      <div class="wk-attribution"><a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a></div>
     </div>
   </div>
 </div>
-<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://unpkg.com/lightweight-charts@5/dist/lightweight-charts.standalone.production.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
@@ -1572,14 +1575,39 @@
   var PHPT={accu:'Acumulação',rise:'Subida',euph:'Euforia',corr:'Correção'};
   var FULL={accumulation:'accu',rise:'rise',euphoria:'euph',correction:'corr'};
   var HALV=['2012-11-28','2016-07-09','2020-05-11','2024-04-19'];
-  var inited=false, chart=null, area=null, ribbon=null, ma=null, mayerS=null, pctS=null;
-  var DATA=null, byTime={}, isLog=true;
-  var ind={phases:true,halving:true,ma200w:false,mayer:false,percentile:false};
+  var inited=false, chart=null, L=null, area=null, candle=null, ma=null, halvMk=null, phasePrim=null;
+  var DATA=null, byTime={}, isLog=true, mode='line';
+  var COMP=null, oscReg={};   // oscReg: id -> {series:[…], pane}
+  var ind={phases:true,halving:true,ma200w:false,rsi:false,stoch:false,macd:false,mayer:false,pct:false};
 
   function hexRgb(h){ h=h.replace('#',''); return parseInt(h.slice(0,2),16)+','+parseInt(h.slice(2,4),16)+','+parseInt(h.slice(4,6),16); }
   // compact price labels (60k, 200k, 2M) → narrows the price-scale column (~0.7×)
   function wkFmtPrice(v){ if(v==null||!isFinite(v)) return ''; if(v>=1e6) return (v/1e6).toFixed(v>=1e7?0:1).replace(/\.0$/,'')+'M'; if(v>=1e3) return (v/1e3).toFixed(v>=1e5?0:1).replace(/\.0$/,'')+'k'; return ''+Math.round(v); }
-  var mode='line', candle=null;
+
+  // ── client-side indicator math (BTC: not stored per-day) ──────────────────────
+  function rsiArr(c,p){ p=p||14; var o=new Array(c.length).fill(null); if(c.length<p+1) return o; var g=0,l=0,i; for(i=1;i<=p;i++){ var dd=c[i]-c[i-1]; if(dd>=0)g+=dd; else l-=dd; } var ag=g/p,al=l/p; o[p]=al===0?100:100-100/(1+ag/al); for(i=p+1;i<c.length;i++){ var d2=c[i]-c[i-1],gg=d2>0?d2:0,ll=d2<0?-d2:0; ag=(ag*(p-1)+gg)/p; al=(al*(p-1)+ll)/p; o[i]=al===0?100:100-100/(1+ag/al); } return o; }
+  function emaArr(a,p){ var o=new Array(a.length).fill(null),k=2/(p+1),e=null,i; for(i=0;i<a.length;i++){ var v=a[i]; if(v==null){ o[i]=e; continue; } e=(e==null)?v:v*k+e*(1-k); o[i]=e; } return o; }
+  function macdArr(c){ var e12=emaArr(c,12),e26=emaArr(c,26); var m=c.map(function(_,i){ return (e12[i]!=null&&e26[i]!=null)?e12[i]-e26[i]:null; }); var s=emaArr(m,9); var h=m.map(function(v,i){ return (v!=null&&s[i]!=null)?v-s[i]:null; }); return {macd:m,signal:s,hist:h}; }
+  function stochRsiArr(c,p){ p=p||14; var r=rsiArr(c,p),i,j; var k=new Array(c.length).fill(null); for(i=0;i<c.length;i++){ if(r[i]==null) continue; var w=[]; for(j=i-p+1;j<=i;j++){ if(j>=0&&r[j]!=null) w.push(r[j]); } if(w.length<p) continue; var mn=Math.min.apply(null,w),mx=Math.max.apply(null,w); k[i]=mx===mn?0:(r[i]-mn)/(mx-mn)*100; } var d=new Array(c.length).fill(null); for(i=0;i<c.length;i++){ if(k[i]==null) continue; var su=0,n=0; for(j=i-2;j<=i;j++){ if(j>=0&&k[j]!=null){ su+=k[j]; n++; } } if(n>0) d[i]=su/n; } return {k:k,d:d}; }
+  function arrData(arr){ var out=[],i; for(i=0;i<DATA.series.length;i++){ if(arr[i]!=null && isFinite(arr[i])) out.push({time:DATA.series[i].t, value:arr[i]}); } return out; }
+  function fix(mn,mx){ return function(){ return {priceRange:{minValue:mn,maxValue:mx}}; }; }
+  function mkLine(color,paneIdx,opts){ return chart.addSeries(L.LineSeries, Object.assign({color:color,lineWidth:1,priceLineVisible:false,lastValueVisible:false},opts||{}), paneIdx); }
+
+  // ── adaptive PT timeline: years → months → days (library picks density) ───────
+  var PTM=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  function wkTick(time,tmType){ var y,m,d; if(typeof time==='string'){ var pp=time.split('-'); y=+pp[0]; m=+pp[1]; d=+pp[2]; } else if(time&&time.year){ y=time.year; m=time.month; d=time.day; } else { var dt=new Date(time*1000); y=dt.getUTCFullYear(); m=dt.getUTCMonth()+1; d=dt.getUTCDate(); } if(tmType===0) return ''+y; if(tmType===1) return PTM[m-1]; return ''+d; }
+
+  // ── phase background bands (custom v5 series primitive on pane 0, behind price) ─
+  function phaseBg(p){ return 'rgba('+hexRgb(PHC[p]||'#a78bfa')+',0.13)'; }
+  function buildRuns(ser){ var runs=[],start=0,i; for(i=1;i<ser.length;i++){ if(ser[i].p!==ser[start].p){ runs.push({from:ser[start].t,to:ser[i].t,p:ser[start].p}); start=i; } } runs.push({from:ser[start].t,to:ser[ser.length-1].t,p:ser[start].p}); return runs; }
+  function makePhasePrimitive(runs){
+    var ch=null;
+    function keyOf(t){ if(typeof t==='string') return t; if(t&&t.year) return t.year+'-'+String(t.month).padStart(2,'0')+'-'+String(t.day).padStart(2,'0'); return ''+t; }
+    var renderer={ draw:function(target){ if(!ch||!ind.phases) return; var ts=ch.timeScale(); var vr=null; try{ vr=ts.getVisibleRange(); }catch(e){} if(!vr) return; var vf=keyOf(vr.from), vt=keyOf(vr.to);
+      target.useBitmapCoordinateSpace(function(scope){ var ctx=scope.context,hpr=scope.horizontalPixelRatio,H=scope.bitmapSize.height,W=scope.bitmapSize.width;
+        runs.forEach(function(run){ if(run.to<vf||run.from>vt) return; var x0=(run.from<=vf)?0:ts.timeToCoordinate(run.from); var x1=(run.to>=vt)?(W/hpr):ts.timeToCoordinate(run.to); if(x0==null) x0=0; if(x1==null) x1=W/hpr; var bx0=Math.round(x0*hpr),bx1=Math.round(x1*hpr); if(bx1<=bx0) return; ctx.fillStyle=phaseBg(run.p); ctx.fillRect(bx0,0,bx1-bx0,H); }); }); } };
+    return { attached:function(pp){ ch=pp.chart; }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'bottom'; }, renderer:function(){ return renderer; } } ]; } };
+  }
 
   function showScreen(s){
     if(s==='B'){ bodyEl.classList.add('wk-b'); try{sessionStorage.setItem('waka_screen','B');}catch(e){} initChart(); if(chart){ try{chart.applyOptions({width:document.getElementById('wk-chart').clientWidth,height:380});}catch(e){} } }
@@ -1599,10 +1627,6 @@
     document.getElementById('wk-phasesw').style.background=PHC[pc];
     document.getElementById('wk-phasetxt').textContent=txt;
     var tag=document.getElementById('wk-phasetag'); tag.style.background='rgba('+hexRgb(PHC[pc])+',.16)'; tag.style.color=PHC[pc];
-    if(cur.m2_value!=null){
-      var sub=document.getElementById('wk-sub');
-      sub.innerHTML='BTC/USD · escala log · fases sobre 10+ anos. &nbsp;·&nbsp; Liquidez M2 global ≈ $'+Number(cur.m2_value).toFixed(1)+' tri · '+(cur.m2_expanding?'a expandir':'a contrair')+(cur.m2_yoy_pct!=null?(' '+(cur.m2_yoy_pct>=0?'+':'')+Number(cur.m2_yoy_pct).toFixed(1)+'% YoY'):'');
-    }
   }
 
   function initChart(){
@@ -1614,30 +1638,32 @@
   }
 
   function render(j){
-    var el=document.getElementById('wk-chart'), lc=window.LightweightCharts;
-    if(!lc){ document.getElementById('wk-loading').textContent='Lightweight Charts não carregou.'; return; }
-    chart=lc.createChart(el,{
-      layout:{background:{color:'#0d1016'},textColor:'#8a93a3',attributionLogo:false,fontSize:10},
+    var el=document.getElementById('wk-chart'); L=window.LightweightCharts;
+    if(!L){ document.getElementById('wk-loading').textContent='Lightweight Charts não carregou.'; return; }
+    chart=L.createChart(el,{
+      layout:{background:{color:'#0d1016'},textColor:'#8a93a3',attributionLogo:true,fontSize:10,
+              panes:{enableResize:true,separatorColor:'#262c3a',separatorHoverColor:'#3a4150'}},
       grid:{vertLines:{color:'rgba(255,255,255,.04)'},horzLines:{color:'rgba(255,255,255,.04)'}},
       rightPriceScale:{borderColor:'#1f2430',mode:1,entireTextOnly:true},
-      timeScale:{borderColor:'#1f2430',timeVisible:false,minBarSpacing:0.02,rightOffset:3},
+      timeScale:{borderColor:'#1f2430',timeVisible:false,minBarSpacing:0.02,rightOffset:3,tickMarkFormatter:wkTick},
       crosshair:{mode:1}, handleScroll:true, handleScale:true,
-      localization:{priceFormatter:wkFmtPrice},
+      localization:{priceFormatter:wkFmtPrice,locale:'pt-PT'},
     });
     var lo=document.getElementById('wk-loading'); if(lo) lo.style.display='none';
-    var ser=j.series;
+    var ser=j.series, close=ser.map(function(d){ return d.c; });
     ser.forEach(function(d){ byTime[d.t]={c:d.c,mayer:d.mayer,pct:d.pct,p:d.p}; });
+    var mac=macdArr(close), st=stochRsiArr(close);
+    COMP={ rsi:rsiArr(close), macd:mac.macd, signal:mac.signal, hist:mac.hist, stochK:st.k, stochD:st.d };
 
-    ribbon=chart.addHistogramSeries({priceScaleId:'wk-phase',priceLineVisible:false,lastValueVisible:false});
-    ribbon.setData(ser.map(function(d){ return {time:d.t,value:1,color:PHC[d.p]||'#a78bfa'}; }));
-    chart.priceScale('wk-phase').applyOptions({scaleMargins:{top:0.9,bottom:0}});
-
-    area=chart.addAreaSeries({lineColor:'#a78bfa',topColor:'rgba(167,139,250,.18)',bottomColor:'rgba(167,139,250,0)',lineWidth:1,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}});
+    // PRICE pane (0): area (always present — carries the phase primitive + markers) + candles
+    area=chart.addSeries(L.AreaSeries,{lineColor:'#a78bfa',topColor:'rgba(167,139,250,.18)',bottomColor:'rgba(167,139,250,0)',lineWidth:1,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
     area.setData(ser.map(function(d){ return {time:d.t,value:d.c}; }));
-    candle=chart.addCandlestickSeries({upColor:'#22c55e',downColor:'#f43f5e',wickUpColor:'#22c55e',wickDownColor:'#f43f5e',borderVisible:false,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}});
+    candle=chart.addSeries(L.CandlestickSeries,{upColor:'#22c55e',downColor:'#f43f5e',wickUpColor:'#22c55e',wickDownColor:'#f43f5e',borderVisible:false,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
     candle.setData(ser.map(function(d){ return {time:d.t,open:d.o,high:d.h,low:d.l,close:d.c}; }));
-    setMode(initialMode());
+    try{ phasePrim=makePhasePrimitive(buildRuns(ser)); area.attachPrimitive(phasePrim); }catch(e){}
+    halvMk=L.createSeriesMarkers(area, []); updateHalvings();
 
+    setMode(initialMode());
     setPhaseTag(j.current);
 
     var leg=document.getElementById('wk-legend');
@@ -1645,17 +1671,35 @@
       if(!param||!param.time){ leg.style.display='none'; return; }
       var key=param.time; if(typeof key==='object'&&key.year){ key=key.year+'-'+String(key.month).padStart(2,'0')+'-'+String(key.day).padStart(2,'0'); }
       var d=byTime[key]; if(!d){ leg.style.display='none'; return; }
-      var html='<b>'+key+'</b> · BTC <b>$'+Math.round(d.c).toLocaleString()+'</b> · '+PHPT[d.p];
-      if(ind.mayer&&d.mayer!=null) html+=' · Mayer <b>'+d.mayer.toFixed(2)+'</b>';
-      if(ind.percentile&&d.pct!=null) html+=' · pct <b>'+Math.round(d.pct)+'%</b>';
-      leg.innerHTML=html; leg.style.display='block';
+      leg.innerHTML='<b>'+key+'</b> · BTC <b>$'+Math.round(d.c).toLocaleString()+'</b> · '+PHPT[d.p]; leg.style.display='block';
     });
 
-    try{ new ResizeObserver(function(){ chart.applyOptions({width:el.clientWidth,height:380}); }).observe(el); }catch(e){}
-    chart.applyOptions({width:el.clientWidth,height:380});
-    wireToolbar();
-    applyInitialPeriod();
+    try{ new ResizeObserver(function(){ chart.applyOptions({width:el.clientWidth}); }).observe(el); }catch(e){}
+    relayout(); wireToolbar(); applyInitialPeriod();
+    setInterval(function(){ if(bodyEl.classList.contains('wk-b') && Object.keys(oscReg).length) savePaneHeights(); }, 2500);
   }
+
+  // ── pane / oscillator machinery (v5) ──────────────────────────────────────────
+  var OSCH=120;  // default oscillator pane height (px)
+  function relayout(){ if(!chart) return; var n=Object.keys(oscReg).length; var H=360+OSCH*n; var el=document.getElementById('wk-chart'); el.style.height=H+'px'; chart.applyOptions({width:el.clientWidth,height:H}); }
+  function savedPaneHeight(id){ try{ var m=JSON.parse(sessionStorage.getItem('wk_paneH')||'{}'); return m[id]; }catch(e){ return null; } }
+  function savePaneHeights(){ try{ var m={}; Object.keys(oscReg).forEach(function(id){ try{ m[id]=Math.round(oscReg[id].pane.getHeight()); }catch(e){} }); sessionStorage.setItem('wk_paneH', JSON.stringify(m)); }catch(e){} }
+  function addOsc(id){ if(oscReg[id]||!OSC[id]) return; var paneIdx=chart.panes().length; var built=OSC[id].build(paneIdx);
+    // oscillator panes are LINEAR (the chart-level log mode would break MACD's negatives)
+    try{ built[0].priceScale().applyOptions({mode:0,borderColor:'#1f2430',scaleMargins:{top:0.14,bottom:0.1}}); }catch(e){}
+    var pane=chart.panes()[paneIdx]; oscReg[id]={series:built,pane:pane}; relayout(); var h=savedPaneHeight(id); try{ pane.setHeight(h||OSCH); }catch(e){} }
+  function removeOsc(id){ var r=oscReg[id]; if(!r) return; var pi=null; try{ pi=r.pane.paneIndex(); }catch(e){} r.series.forEach(function(s){ try{ chart.removeSeries(s); }catch(e){} }); try{ if(pi!=null && r.pane.getSeries().length===0) chart.removePane(pi); }catch(e){} delete oscReg[id]; relayout(); }
+  var OSC={
+    rsi:{build:function(p){ var s=mkLine('#5b8cff',p,{autoscaleInfoProvider:fix(0,100)}); s.setData(arrData(COMP.rsi)); s.createPriceLine({price:70,color:'#3a4150',lineStyle:2,lineWidth:1,axisLabelVisible:false}); s.createPriceLine({price:30,color:'#3a4150',lineStyle:2,lineWidth:1,axisLabelVisible:false}); return [s]; }},
+    stoch:{build:function(p){ var k=mkLine('#22d3ee',p,{autoscaleInfoProvider:fix(0,100)}); k.setData(arrData(COMP.stochK)); var d=mkLine('#f59e0b',p); d.setData(arrData(COMP.stochD)); k.createPriceLine({price:80,color:'#3a4150',lineStyle:2,axisLabelVisible:false}); k.createPriceLine({price:20,color:'#3a4150',lineStyle:2,axisLabelVisible:false}); return [k,d]; }},
+    macd:{build:function(p){ var h=chart.addSeries(L.HistogramSeries,{priceLineVisible:false,lastValueVisible:false},p); h.setData(DATA.series.map(function(d,i){ var v=COMP.hist[i]; return (v==null)?null:{time:d.t,value:v,color:v>=0?'rgba(34,197,94,.55)':'rgba(244,63,94,.55)'}; }).filter(Boolean)); var m=mkLine('#5b8cff',p); m.setData(arrData(COMP.macd)); var sg=mkLine('#f59e0b',p); sg.setData(arrData(COMP.signal)); return [h,m,sg]; }},
+    mayer:{build:function(p){ var s=mkLine('#a78bfa',p); s.setData(arrData(DATA.series.map(function(d){ return d.mayer; }))); s.createPriceLine({price:1,color:'#3a4150',lineStyle:2,axisLabelVisible:false}); s.createPriceLine({price:2.4,color:'rgba(244,63,94,.5)',lineStyle:3,axisLabelVisible:false}); return [s]; }},
+    pct:{build:function(p){ var s=mkLine('#22d3ee',p,{autoscaleInfoProvider:fix(0,100)}); s.setData(arrData(DATA.series.map(function(d){ return d.pct; }))); return [s]; }},
+  };
+  function addMa(){ if(ma) return; ma=chart.addSeries(L.LineSeries,{color:'#f59e0b',lineWidth:1,priceLineVisible:false,lastValueVisible:false},0); ma.setData(arrData(DATA.series.map(function(d){ return d.ma200w; }))); }
+  function rmMa(){ if(ma){ try{ chart.removeSeries(ma); }catch(e){} ma=null; } }
+  function updateHalvings(){ if(!halvMk) return; halvMk.setMarkers(ind.halving ? HALV.map(function(t){ return {time:t,position:'aboveBar',color:'#8a93a3',shape:'arrowDown',text:'⛏'}; }) : []); }
+  function setPhases(on){ ind.phases=on; try{ if(on) area.attachPrimitive(phasePrim); else area.detachPrimitive(phasePrim); }catch(e){} }
 
   var PERIODS=[{d:1,k:'1D'},{d:7,k:'7D'},{d:15,k:'15D'},{d:30,k:'30D'},{d:60,k:'60D'},{d:90,k:'90D'},{d:182,k:'6M'},{d:365,k:'1A'},{d:1460,k:'4A'},{d:0,k:'ALL'}];
   function applyPeriod(d,label){
@@ -1673,31 +1717,24 @@
     applyPeriod(pe.d, pe.k);
   }
 
-  function activeSeries(){ return (mode==='candle' && candle) ? candle : area; }
-  function applyHalvings(){
-    var mk = ind.halving ? HALV.map(function(t){ return {time:t,position:'aboveBar',color:'#8a93a3',shape:'arrowDown',text:'⛏'}; }) : [];
-    var s=activeSeries();
-    if(area) area.setMarkers(area===s?mk:[]);
-    if(candle) candle.setMarkers(candle===s?mk:[]);
-  }
   function initialMode(){ var m='line'; try{ m=sessionStorage.getItem('wk_mode')||'line'; }catch(e){} return m==='candle'?'candle':'line'; }
   function setMode(m){
     mode=(m==='candle')?'candle':'line';
-    if(area) area.applyOptions({visible:mode==='line'});
+    // area stays visible (carries the phase primitive + markers); transparent in candle mode
+    if(area) area.applyOptions(mode==='candle'
+      ? {lineColor:'rgba(0,0,0,0)',topColor:'rgba(0,0,0,0)',bottomColor:'rgba(0,0,0,0)'}
+      : {lineColor:'#a78bfa',topColor:'rgba(167,139,250,.18)',bottomColor:'rgba(167,139,250,0)'});
     if(candle) candle.applyOptions({visible:mode==='candle'});
-    applyHalvings();
     Array.prototype.forEach.call(document.querySelectorAll('.wk-mode-b'),function(bn){ bn.classList.toggle('on', bn.dataset.mode===mode); });
     try{ sessionStorage.setItem('wk_mode', mode); }catch(e){}
   }
 
-  function lineData(field){ return DATA.series.filter(function(d){return d[field]!=null;}).map(function(d){return {time:d.t,value:d[field]};}); }
   function toggleInd(k,on){
     ind[k]=on;
-    if(k==='halving') return applyHalvings();
-    if(k==='phases'){ if(ribbon) ribbon.applyOptions({visible:on}); return; }
-    if(k==='ma200w'){ if(on){ if(!ma){ ma=chart.addLineSeries({color:'#f59e0b',lineWidth:1,priceLineVisible:false,lastValueVisible:false}); ma.setData(lineData('ma200w')); } } else if(ma){ chart.removeSeries(ma); ma=null; } return; }
-    if(k==='mayer'){ if(on){ if(!mayerS){ mayerS=chart.addLineSeries({color:'#5b8cff',lineWidth:1,priceScaleId:'wk-mayer',priceLineVisible:false,lastValueVisible:false}); mayerS.setData(lineData('mayer')); } } else if(mayerS){ chart.removeSeries(mayerS); mayerS=null; } return; }
-    if(k==='percentile'){ if(on){ if(!pctS){ pctS=chart.addLineSeries({color:'#22d3ee',lineWidth:1,priceScaleId:'wk-pct',priceLineVisible:false,lastValueVisible:false}); pctS.setData(lineData('pct')); } } else if(pctS){ chart.removeSeries(pctS); pctS=null; } return; }
+    if(k==='halving') return updateHalvings();
+    if(k==='phases') return setPhases(on);
+    if(k==='ma200w') return on?addMa():rmMa();
+    if(['rsi','stoch','macd','mayer','pct'].indexOf(k)>=0){ if(on) addOsc(k); else removeOsc(k); savePaneHeights(); }
   }
 
   function wireToolbar(){
@@ -1710,7 +1747,7 @@
     document.addEventListener('click',function(e){ if(!e.target.closest('.wk-per-wrap')) perMenu.classList.remove('open'); });
     Array.prototype.forEach.call(document.querySelectorAll('.wk-per-item'),function(it){ it.onclick=function(){ applyPeriod(+it.dataset.d, it.textContent.trim()); perMenu.classList.remove('open'); }; });
     var st=document.getElementById('wk-scaleToggle');
-    st.onclick=function(){ isLog=!isLog; st.textContent=isLog?'LOG':'LIN'; chart.priceScale('right').applyOptions({mode:isLog?1:0}); };
+    st.onclick=function(){ isLog=!isLog; st.textContent=isLog?'LOG':'LIN'; try{ area.priceScale().applyOptions({mode:isLog?1:0}); }catch(e){} };
     Array.prototype.forEach.call(document.querySelectorAll('.wk-mode-b'),function(bn){ bn.onclick=function(){ setMode(bn.dataset.mode); }; });
   }
 
