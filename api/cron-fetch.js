@@ -4,7 +4,7 @@
 // inputs it has and nulls the rest.
 
 import {
-  getActiveTokens, sbInsert, sbUpsert, recentReadingExists, getPrevActivitySnapshot,
+  getActiveTokens, sbInsert, sbUpsert, sbSelect, recentReadingExists, getPrevActivitySnapshot,
   getPrevReadingForSignals, getLastSignalDates,
 } from '../lib/tokens.js';
 import { fetchTokenInputs } from '../lib/sources.js';
@@ -44,19 +44,27 @@ export default async function handler(req, res) {
   // the phase stays null and signals fall back to unconditioned behavior.
   let currentPhase = null;
   try {
-    const btc = await getBtcDailySeries(365, cgKey);
+    // Long history (≥2011) from btc_history → complete 200-week MA. Append today's live price
+    // and also persist it into btc_history so the long series stays current between imports.
+    const hist = await sbSelect(base, serviceKey, 'btc_history?select=date,close&order=date.asc&limit=20000');
+    const prices = hist.map((r) => Number(r.close)).filter(Number.isFinite);
+    const btc = await getBtcDailySeries(2, cgKey);
+    let cycleDay = new Date().toISOString().slice(0, 10);
     if (btc.length) {
-      const prices = btc.map((p) => p.price);
-      const i = prices.length - 1;
-      const { phase, indicators } = classifyLatest(prices);   // 4-indicator consensus + hysteresis
+      const live = btc[btc.length - 1].price;
+      cycleDay = new Date(btc[btc.length - 1].ts).toISOString().slice(0, 10);
+      await sbUpsert(base, serviceKey, 'btc_history', [{ date: cycleDay, close: live, source: 'coingecko-live' }], 'date');
+      if (hist.length && hist[hist.length - 1].date === cycleDay) prices[prices.length - 1] = live; else prices.push(live);
+    }
+    if (prices.length) {
+      const { phase, indicators } = classifyLatest(prices);   // over 10+ years now
       currentPhase = phase;
-      const cycleDay = new Date(btc[i].ts).toISOString().slice(0, 10);
       // Global M2 liquidity confirmer (US+EU+China → USD; best-effort, never blocks the row).
       try { const m2 = globalM2MetricsAsOf(await fetchGlobalM2Inputs(), cycleDay); if (m2) Object.assign(indicators, m2); }
       catch (e) { summary.push({ m2_error: e.message }); }
       await sbUpsert(base, serviceKey, 'market_cycle', [{
         cycle_date: cycleDay,
-        btc_price: prices[i], phase, indicator_values: indicators, updated_at: fetchedAt,
+        btc_price: prices[prices.length - 1], phase, indicator_values: indicators, updated_at: fetchedAt,
       }], 'cycle_date');
     }
   } catch (e) { summary.push({ cycle_error: e.message }); }

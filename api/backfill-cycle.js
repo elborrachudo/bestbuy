@@ -11,7 +11,7 @@
 import { getActiveTokens, sbSelect, sbInsert, sbDelete, sbUpsert } from '../lib/tokens.js';
 import { stochRsiSeries, macdSeries } from '../lib/scoring.js';
 import { generateSignals } from '../lib/signals.js';
-import { getBtcDailySeries, classifySeries } from '../lib/cycle.js';
+import { classifySeries } from '../lib/cycle.js';
 import { fetchGlobalM2Inputs, globalM2MetricsAsOf } from '../lib/globalm2.js';
 import { structuralDeclineSeries } from '../lib/survivorship.js';
 
@@ -33,28 +33,26 @@ export default async function handler(req, res) {
   }
   const onlySymbol = ((req.query && req.query.symbol) || '').trim().toUpperCase();
 
-  // ── 1. Market cycle from BTC ────────────────────────────────────────────────
+  // ── 1. Market cycle from the LONG BTC history (Phase 3) ─────────────────────
+  // Read the full daily series from btc_history (≥2011) so the 200-week MA is COMPLETE
+  // (ma200w_partial=false) and the price percentile is over 10+ years, not ~1.
   let phaseByDate = {}, cycleRows = 0, phaseDist = {};
   try {
-    const btc = await getBtcDailySeries(365, cgKey);
-    const prices = btc.map((p) => p.price);
+    const hist = await sbSelect(base, serviceKey, 'btc_history?select=date,close&order=date.asc&limit=20000');
+    const series = hist.map((r) => ({ day: r.date, price: N(r.close) })).filter((r) => Number.isFinite(r.price));
+    if (series.length < 400) { res.status(409).json({ ok: false, error: `btc_history thin (${series.length}); run /api/import-btc-history first` }); return; }
+    const prices = series.map((r) => r.price);
     const cls = classifySeries(prices);   // 4-indicator consensus + hysteresis, per day
     // Global M2 liquidity confirmer (best-effort; attached per-day as-of).
     let g2 = null; try { g2 = await fetchGlobalM2Inputs(); } catch (e) { console.warn('global m2 failed:', e.message); }
-    // CoinGecko can return two points on the same UTC date (e.g. the trailing current
-    // price). Dedupe by date — keep the last — so one upsert batch never touches a row
-    // twice (which Postgres rejects with 21000).
-    const byDate = new Map();
-    btc.forEach((p, i) => {
-      const day = new Date(p.ts).toISOString().slice(0, 10);
+    const rows = series.map((r, i) => {
       const iv = cls[i].indicators;
-      if (g2) { const m2 = globalM2MetricsAsOf(g2, day); if (m2) Object.assign(iv, m2); }
-      byDate.set(day, { cycle_date: day, btc_price: p.price, phase: cls[i].phase, indicator_values: iv });
-      phaseByDate[day] = cls[i].phase;
+      if (g2) { const m2 = globalM2MetricsAsOf(g2, r.day); if (m2) Object.assign(iv, m2); }
+      phaseByDate[r.day] = cls[i].phase;
+      phaseDist[cls[i].phase] = (phaseDist[cls[i].phase] || 0) + 1;
+      return { cycle_date: r.day, btc_price: r.price, phase: cls[i].phase, indicator_values: iv };
     });
-    const rows = [...byDate.values()];
-    rows.forEach((r) => { phaseDist[r.phase] = (phaseDist[r.phase] || 0) + 1; });
-    for (let i = 0; i < rows.length; i += 200) await sbUpsert(base, serviceKey, 'market_cycle', rows.slice(i, i + 200), 'cycle_date');
+    for (let i = 0; i < rows.length; i += 500) await sbUpsert(base, serviceKey, 'market_cycle', rows.slice(i, i + 500), 'cycle_date');
     cycleRows = rows.length;
   } catch (e) {
     res.status(502).json({ ok: false, error: `btc/market_cycle: ${e.message}` });
