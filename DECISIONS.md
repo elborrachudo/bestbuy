@@ -310,6 +310,30 @@ noted it here.
 - **Best-effort:** any source failing never blocks the cycle row (logged via `console.warn`).
   Populates on the next cron run (current) and a `backfill-cycle` re-run (per-day history).
 
+## Phase 3 — long BTC history (complete 200W MA + 3-cycle validation) (IMPLEMENTED)
+- **What:** imported BTC daily OHLC since **2011-08-18** (5,428 days) into a new
+  `btc_history` table, and the cycle detector now computes the 200-week MA / Mayer /
+  drawdown / expanding-window percentile over **10+ years** instead of ~1. So the
+  200W MA is **complete** (`ma200w_partial=false`) for all recent dates (4,029 of 5,428
+  rows; the first ~1,400 days are legitimately partial).
+- **Source:** `api/import-btc-history.js` → **Bitstamp** `ohlc/btcusd` (keyless, daily since
+  2011), Coinbase fallback. NOT Binance (geo-blocked from Vercel-US, 451), NOT CryptoCompare
+  (now needs a key), NOT CoinGecko `days=max` (demo caps at 365d). Idempotent upsert by date.
+- **Wiring:** `backfill-cycle` reads the full series via `sbSelectAll` (PostgREST caps a
+  single response at 1000 rows → paginate) and recomputes `market_cycle` for all history;
+  `cron-fetch` loads the long series, appends + persists today's live price into
+  `btc_history`, and classifies over the complete history each run.
+- **Threshold fix (validated against 3 real cycles):** an **extreme drawdown** (>60% off ATH
+  with Mayer < 1.0) now reads **accumulation** (capitulation/bottom zone) even while still
+  falling — placed ahead of the falling-knife correction rule. This flipped the 2015-01 /
+  2018-12 / 2022-11 lows from `correction` to `accumulation`. Today's −52% sits above the
+  threshold and correctly remains `correction`.
+- **Validation (the acid test):** bottoms 2015/2018/2022 → `accumulation`; tops 2017/2021/
+  2025 → `euphoria`; today → `correction` (Mayer 0.80, dd −52%). All 7 backbone milestones
+  reconcile against the right OHLC field (note: the "$69k" 2021 top is the intraday HIGH;
+  the "$172" 2015 low is the Jan-14 close). Phases 1+2 untouched: gate (0 buys in correction/
+  euphoria), alpha, charts, technicals, M2 ($94.1T UEC), survivorship all intact. 66 tests.
+
 ## Phase 2 — complete
 All Phase-2 items (robust detector, survivorship filter, phase sizing, M2 confirmer) are
 implemented. Nothing outstanding.
