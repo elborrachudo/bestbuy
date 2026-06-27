@@ -12,12 +12,22 @@ export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!base || !key) { res.status(500).json({ ok: false, error: 'missing supabase env' }); return; }
   try {
-    const rows = await sbSelectAll(base, key, 'market_cycle?select=cycle_date,btc_price,phase,indicator_values&order=cycle_date.asc');
+    const [rows, hist] = await Promise.all([
+      sbSelectAll(base, key, 'market_cycle?select=cycle_date,btc_price,phase,indicator_values&order=cycle_date.asc'),
+      sbSelectAll(base, key, 'btc_history?select=date,open,high,low,close&order=date.asc'),
+    ]);
+    const ohlc = {};
+    hist.forEach((r) => { ohlc[r.date] = { o: n(r.open), h: n(r.high), l: n(r.low), c: n(r.close) }; });
     const series = rows.map((r) => {
       const iv = r.indicator_values || {};
+      const o = ohlc[r.cycle_date] || {};
+      const c = o.c != null ? o.c : n(r.btc_price);
       return {
         t: r.cycle_date,
-        c: n(r.btc_price),
+        c,                                   // close (line series)
+        o: o.o != null ? o.o : c,            // OHLC (candles); fallback flat to close
+        h: o.h != null ? o.h : c,
+        l: o.l != null ? o.l : c,
         p: PH[r.phase] || 'corr',
         mayer: n(iv.mayer),
         ma200w: n(iv.ma200w),

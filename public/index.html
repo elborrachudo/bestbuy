@@ -441,6 +441,9 @@
   .wk-per-item:hover{background:rgba(91,140,255,.12);}
   .wk-per-item.on{background:rgba(91,140,255,.20);color:#8fd1ff;font-weight:600;}
   #wk-chart{height:380px;width:100%;border-radius:0;overflow:hidden;position:relative;}
+  .wk-modetog{position:absolute;left:8px;bottom:8px;z-index:6;display:flex;gap:2px;background:rgba(13,16,22,.8);border:1px solid #1f2430;border-radius:8px;padding:2px;}
+  .wk-mode-b{width:28px;height:24px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#5a6273;cursor:pointer;border-radius:6px;padding:0;}
+  .wk-mode-b.on{background:rgba(91,140,255,.22);color:#a9c2ff;}
   .wk-legend{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;color:#cdd5e0;background:rgba(13,16,22,.72);border:1px solid #1f2430;border-radius:7px;padding:5px 8px;pointer-events:none;line-height:1.5;display:none;}
   .wk-legend b{color:#fff;font-weight:600;}
   .wk-sub{font-size:11px;color:#8a93a3;margin-top:8px;line-height:1.5;}
@@ -490,7 +493,11 @@
         </div>
         <div class="wk-scaletoggle" id="wk-scaleToggle">LOG</div>
       </div>
-      <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div></div>
+      <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div>
+        <div class="wk-modetog" id="wk-modetog">
+          <button class="wk-mode-b on" data-mode="line" title="Linha" aria-label="Linha"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-6 4 3 6-8"/></svg></button>
+          <button class="wk-mode-b" data-mode="candle" title="Velas" aria-label="Velas"><svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.5" fill="currentColor"><line x1="7" y1="3" x2="7" y2="21"/><rect x="5" y="8" width="4" height="8" rx="0.5"/><line x1="17" y1="5" x2="17" y2="19"/><rect x="15" y="10" width="4" height="6" rx="0.5"/></svg></button>
+        </div></div>
       <div class="wk-sub" id="wk-sub">BTC/USD · escala log · fases do detetor de ciclo (Mayer + 200W MA + drawdown + percentil) sobre 10+ anos.</div>
       <div class="wk-attribution"><a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView Lightweight Charts™</a></div>
     </div>
@@ -1570,6 +1577,9 @@
   var ind={phases:true,halving:true,ma200w:false,mayer:false,percentile:false};
 
   function hexRgb(h){ h=h.replace('#',''); return parseInt(h.slice(0,2),16)+','+parseInt(h.slice(2,4),16)+','+parseInt(h.slice(4,6),16); }
+  // compact price labels (60k, 200k, 2M) → narrows the price-scale column (~0.7×)
+  function wkFmtPrice(v){ if(v==null||!isFinite(v)) return ''; if(v>=1e6) return (v/1e6).toFixed(v>=1e7?0:1).replace(/\.0$/,'')+'M'; if(v>=1e3) return (v/1e3).toFixed(v>=1e5?0:1).replace(/\.0$/,'')+'k'; return ''+Math.round(v); }
+  var mode='line', candle=null;
 
   function showScreen(s){
     if(s==='B'){ bodyEl.classList.add('wk-b'); try{sessionStorage.setItem('waka_screen','B');}catch(e){} initChart(); if(chart){ try{chart.applyOptions({width:document.getElementById('wk-chart').clientWidth,height:380});}catch(e){} } }
@@ -1607,11 +1617,12 @@
     var el=document.getElementById('wk-chart'), lc=window.LightweightCharts;
     if(!lc){ document.getElementById('wk-loading').textContent='Lightweight Charts não carregou.'; return; }
     chart=lc.createChart(el,{
-      layout:{background:{color:'#0d1016'},textColor:'#8a93a3',attributionLogo:false},
+      layout:{background:{color:'#0d1016'},textColor:'#8a93a3',attributionLogo:false,fontSize:10},
       grid:{vertLines:{color:'rgba(255,255,255,.04)'},horzLines:{color:'rgba(255,255,255,.04)'}},
-      rightPriceScale:{borderColor:'#1f2430',mode:1},
+      rightPriceScale:{borderColor:'#1f2430',mode:1,entireTextOnly:true},
       timeScale:{borderColor:'#1f2430',timeVisible:false,minBarSpacing:0.02,rightOffset:3},
       crosshair:{mode:1}, handleScroll:true, handleScale:true,
+      localization:{priceFormatter:wkFmtPrice},
     });
     var lo=document.getElementById('wk-loading'); if(lo) lo.style.display='none';
     var ser=j.series;
@@ -1623,8 +1634,11 @@
 
     area=chart.addAreaSeries({lineColor:'#a78bfa',topColor:'rgba(167,139,250,.18)',bottomColor:'rgba(167,139,250,0)',lineWidth:1,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}});
     area.setData(ser.map(function(d){ return {time:d.t,value:d.c}; }));
+    candle=chart.addCandlestickSeries({upColor:'#22c55e',downColor:'#f43f5e',wickUpColor:'#22c55e',wickDownColor:'#f43f5e',borderVisible:false,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}});
+    candle.setData(ser.map(function(d){ return {time:d.t,open:d.o,high:d.h,low:d.l,close:d.c}; }));
+    setMode(initialMode());
 
-    applyHalvings(); setPhaseTag(j.current);
+    setPhaseTag(j.current);
 
     var leg=document.getElementById('wk-legend');
     chart.subscribeCrosshairMove(function(param){
@@ -1659,7 +1673,22 @@
     applyPeriod(pe.d, pe.k);
   }
 
-  function applyHalvings(){ if(area) area.setMarkers(ind.halving ? HALV.map(function(t){ return {time:t,position:'aboveBar',color:'#8a93a3',shape:'arrowDown',text:'⛏'}; }) : []); }
+  function activeSeries(){ return (mode==='candle' && candle) ? candle : area; }
+  function applyHalvings(){
+    var mk = ind.halving ? HALV.map(function(t){ return {time:t,position:'aboveBar',color:'#8a93a3',shape:'arrowDown',text:'⛏'}; }) : [];
+    var s=activeSeries();
+    if(area) area.setMarkers(area===s?mk:[]);
+    if(candle) candle.setMarkers(candle===s?mk:[]);
+  }
+  function initialMode(){ var m='line'; try{ m=sessionStorage.getItem('wk_mode')||'line'; }catch(e){} return m==='candle'?'candle':'line'; }
+  function setMode(m){
+    mode=(m==='candle')?'candle':'line';
+    if(area) area.applyOptions({visible:mode==='line'});
+    if(candle) candle.applyOptions({visible:mode==='candle'});
+    applyHalvings();
+    Array.prototype.forEach.call(document.querySelectorAll('.wk-mode-b'),function(bn){ bn.classList.toggle('on', bn.dataset.mode===mode); });
+    try{ sessionStorage.setItem('wk_mode', mode); }catch(e){}
+  }
 
   function lineData(field){ return DATA.series.filter(function(d){return d[field]!=null;}).map(function(d){return {time:d.t,value:d[field]};}); }
   function toggleInd(k,on){
@@ -1682,6 +1711,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('.wk-per-item'),function(it){ it.onclick=function(){ applyPeriod(+it.dataset.d, it.textContent.trim()); perMenu.classList.remove('open'); }; });
     var st=document.getElementById('wk-scaleToggle');
     st.onclick=function(){ isLog=!isLog; st.textContent=isLog?'LOG':'LIN'; chart.priceScale('right').applyOptions({mode:isLog?1:0}); };
+    Array.prototype.forEach.call(document.querySelectorAll('.wk-mode-b'),function(bn){ bn.onclick=function(){ setMode(bn.dataset.mode); }; });
   }
 
   if(document.readyState!=='loading') applyEntry(); else document.addEventListener('DOMContentLoaded',applyEntry);
