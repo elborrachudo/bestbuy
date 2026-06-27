@@ -1,50 +1,59 @@
-// api/import-btc-history.js — Phase 3. Imports long BTC daily OHLC (≥2013) into btc_history
-// so the cycle detector computes a COMPLETE 200-week MA + validates over 3 real cycles.
+// api/import-btc-history.js — Phase 3. Imports long BTC daily OHLC into btc_history so the
+// cycle detector computes a COMPLETE 200-week MA + validates over 3 real cycles.
 //
-// Source: CryptoCompare histoday (keyless, back to ~2010, not geo-blocked from US — Binance
-// is 451 here). CoinGecko days=max is a close-only fallback. Idempotent upsert by date.
-// Protected by CRON_SECRET. Returns coverage + the backbone-milestone closes for validation.
+// Keyless sources reachable from Vercel's US region (Binance is 451 here; CryptoCompare now
+// needs a key; CoinGecko demo caps at 365d):
+//   • Bitstamp  /api/v2/ohlc/btcusd  — BTC/USD daily since 2011-08 (covers all milestones).
+//   • Coinbase  /products/BTC-USD/candles — daily since 2015-07 (fallback / gap-fill).
+// Idempotent upsert by date. CRON_SECRET. Returns coverage + milestone closes for ±5% check.
 
 import { sbUpsert } from '../lib/tokens.js';
 
 const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; bestbuy/1.0)', 'Accept': 'application/json' };
-const day = (ts) => new Date(ts * 1000).toISOString().slice(0, 10);
+const dstr = (sec) => new Date(sec * 1000).toISOString().slice(0, 10);
 
-// CryptoCompare: paginate back with toTs until we reach ~2010 or data runs out.
-async function fetchCryptoCompare() {
+// Bitstamp: paginate forward from 2011 (limit 1000 candles/page).
+async function fetchBitstamp() {
   const out = new Map();
-  let toTs = Math.floor(Date.now() / 1000);
-  const floor = Math.floor(new Date('2010-07-01').getTime() / 1000);
-  for (let page = 0; page < 8; page++) {
-    const url = `https://min-api.cryptocompare.com/data/v2/histoday?fsym=BTC&tsym=USD&limit=2000&toTs=${toTs}`;
+  let start = Math.floor(new Date('2011-08-01').getTime() / 1000);
+  const now = Math.floor(Date.now() / 1000);
+  for (let page = 0; page < 40 && start < now; page++) {
+    const url = `https://www.bitstamp.net/api/v2/ohlc/btcusd/?step=86400&limit=1000&start=${start}`;
     const r = await fetch(url, { headers: UA });
-    if (!r.ok) throw new Error(`cryptocompare ${r.status}`);
+    if (!r.ok) throw new Error(`bitstamp ${r.status}`);
     const j = await r.json();
-    const data = (j && j.Data && j.Data.Data) || [];
-    if (!data.length) break;
-    for (const d of data) {
-      if (d.close > 0) out.set(day(d.time), {
-        date: day(d.time), open: d.open, high: d.high, low: d.low, close: d.close,
-        volume: d.volumeto != null ? d.volumeto : null, source: 'cryptocompare',
+    const ohlc = (j && j.data && j.data.ohlc) || [];
+    if (!ohlc.length) break;
+    let maxT = start;
+    for (const c of ohlc) {
+      const t = Number(c.timestamp), close = Number(c.close);
+      if (close > 0) out.set(dstr(t), {
+        date: dstr(t), open: Number(c.open) || null, high: Number(c.high) || null,
+        low: Number(c.low) || null, close, volume: Number(c.volume) || null, source: 'bitstamp',
       });
+      if (t > maxT) maxT = t;
     }
-    const oldest = data[0].time;                 // CC returns ascending → [0] is oldest
-    if (oldest <= floor || data.every((d) => d.close === 0)) break;
-    toTs = oldest - 86400;
+    if (maxT <= start) break;
+    start = maxT + 86400;
   }
   return out;
 }
 
-// CoinGecko close-only fallback (days=max → daily for the demo key).
-async function fetchCoinGecko(apiKey) {
-  const h = { ...UA }; if (apiKey) h['x-cg-demo-api-key'] = apiKey;
-  const r = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=max', { headers: h });
-  if (!r.ok) throw new Error(`coingecko ${r.status}`);
-  const j = await r.json();
+// Coinbase: 300-day windows back from now to 2015-07.
+async function fetchCoinbase() {
   const out = new Map();
-  for (const [ms, price] of (j.prices || [])) {
-    const date = new Date(ms).toISOString().slice(0, 10);
-    if (price > 0) out.set(date, { date, open: null, high: null, low: null, close: price, volume: null, source: 'coingecko' });
+  const start0 = new Date('2015-07-20').getTime();
+  for (let winEnd = Date.now(); winEnd > start0;) {
+    const winStart = Math.max(start0, winEnd - 300 * 86400000);
+    const url = `https://api.exchange.coinbase.com/products/BTC-USD/candles?granularity=86400&start=${new Date(winStart).toISOString()}&end=${new Date(winEnd).toISOString()}`;
+    const r = await fetch(url, { headers: UA });
+    if (!r.ok) throw new Error(`coinbase ${r.status}`);
+    const arr = await r.json();                 // [[time, low, high, open, close, volume], …]
+    for (const c of arr) {
+      const date = dstr(c[0]), close = c[4];
+      if (close > 0) out.set(date, { date, open: c[3], high: c[2], low: c[1], close, volume: c[5], source: 'coinbase' });
+    }
+    winEnd = winStart - 86400000;
   }
   return out;
 }
@@ -56,7 +65,6 @@ const MILESTONES = {
 
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL, serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const cgKey = process.env.COINGECKO_API_KEY || null;
   if (!base || !serviceKey) { res.status(500).json({ ok: false, error: 'missing supabase env' }); return; }
   const secret = process.env.CRON_SECRET;
   if (secret) {
@@ -66,14 +74,11 @@ export default async function handler(req, res) {
 
   const sources = {};
   let rows = new Map();
-  try { rows = await fetchCryptoCompare(); sources.cryptocompare = rows.size; }
-  catch (e) { sources.cryptocompare_error = e.message; }
-  // Fallback / gap-fill with CoinGecko if CC failed or covers little.
-  if (rows.size < 1000) {
-    try {
-      const cg = await fetchCoinGecko(cgKey); sources.coingecko = cg.size;
-      for (const [d, v] of cg) if (!rows.has(d)) rows.set(d, v);
-    } catch (e) { sources.coingecko_error = e.message; }
+  try { rows = await fetchBitstamp(); sources.bitstamp = rows.size; }
+  catch (e) { sources.bitstamp_error = e.message; }
+  if (rows.size < 1500) {
+    try { const cb = await fetchCoinbase(); sources.coinbase = cb.size; for (const [d, v] of cb) if (!rows.has(d)) rows.set(d, v); }
+    catch (e) { sources.coinbase_error = e.message; }
   }
   if (!rows.size) { res.status(502).json({ ok: false, error: 'no data from any source', sources }); return; }
 
@@ -88,8 +93,5 @@ export default async function handler(req, res) {
     const close = got ? Number(got.close) : null;
     milestones[d] = { expected, got: close == null ? null : Math.round(close), ok: close == null ? null : Math.abs(close - expected) / expected <= 0.05 };
   }
-  res.status(200).json({
-    ok: true, imported: all.length, first: all[0].date, last: all[all.length - 1].date,
-    sources, milestones,
-  });
+  res.status(200).json({ ok: true, imported: all.length, first: all[0].date, last: all[all.length - 1].date, sources, milestones });
 }
