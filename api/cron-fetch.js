@@ -11,7 +11,7 @@ import { fetchTokenInputs } from '../lib/sources.js';
 import { fetchActivityRaw } from '../lib/activity.js';
 import { buildReading, scoreActivity, round1 } from '../lib/scoring.js';
 import { detectLiveSignal } from '../lib/signals.js';
-import { getBtcDailySeries, classifyLatest } from '../lib/cycle.js';
+import { getBtcDailySeries, classifyLatest, getM2Monthly, m2MetricsAsOf } from '../lib/cycle.js';
 
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL;
@@ -49,8 +49,12 @@ export default async function handler(req, res) {
       const i = prices.length - 1;
       const { phase, indicators } = classifyLatest(prices);   // 4-indicator consensus + hysteresis
       currentPhase = phase;
+      const cycleDay = new Date(btc[i].ts).toISOString().slice(0, 10);
+      // M2 liquidity confirmer (best-effort; never blocks the cycle row).
+      try { const m2 = m2MetricsAsOf(await getM2Monthly(), cycleDay); if (m2) Object.assign(indicators, m2); }
+      catch (e) { summary.push({ m2_error: e.message }); }
       await sbUpsert(base, serviceKey, 'market_cycle', [{
-        cycle_date: new Date(btc[i].ts).toISOString().slice(0, 10),
+        cycle_date: cycleDay,
         btc_price: prices[i], phase, indicator_values: indicators, updated_at: fetchedAt,
       }], 'cycle_date');
     }

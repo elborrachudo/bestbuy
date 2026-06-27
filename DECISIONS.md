@@ -280,8 +280,24 @@ noted it here.
   The regime banner shows the current sizing (e.g. "sizing 1.5× (fundo)").
 - This does NOT change the signal generator/state machine or the confluence grading.
 
-## Phase 2 — still NOT implemented
-- Optional: global M2 as a liquidity confirmer.
+## Phase 2.1 — M2 liquidity confirmer (IMPLEMENTED)
+- **Source:** US **M2** money supply from FRED's **keyless public CSV**
+  (`fredgraph.csv?id=M2SL`) — no API key, no paid source — used as the global-liquidity
+  proxy (the dominant crypto-liquidity driver; true global M2 would need aggregating
+  multiple central banks, which isn't keyless). Server-side fetch (egress), best-effort:
+  a FRED failure never blocks the cycle row.
+- **Metrics** (stored per market_cycle day in `indicator_values`, as-of, no lookahead):
+  `m2_value`, `m2_yoy_pct`, `m2_expanding` (vs 3 months prior).
+- **Use:** a displayed **CONFIRMER** only — the banner shows "Liquidez M2: a expandir
+  (vento a favor) / a contrair (vento contra) · ±X% YoY". It does **not** change the phase
+  gate or signal generation (kept safe/auditable); it qualifies the regime as a tailwind or
+  headwind for dip-buys.
+- **Populates:** on the next cron run (current value) and on a `backfill-cycle` re-run
+  (per-day history). Degrades gracefully (banner simply omits M2 until data exists).
+
+## Phase 2 — complete
+All Phase-2 items (robust detector, survivorship filter, phase sizing, M2 confirmer) are
+implemented. Nothing outstanding.
 - **Honest warnings.** (a) The long-term/cycle view only becomes reliable with YEARS of
   history; today there's ~1 year — it's built now and matures over time. (b) MVRV/NUPL are
   BTC = a GLOBAL traffic light, not per-asset. (c) The 4-year cycle is changing

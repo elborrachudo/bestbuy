@@ -11,7 +11,7 @@
 import { getActiveTokens, sbSelect, sbInsert, sbDelete, sbUpsert } from '../lib/tokens.js';
 import { stochRsiSeries, macdSeries } from '../lib/scoring.js';
 import { generateSignals } from '../lib/signals.js';
-import { getBtcDailySeries, classifySeries } from '../lib/cycle.js';
+import { getBtcDailySeries, classifySeries, getM2Monthly, m2MetricsAsOf } from '../lib/cycle.js';
 import { structuralDeclineSeries } from '../lib/survivorship.js';
 
 const N = (x) => (x == null ? null : Number(x));
@@ -38,13 +38,17 @@ export default async function handler(req, res) {
     const btc = await getBtcDailySeries(365, cgKey);
     const prices = btc.map((p) => p.price);
     const cls = classifySeries(prices);   // 4-indicator consensus + hysteresis, per day
+    // M2 liquidity confirmer (best-effort; attached per-day as-of).
+    let m2series = null; try { m2series = await getM2Monthly(); } catch (e) { /* no M2 → cycle still fine */ }
     // CoinGecko can return two points on the same UTC date (e.g. the trailing current
     // price). Dedupe by date — keep the last — so one upsert batch never touches a row
     // twice (which Postgres rejects with 21000).
     const byDate = new Map();
     btc.forEach((p, i) => {
       const day = new Date(p.ts).toISOString().slice(0, 10);
-      byDate.set(day, { cycle_date: day, btc_price: p.price, phase: cls[i].phase, indicator_values: cls[i].indicators });
+      const iv = cls[i].indicators;
+      if (m2series) { const m2 = m2MetricsAsOf(m2series, day); if (m2) Object.assign(iv, m2); }
+      byDate.set(day, { cycle_date: day, btc_price: p.price, phase: cls[i].phase, indicator_values: iv });
       phaseByDate[day] = cls[i].phase;
     });
     const rows = [...byDate.values()];

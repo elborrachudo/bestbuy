@@ -835,15 +835,22 @@
     var conf=iv && iv.phase_confidence!=null ? Math.round(Number(iv.phase_confidence)*100) : null;
     var confTxt=conf!=null ? ' · confiança '+conf+'%' : '';
     var mayerTxt=iv && iv.mayer!=null ? ' · Mayer '+Number(iv.mayer).toFixed(2) : '';
+    // M2 liquidity confirmer (informational): expanding = tailwind, contracting = headwind.
+    var m2Txt='';
+    if(iv && iv.m2_expanding!=null){
+      var exp=iv.m2_expanding===true||iv.m2_expanding==='true';
+      var yoy=iv.m2_yoy_pct!=null?(' '+(Number(iv.m2_yoy_pct)>=0?'+':'')+Number(iv.m2_yoy_pct).toFixed(1)+'% YoY'):'';
+      m2Txt=' &nbsp;·&nbsp; Liquidez M2: <b style="color:'+(exp?'#22c55e':'#f59e0b')+'">'+(exp?'a expandir (vento a favor)':'a contrair (vento contra)')+'</b>'+yoy;
+    }
     if(state.view==='long'){
       var chips=Object.keys(PHASE_PT).map(function(k){ return '<span style="color:'+PHASE_COL[k]+';font-weight:700">●</span> '+PHASE_PT[k]; }).join(' &nbsp; ');
-      box.innerHTML='Fases: '+chips+(ph? ' &nbsp;·&nbsp; <b>agora: <span class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph]+'</span>'+confTxt+mayerTxt+'</b>':'')+
+      box.innerHTML='Fases: '+chips+(ph? ' &nbsp;·&nbsp; <b>agora: <span class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph]+'</span>'+confTxt+mayerTxt+'</b>':'')+m2Txt+
         ' &nbsp;·&nbsp; BTC base-100 (eixo log); detetor: Mayer + 200W MA + drawdown + percentil.';
     } else {
       var pa=portfolioAlpha(); var aTxt=pa==null?'':' &nbsp;·&nbsp; Carteira: <b>'+(pa>=0?'+':'')+pa.toFixed(0)+'pp</b> vs segurar';
       var sizeTxt = ph==='accumulation' ? ' &nbsp;·&nbsp; sizing 1.5× (fundo)' : (ph==='rise' ? ' &nbsp;·&nbsp; sizing 1.0×' : '');
       box.innerHTML=ph
-        ? 'Ciclo: <b class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph].toUpperCase()+'</b>'+confTxt+' — sinais condicionados: '+PHASE_RULE[ph]+'.'+sizeTxt+aTxt
+        ? 'Ciclo: <b class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph].toUpperCase()+'</b>'+confTxt+' — sinais condicionados: '+PHASE_RULE[ph]+'.'+sizeTxt+m2Txt+aTxt
         : 'Ciclo de mercado: a aguardar dados (Fase 1).'+aTxt;
     }
   }
