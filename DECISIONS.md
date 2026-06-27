@@ -310,6 +310,28 @@ noted it here.
 - **Best-effort:** any source failing never blocks the cycle row (logged via `console.warn`).
   Populates on the next cron run (current) and a `backfill-cycle` re-run (per-day history).
 
+## Phase A — professional charting screen (Lightweight Charts) + 2-PIN nav (IMPLEMENTED)
+- **What:** a second screen (Screen B) — a TradingView-style cycle chart built on **Lightweight
+  Charts 4.1.3** (Apache-2.0, CDN/buildless), replacing the hand-rolled canvas long-view that
+  broke on the long BTC history. Same `index.html`, no new dependency build.
+- **Data:** `/api/cycle-series` returns the FULL `market_cycle` series (5,428 days, paged past
+  PostgREST's 1000-row cap) as a compact payload — read, not recomputed. BTC in **log** scale.
+- **Features:** phase ribbon (per-day colored histogram strip = accumulation green / rise blue /
+  euphoria orange / correction purple), halving markers (2012/2016/2020/2024), period buttons
+  (1A/4A/Tudo via `timeScale().setVisibleRange`/`fitContent` — fixes the inert buttons),
+  LOG/LIN toggle, indicators dropdown (200W MA on the price scale; Mayer + percentil as overlays —
+  all read from `market_cycle`, not recomputed), crosshair legend, current phase + confidence +
+  Mayer + global-M2 header, TradingView attribution (license).
+- **Two screens, cross-nav:** Screen A = the existing dashboard (signals + token list), intact.
+  Tap the dashboard chart title → Screen B; tap "WAKAWAKA charting" → Screen A. Instant show/hide
+  (`body.wk-b`), state preserved.
+- **Two PINs (entry routing only; decorative, not security):** `0211` → Screen A, `0222` →
+  Screen B; any other code still invalid (shake/clear). `sessionStorage` remembers the entry
+  screen; after entering, free A/B navigation via the titles. Overlay anti-flash/animation kept.
+- **Verified** via headless Chromium against a local harness (sample series): chart renders in
+  log with phase ribbon + halvings + all 5 indicator overlays; the live screen uses the full
+  daily series. Screen A and Phases 1-3 untouched.
+
 ## Phase 3 — long BTC history (complete 200W MA + 3-cycle validation) (IMPLEMENTED)
 - **What:** imported BTC daily OHLC since **2011-08-18** (5,428 days) into a new
   `btc_history` table, and the cycle detector now computes the 200-week MA / Mayer /
