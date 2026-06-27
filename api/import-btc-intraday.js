@@ -6,7 +6,7 @@
 // upsert by ts. CRON_SECRET. Query ?tier=1h|1m|both (default both).
 
 import { sbDelete } from '../lib/tokens.js';
-import { fetchBitstampOhlc, upsertCandles } from '../lib/btcintraday.js';
+import { fetchBitstampOhlc, upsertCandles, INTRADAY_WINDOW_DAYS } from '../lib/btcintraday.js';
 
 const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; bestbuy/1.0)', 'Accept': 'application/json' };
 const iso = (sec) => new Date(sec * 1000).toISOString();
@@ -57,9 +57,10 @@ export default async function handler(req, res) {
     }
 
     if (tier === '1m' || tier === 'both') {
-      const since = now - 7 * 86400;             // last 7 days
+      const since = now - INTRADAY_WINDOW_DAYS * 86400;   // rolling window (60d)
+      const pages = Math.ceil((INTRADAY_WINDOW_DAYS * 1440) / 1000) + 2;   // 1000 candles/page
       let rows = new Map();
-      try { rows = await fetchBitstampOhlc(60, since, 12); out.tiers.m_bitstamp = rows.size; }
+      try { rows = await fetchBitstampOhlc(60, since, pages); out.tiers.m_bitstamp = rows.size; }
       catch (e) { out.tiers.m_bitstamp_error = e.message; }
       const all = await upsertCandles(base, serviceKey, 'btc_1m', rows);
       await sbDelete(base, serviceKey, 'btc_1m', `ts=lt.${encodeURIComponent(iso(since))}`);

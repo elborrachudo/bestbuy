@@ -13,7 +13,7 @@ import { buildReading, scoreActivity, round1 } from '../lib/scoring.js';
 import { detectLiveSignal } from '../lib/signals.js';
 import { getBtcDailySeries, classifyLatest } from '../lib/cycle.js';
 import { fetchGlobalM2Inputs, globalM2MetricsAsOf } from '../lib/globalm2.js';
-import { rollIntraday } from '../lib/btcintraday.js';
+import { rollIntraday, closeDailyCandle } from '../lib/btcintraday.js';
 
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL;
@@ -43,6 +43,11 @@ export default async function handler(req, res) {
   // Global market-cycle phase (via BTC) — computed once per run, conditions every
   // token's signal and is recorded in market_cycle. Best-effort: if BTC fetch fails,
   // the phase stays null and signals fall back to unconditioned behavior.
+  // Roll the intraday charting tiers FIRST (btc_1h top-up + btc_1m rolling window) so the daily
+  // candle close below can aggregate today's freshest hourly candles. Best-effort.
+  try { const roll = await rollIntraday(base, serviceKey); summary.push({ intraday: roll }); }
+  catch (e) { summary.push({ intraday_error: e.message }); }
+
   let currentPhase = null;
   try {
     // Long history (≥2011) from btc_history → complete 200-week MA. Append today's live price
@@ -54,7 +59,9 @@ export default async function handler(req, res) {
     if (btc.length) {
       const live = btc[btc.length - 1].price;
       cycleDay = new Date(btc[btc.length - 1].ts).toISOString().slice(0, 10);
-      await sbUpsert(base, serviceKey, 'btc_history', [{ date: cycleDay, close: live, source: 'coingecko-live' }], 'date');
+      // close the live daily candle with REAL OHLC aggregated from btc_1h (not close-only)
+      try { await closeDailyCandle(base, serviceKey, cycleDay, live); }
+      catch (e) { await sbUpsert(base, serviceKey, 'btc_history', [{ date: cycleDay, close: live, source: 'coingecko-live' }], 'date'); summary.push({ daily_ohlc_error: e.message }); }
       if (hist.length && hist[hist.length - 1].date === cycleDay) prices[prices.length - 1] = live; else prices.push(live);
     }
     if (prices.length) {
@@ -69,11 +76,6 @@ export default async function handler(req, res) {
       }], 'cycle_date');
     }
   } catch (e) { summary.push({ cycle_error: e.message }); }
-
-  // Roll the intraday charting tiers (btc_1h top-up, btc_1m last-7-days). Best-effort —
-  // never blocks the token run if Bitstamp is unreachable.
-  try { const roll = await rollIntraday(base, serviceKey); summary.push({ intraday: roll }); }
-  catch (e) { summary.push({ intraday_error: e.message }); }
 
   let tokens;
   try {

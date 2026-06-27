@@ -1648,6 +1648,8 @@
   };
   var CS_WIN={'1m':0.25,'5m':1,'15m':3,'1H':14,'4H':60,'1D':90,'1W':365,'1M':1460,'3M':2920,'6M':0,'1A':0,'2A':0};  // default visible window (days); 0=ALL
   var DAILY_ONLY=['ma200w','mayer','pct'];   // cycle indicators valid only on daily-family buckets
+  var INTRADAY_WINDOW_DAYS=60;               // rolling minute window (must match lib/btcintraday.js)
+  var CS_GUARD_MSG='1m/5m/15m disponível só nos últimos '+INTRADAY_WINDOW_DAYS+' dias';
   var ind={phases:true,halving:true,ma200w:false,rsi:false,stoch:false,macd:false,mayer:false,pct:false};
   var cfgId=null;            // oscillator id currently open in the configurator
 
@@ -1889,11 +1891,11 @@
 
   var _guardSub=null;
   function disarmGuard(){ if(_guardSub){ try{ chart.timeScale().unsubscribeVisibleRangeChange(_guardSub); }catch(e){} _guardSub=null; } }
-  function armMinuteGuard(cands){ disarmGuard(); if(!cands.length) return; var firstT=cands[0].t; _guardSub=function(r){ if(!r) return; var from=(typeof r.from==='number')?r.from:null; if(from!=null && from < firstT-3600){ notify('1m/5m/15m disponível só nos últimos 7 dias'); disarmGuard(); applyCandleSize('1D'); } }; try{ chart.timeScale().subscribeVisibleRangeChange(_guardSub); }catch(e){} }
+  function armMinuteGuard(cands){ disarmGuard(); if(!cands.length) return; var firstT=cands[0].t; _guardSub=function(r){ if(!r) return; var from=(typeof r.from==='number')?r.from:null; if(from!=null && from < firstT-3600){ notify(CS_GUARD_MSG); disarmGuard(); applyCandleSize('1D'); } }; try{ chart.timeScale().subscribeVisibleRangeChange(_guardSub); }catch(e){} }
 
   function applyCandleSize(size, opt){ var spec=CSPEC[size]; if(!spec) return; opt=opt||{}; disarmGuard();
     loadTier(spec.tier, function(cands){
-      if(spec.kind==='intra' && (!cands || !cands.length)){ notify('1m/5m/15m disponível só nos últimos 7 dias'); if(size!=='1D') applyCandleSize('1D'); return; }
+      if(spec.kind==='intra' && (!cands || !cands.length)){ notify(CS_GUARD_MSG); if(size!=='1D') applyCandleSize('1D'); return; }
       CSIZE=size; try{ sessionStorage.setItem('wk_csize', size); }catch(e){}
       ACTIVE=buildActive(size); CLOSE=ACTIVE.map(function(d){ return d.close; });
       var intra=spec.kind==='intra';
