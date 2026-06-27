@@ -332,6 +332,32 @@ noted it here.
   log with phase ribbon + halvings + all 5 indicator overlays; the live screen uses the full
   daily series. Screen A and Phases 1-3 untouched.
 
+## Charting tiers — 3-tier BTC storage + candle-size dropdown 1m→2A (IMPLEMENTED)
+- **3 storage tiers (Supabase):** `btc_history` (daily, 2011→today, reused as the daily tier),
+  new `btc_1h` (hourly, ~2y rolling — 17,521 rows) and `btc_1m` (minute, last 7 days — 10,081
+  rows). `btc_1h`/`btc_1m`: `ts timestamptz PK`, OHLCV, **RLS enabled** (read only server-side via
+  the service key; unlike `btc_history` which is anon-readable). Total well under 50 MB.
+- **Source:** Bitstamp OHLC (`step=3600`/`60`), Coinbase 1h fallback. NOT Binance (451 from
+  Vercel-US). `api/import-btc-intraday.js` seeds both; `lib/btcintraday.js` shares the fetcher +
+  `rollIntraday()`, folded into the existing 3×/day `cron-fetch` (no new cron entry) to top up the
+  recent edge and prune `btc_1m` to 7 days. `api/btc-candles.js?tier=daily|1h|1m` serves a tier as
+  compact OHLC (daily time = `YYYY-MM-DD`, intraday = epoch seconds).
+- **Candle-size dropdown (Screen B), 12 options, separate from the period (range) dropdown:**
+  1m/5m/15m ← `btc_1m`, 1H/4H ← `btc_1h`, 1D/1W/1M/3M/6M/1A/2A ← daily. Buckets larger than the
+  native tier are **aggregated on the fly in JS** (open=first, close=last, high=max, low=min) — no
+  per-resolution tables. **Guard:** 1m/5m/15m outside the 7-day window → discreet toast + automatic
+  fallback to 1D (never an empty chart); a visible-range listener also falls back if panned out.
+- **Indicator interplay:** the daily cycle indicators (Mayer / 200W MA / percentil) ride the
+  daily-family buckets and are greyed + switched off at intraday resolutions (no sub-daily values);
+  the RSI/StochRSI/MACD oscillators recompute from the active series' closes at every resolution.
+  LOG scale kept; the time axis switches to intraday labels. Refactored the price/phase/oscillator
+  path onto one `ACTIVE` series; `rebuildOsc` adds the new series before removing the old so panes
+  never collapse on rebuild.
+- **Verified:** `btc_1h` 17,521 rows (2024-06→2026-06), `btc_1m` 10,081 rows (7d); live
+  `/api/btc-candles?tier=1h` returns 17,521 OHLC candles. Frontend verified headless against real
+  daily + synthetic intraday: aggregation, intraday load, daily-only greying, guard fallback,
+  oscillator survival across a candle-size switch. Screen A, PINs, periods untouched.
+
 ## Charting v3 — configurable oscillators + pane titles + snap-to-height (IMPLEMENTED)
 - **Migrated to Lightweight Charts v5** (native multi-pane); Screen B now does:
 - **Oscillators computed CLIENT-SIDE, parameterizable.** RSI / StochRSI / MACD are computed in
