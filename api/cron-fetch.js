@@ -152,6 +152,7 @@ export default async function handler(req, res) {
           rsi_14: row.rsi_14, stochrsi_14: row.stochrsi_14, macd_histogram: row.macd_histogram,
           score_below_high: row.score_below_high, score_fundamentals: row.score_fundamentals,
           score_activity: row.score_activity, price: row.price,
+          structural_decline: inputs.structuralDecline,   // §2.2 survivorship
         };
         const prevR = await getPrevReadingForSignals(base, serviceKey, t.id, fetchedAt);
         const last = await getLastSignalDates(base, serviceKey, t.id);

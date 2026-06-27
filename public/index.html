@@ -798,12 +798,27 @@
     var rows=state.readingsByToken[tid]||[]; if(!rows.length) return null;
     var lastPrice=Number(rows[rows.length-1].price);
     var units=0, invested=0, cash=0, firstBuyPrice=null;
+    // §2.3 sizing: BUY allocation = $50 × size_mult (bigger in accumulation); SELL realizes
+    // a size_mult FRACTION of the position (partial in euphoria, full otherwise).
     sigs.forEach(function(s){ var p=Number(s.price_at_signal); if(!(p>0)) return;
-      if(s.side==='BUY'){ units+=50/p; invested+=50; if(firstBuyPrice==null) firstBuyPrice=p; }
-      else if(s.side==='SELL' && units>0){ cash+=units*p; units=0; } });
+      var mult=s.size_mult!=null?Number(s.size_mult):1;
+      if(s.side==='BUY'){ var amt=50*mult; units+=amt/p; invested+=amt; if(firstBuyPrice==null) firstBuyPrice=p; }
+      else if(units>0){ var sell=units*mult; cash+=sell*p; units-=sell; } });
     if(invested<=0||firstBuyPrice==null||!(lastPrice>0)) return null;
     var stratVal=cash+units*lastPrice, stratRet=(stratVal-invested)/invested, bhRet=lastPrice/firstBuyPrice-1;
     return { stratRet:stratRet, bhRet:bhRet, alphaPP:(stratRet-bhRet)*100, stratPnl:stratVal-invested, invested:invested };
+  }
+
+  // §2.2 survivorship flag (client-side mirror of lib/survivorship.js): price under a long
+  // MA that has been falling for ~90d. Buys for these assets are suppressed server-side.
+  function smaAt(p, period, end){ if(end+1<period) return null; var s=0; for(var k=end-period+1;k<=end;k++) s+=p[k]; return s/period; }
+  function isStructuralDecline(tid){
+    var rows=(state.readingsByToken[tid]||[]).filter(function(r){ return r.price!=null; });
+    if(rows.length<2) return false;
+    var p=rows.map(function(r){ return Number(r.price); }), i=p.length-1;
+    var ma=smaAt(p, Math.min(i+1,200), i), j=i-90, maPast=j>=0?smaAt(p, Math.min(j+1,200), j):null;
+    if(ma==null||maPast==null) return false;
+    return p[i]<ma && ma<maPast;
   }
   function portfolioAlpha(){
     var ds=0, db=0, cap=0;
@@ -826,8 +841,9 @@
         ' &nbsp;·&nbsp; BTC base-100 (eixo log); detetor: Mayer + 200W MA + drawdown + percentil.';
     } else {
       var pa=portfolioAlpha(); var aTxt=pa==null?'':' &nbsp;·&nbsp; Carteira: <b>'+(pa>=0?'+':'')+pa.toFixed(0)+'pp</b> vs segurar';
+      var sizeTxt = ph==='accumulation' ? ' &nbsp;·&nbsp; sizing 1.5× (fundo)' : (ph==='rise' ? ' &nbsp;·&nbsp; sizing 1.0×' : '');
       box.innerHTML=ph
-        ? 'Ciclo: <b class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph].toUpperCase()+'</b>'+confTxt+' — sinais condicionados: '+PHASE_RULE[ph]+'.'+aTxt
+        ? 'Ciclo: <b class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph].toUpperCase()+'</b>'+confTxt+' — sinais condicionados: '+PHASE_RULE[ph]+'.'+sizeTxt+aTxt
         : 'Ciclo de mercado: a aguardar dados (Fase 1).'+aTxt;
     }
   }
@@ -1011,6 +1027,11 @@
         tok.appendChild(el('div','flag', noCov
           ? 'sem cobertura de Fundamentals · Technicals + Atividade'
           : 'market-only · sem dados de Fundamentals'));
+      }
+      if(isStructuralDecline(t.id)){
+        var sd=el('div','flag','⚠ declínio estrutural · compras suprimidas');
+        sd.style.color='#f59e0b'; sd.style.fontStyle='normal';
+        tok.appendChild(sd);
       }
       var alpha=alphaForToken(t.id);
       if(alpha){

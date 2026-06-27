@@ -12,6 +12,7 @@ import { getActiveTokens, sbSelect, sbInsert, sbDelete, sbUpsert } from '../lib/
 import { stochRsiSeries, macdSeries } from '../lib/scoring.js';
 import { generateSignals } from '../lib/signals.js';
 import { getBtcDailySeries, classifySeries } from '../lib/cycle.js';
+import { structuralDeclineSeries } from '../lib/survivorship.js';
 
 const N = (x) => (x == null ? null : Number(x));
 
@@ -82,12 +83,13 @@ export default async function handler(req, res) {
       const prices = daily.map((r) => N(r.price));
       if (prices.filter((p) => p != null).length < 15) { summary.push({ symbol: t.symbol, skipped: 'thin' }); continue; }
       const stoch = stochRsiSeries(prices), macd = macdSeries(prices);
+      const decline = structuralDeclineSeries(prices);
       const enriched = daily.map((r, i) => ({
         fetched_at: r.fetched_at, rsi_14: N(r.rsi_14),
         stochrsi_14: r.stochrsi_14 != null ? N(r.stochrsi_14) : stoch[i],
         macd_histogram: r.macd_histogram != null ? N(r.macd_histogram) : macd.hist[i],
         score_below_high: N(r.score_below_high), score_fundamentals: N(r.score_fundamentals),
-        score_activity: N(r.score_activity), price: N(r.price),
+        score_activity: N(r.score_activity), price: N(r.price), structural_decline: decline[i],
       }));
 
       const conditioned = generateSignals(enriched, phaseByDate);

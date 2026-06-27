@@ -257,11 +257,30 @@ noted it here.
 - **Frontend.** Cycle chart adds a faint 200W-MA guide line (base-100); banner shows the
   current phase + confidence + Mayer.
 
-## Phase 2 remainder — still prepared, NOT implemented (awaiting go)
-- **Asset survivorship filter** — down-weight/exclude assets in prolonged structural
-  decline (below a falling MA200 for many months) to avoid "ONDOs".
-- **Phase-based sizing + DCA** — larger size in accumulation, smaller in rise; staged DCA
-  in accumulation; partial (non-binary) realization in euphoria.
+## Phase 2.2 — asset survivorship filter (IMPLEMENTED)
+- **Goal:** don't buy "ONDOs" — assets in a prolonged structural decline — even when the
+  global cycle says accumulation. Per-asset (vs the GLOBAL BTC cycle gate).
+- **Detection (`lib/survivorship.js`):** `structuralDecline = price < longMA AND longMA(now)
+  < longMA(90d ago)` — price beneath a long (200d, capped to available history) MA that has
+  itself been sloping down for ~90 days. Honest false during warmup.
+- **Action:** suppresses **BUY** signals for flagged assets (in `generateSignals` /
+  `detectLiveSignal`, after the cycle gate). Never blocks sells. The score/pillars and the
+  list ranking are NOT changed (guardrail) — the asset is only **flagged** in the UI
+  ("⚠ declínio estrutural · compras suprimidas") and its buys are withheld.
+
+## Phase 2.3 — phase-based sizing + partial realization (IMPLEMENTED)
+- Each signal carries a `size_mult` (`signals.size_mult`):
+  - **BUY** → allocation multiplier: **accumulation 1.5×** (cycle bottom, max upside),
+    **rise 1.0×**. (euphoria/correction buys are suppressed anyway.)
+  - **SELL** → realization FRACTION (partial, non-binary): **euphoria 0.5** (let half ride),
+    **else 1.0** (full).
+- The alpha backtest sizes with it: BUY invests `$50 × size_mult`; SELL realizes a
+  `size_mult` fraction of the open position. "DCA escalonado" is expressed as the larger
+  accumulation allocation (the dashboard signals, it doesn't auto-execute staged orders).
+  The regime banner shows the current sizing (e.g. "sizing 1.5× (fundo)").
+- This does NOT change the signal generator/state machine or the confluence grading.
+
+## Phase 2 — still NOT implemented
 - Optional: global M2 as a liquidity confirmer.
 - **Honest warnings.** (a) The long-term/cycle view only becomes reliable with YEARS of
   history; today there's ~1 year — it's built now and matures over time. (b) MVRV/NUPL are
