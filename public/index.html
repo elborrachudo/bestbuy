@@ -400,93 +400,103 @@
 
 <!-- ===== Screen B — professional cycle charting (Lightweight Charts) ===== -->
 <style id="wk-style">
-  #screenB{display:none;padding:0;}
-  body.wk-b{padding:0;}
+  /* ── Fase V: petrol/teal "Kiyotaka-style" reskin (Screen B chrome only; data layers/logic untouched) ── */
+  #screenB{display:none;padding:0;background:#08171c;}
+  body.wk-b{padding:0;background:#08171c;}
   body.wk-b .wrap{display:none;}
   body.wk-b .modal-back{display:none;}
   body.wk-b #screenB{display:block;}
   .wk-wrap{max-width:none;margin:0;}
-  .wk-card{background:#11141b;border:none;border-radius:0;padding:10px 8px;}
+  .wk-card{background:#0b1c22;border:none;border-radius:0;padding:10px 8px;}
   .wk-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;}
-  .wk-title{font-size:18px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:7px;cursor:pointer;color:#e8ecf2;}
+  .wk-title{font-size:18px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:7px;cursor:pointer;color:#e6f1f2;}
   .wk-title:active{opacity:.6;}
-  .wk-title .wk-arrow{font-size:13px;color:#5a6273;}
-  .wk-phasetag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:8px;background:rgba(167,139,250,.14);color:#c4b5fd;white-space:nowrap;}
+  .wk-title .wk-arrow{font-size:13px;color:#4f7780;}
+  .wk-phasetag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:rgba(167,139,250,.14);color:#c4b5fd;white-space:nowrap;}
   .wk-phasetag .wk-sw{width:8px;height:8px;border-radius:50%;background:#a78bfa;}
   .wk-toolbar{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
   .wk-layers{display:flex;gap:6px;flex-wrap:wrap;margin:-2px 0 8px;}
-  .wk-layer{font-size:11px;font-weight:600;color:#8a93a3;border:1px solid #1f2430;background:rgba(255,255,255,.02);border-radius:8px;padding:5px 9px;cursor:pointer;line-height:1;}
-  .wk-layer.on{background:rgba(91,140,255,.18);border-color:#3a4d80;color:#a9c2ff;}
+  .wk-layer{font-size:11px;font-weight:600;color:#7fa6ad;border:1px solid #1a3a44;background:rgba(45,212,191,.04);border-radius:999px;padding:5px 11px;cursor:pointer;line-height:1;}
+  .wk-layer.on{background:rgba(45,212,191,.16);border-color:rgba(45,212,191,.42);color:#5eead4;}
   .wk-layer-soon{opacity:.45;}
   .wk-layer[data-layer="halvings"].on{background:rgba(200,164,21,.18);border-color:#7a6512;color:#e4c64a;}
   .wk-ind-wrap{position:relative;}
-  .wk-ind-btn{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;border:1px solid #1f2430;border-radius:9px;padding:7px 11px;color:#c4b5fd;background:rgba(167,139,250,.10);cursor:pointer;}
-  .wk-ind-menu{position:absolute;top:42px;left:0;z-index:30;width:235px;background:#13161e;border:1px solid #1f2430;border-radius:12px;padding:6px;box-shadow:0 12px 40px rgba(0,0,0,.5);display:none;}
+  .wk-ind-btn{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;border:1px solid #1a3a44;border-radius:999px;padding:7px 13px;color:#5eead4;background:rgba(45,212,191,.10);cursor:pointer;}
+  .wk-ind-menu{position:absolute;top:42px;left:0;z-index:30;width:235px;background:#0e242c;border:1px solid #1a3a44;border-radius:12px;padding:6px;box-shadow:0 12px 40px rgba(0,0,0,.55);display:none;}
   .wk-ind-menu.open{display:block;}
-  .wk-ind-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:#e8ecf2;}
-  .wk-ind-radio{width:34px;height:20px;border-radius:11px;background:#2a3040;position:relative;transition:.2s;flex-shrink:0;}
-  .wk-ind-radio::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#5a6273;transition:.2s;}
-  .wk-ind-item.on .wk-ind-radio{background:rgba(91,140,255,.4);}
-  .wk-ind-item.on .wk-ind-radio::after{transform:translateX(14px);background:#a9c2ff;}
+  .wk-ind-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:#e6f1f2;}
+  .wk-ind-radio{width:34px;height:20px;border-radius:11px;background:#163039;position:relative;transition:.2s;flex-shrink:0;}
+  .wk-ind-radio::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#4f7780;transition:.2s;}
+  .wk-ind-item.on .wk-ind-radio{background:rgba(45,212,191,.4);}
+  .wk-ind-item.on .wk-ind-radio::after{transform:translateX(14px);background:#5eead4;}
   .wk-ind-item .wk-nm{flex:1;}
   .wk-ind-item .wk-csw{width:10px;height:10px;border-radius:2px;}
-  .wk-ind-sep{height:1px;background:#1f2430;margin:5px 8px;}
-  .wk-ind-head{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#5a6273;padding:6px 10px 3px;}
+  .wk-ind-sep{height:1px;background:#1a3a44;margin:5px 8px;}
+  .wk-ind-head{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4f7780;padding:6px 10px 3px;}
   .wk-spacer{flex:1;}
   .wk-ranges{display:flex;gap:5px;}
-  .wk-rng{font-size:11px;color:#8a93a3;padding:6px 9px;border-radius:8px;background:#161a23;cursor:pointer;}
-  .wk-rng.on{color:#8fd1ff;border:1px solid rgba(91,180,255,.4);}
-  .wk-scaletoggle{font-size:11px;font-weight:600;color:#8fd1ff;border:1px solid rgba(91,180,255,.4);border-radius:8px;padding:6px 9px;background:#161a23;cursor:pointer;}
+  .wk-rng{font-size:11px;color:#7fa6ad;padding:6px 9px;border-radius:999px;background:#0e242c;cursor:pointer;}
+  .wk-rng.on{color:#5eead4;border:1px solid rgba(45,212,191,.42);}
+  .wk-scaletoggle{font-size:11px;font-weight:600;color:#5eead4;border:1px solid rgba(45,212,191,.42);border-radius:999px;padding:6px 12px;background:rgba(45,212,191,.08);cursor:pointer;}
   .wk-per-wrap{position:relative;}
-  .wk-per-btn{font-size:11px;font-weight:600;color:#8fd1ff;border:1px solid rgba(91,180,255,.4);border-radius:8px;padding:6px 10px;background:#161a23;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;}
-  .wk-per-caret{color:#5a6273;}
-  .wk-per-menu{position:absolute;top:36px;right:0;z-index:30;width:92px;background:#13161e;border:1px solid #1f2430;border-radius:10px;padding:5px;box-shadow:0 12px 40px rgba(0,0,0,.5);display:none;}
+  .wk-per-btn{font-size:11px;font-weight:600;color:#5eead4;border:1px solid rgba(45,212,191,.42);border-radius:999px;padding:6px 12px;background:rgba(45,212,191,.08);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;}
+  .wk-per-caret{color:#4f7780;}
+  .wk-per-menu{position:absolute;top:36px;right:0;z-index:30;width:92px;background:#0e242c;border:1px solid #1a3a44;border-radius:12px;padding:5px;box-shadow:0 12px 40px rgba(0,0,0,.55);display:none;}
   .wk-per-menu.open{display:block;}
-  .wk-per-item{font-size:12px;color:#cdd5e0;padding:7px 10px;border-radius:7px;cursor:pointer;text-align:center;}
-  .wk-per-item:hover{background:rgba(91,140,255,.12);}
-  .wk-per-item.on{background:rgba(91,140,255,.20);color:#8fd1ff;font-weight:600;}
-  #wk-chart{height:72dvh;width:100%;border-radius:0;overflow:hidden;position:relative;}
+  .wk-per-item{font-size:12px;color:#a9c7cd;padding:7px 10px;border-radius:999px;cursor:pointer;text-align:center;}
+  .wk-per-item:hover{background:rgba(45,212,191,.12);}
+  .wk-per-item.on{background:rgba(45,212,191,.20);color:#5eead4;font-weight:600;}
+  /* ── vertical left drawing toolbar (Fase V visual; tools are no-op until Fase VII) ── */
+  .wk-stage{display:flex;align-items:stretch;}
+  .wk-drawbar{flex:0 0 38px;width:38px;display:flex;flex-direction:column;gap:2px;background:#0a181d;border-right:1px solid #16323b;padding:5px 0;overflow-y:auto;overflow-x:hidden;-ms-overflow-style:none;scrollbar-width:none;}
+  .wk-drawbar::-webkit-scrollbar{width:0;height:0;}
+  .wk-tool{flex:0 0 auto;width:32px;height:32px;margin:0 auto;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#80a8af;border-radius:8px;cursor:pointer;padding:0;}
+  .wk-tool:hover{background:rgba(45,212,191,.12);color:#5eead4;}
+  .wk-tool.on{background:rgba(45,212,191,.18);color:#5eead4;}
+  .wk-tool svg{width:18px;height:18px;display:block;}
+  .wk-tool-sep{flex:0 0 auto;height:1px;width:18px;margin:4px auto;background:#16323b;}
+  #wk-chart{height:72dvh;flex:1 1 auto;min-width:0;border-radius:0;overflow:hidden;position:relative;}
   /* tiny pane titles (UPPERCASE, white, discreet) — overlay, double-tap to configure */
   .wk-titles{position:absolute;inset:0;pointer-events:none;z-index:5;}
   .wk-ptitle{position:absolute;left:6px;font-size:10px;font-weight:700;letter-spacing:.09em;color:rgba(255,255,255,.5);padding:1px 3px;border-radius:4px;user-select:none;white-space:nowrap;}
   .wk-ptitle-osc{pointer-events:auto;cursor:pointer;}
-  .wk-ptitle-osc::after{content:'⚙';margin-left:4px;font-size:9px;color:rgba(91,140,255,.65);}
-  .wk-ptitle-osc:active{color:#fff;background:rgba(91,140,255,.18);}
+  .wk-ptitle-osc::after{content:'⚙';margin-left:4px;font-size:9px;color:rgba(45,212,191,.65);}
+  .wk-ptitle-osc:active{color:#fff;background:rgba(45,212,191,.18);}
   /* configurator bottom-sheet */
   .wk-cfg-back{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;display:none;}
   .wk-cfg-back.open{display:block;}
-  .wk-cfg{position:fixed;left:0;right:0;bottom:0;z-index:61;background:#13161e;border-top:1px solid #1f2430;border-radius:16px 16px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .25s cubic-bezier(.4,0,.2,1);max-height:82dvh;overflow-y:auto;}
+  .wk-cfg{position:fixed;left:0;right:0;bottom:0;z-index:61;background:#0e242c;border-top:1px solid #1a3a44;border-radius:16px 16px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom));transform:translateY(105%);transition:transform .25s cubic-bezier(.4,0,.2,1);max-height:82dvh;overflow-y:auto;}
   .wk-cfg.open{transform:translateY(0);}
   .wk-cfg-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-  .wk-cfg-h span{font-size:15px;font-weight:700;color:#e8ecf2;letter-spacing:.05em;}
-  .wk-cfg-x{background:transparent;border:none;color:#8a93a3;font-size:19px;line-height:1;cursor:pointer;padding:4px 6px;}
+  .wk-cfg-h span{font-size:15px;font-weight:700;color:#e6f1f2;letter-spacing:.05em;}
+  .wk-cfg-x{background:transparent;border:none;color:#7fa6ad;font-size:19px;line-height:1;cursor:pointer;padding:4px 6px;}
   .wk-cfg-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 2px;border-bottom:1px solid rgba(255,255,255,.05);}
-  .wk-cfg-row label{font-size:13px;color:#cdd5e0;}
-  .wk-cfg-row input[type=number]{width:78px;background:#0d1016;border:1px solid #2a3040;border-radius:8px;color:#e8ecf2;font-size:14px;padding:8px 10px;text-align:right;}
-  .wk-cfg-row input[type=color]{width:44px;height:32px;background:transparent;border:1px solid #2a3040;border-radius:8px;padding:2px;cursor:pointer;}
+  .wk-cfg-row label{font-size:13px;color:#a9c7cd;}
+  .wk-cfg-row input[type=number]{width:78px;background:#08171c;border:1px solid #1a3a44;border-radius:8px;color:#e6f1f2;font-size:14px;padding:8px 10px;text-align:right;}
+  .wk-cfg-row input[type=color]{width:44px;height:32px;background:transparent;border:1px solid #1a3a44;border-radius:8px;padding:2px;cursor:pointer;}
   .wk-cfg-foot{display:flex;gap:10px;margin-top:14px;}
-  .wk-cfg-foot button{flex:1;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid #2a3040;}
-  #wk-cfg-reset{background:transparent;color:#9aa3b2;}
-  #wk-cfg-apply{background:#5b8cff;color:#fff;border-color:#5b8cff;}
+  .wk-cfg-foot button{flex:1;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:1px solid #1a3a44;}
+  #wk-cfg-reset{background:transparent;color:#7fa6ad;}
+  #wk-cfg-apply{background:#14b8a6;color:#04201c;border-color:#14b8a6;}
   /* candle-size dropdown (12 options in a grid) */
   .wk-cs-menu{width:168px;left:auto;right:0;display:none;grid-template-columns:repeat(3,1fr);gap:4px;}
   .wk-cs-menu.open{display:grid;}
-  .wk-cs-item{font-size:12px;color:#cdd5e0;padding:8px 4px;border-radius:7px;cursor:pointer;text-align:center;border:1px solid transparent;}
-  .wk-cs-item:hover{background:rgba(91,140,255,.12);}
-  .wk-cs-item.on{background:rgba(91,140,255,.20);color:#8fd1ff;font-weight:600;}
+  .wk-cs-item{font-size:12px;color:#a9c7cd;padding:8px 4px;border-radius:999px;cursor:pointer;text-align:center;border:1px solid transparent;}
+  .wk-cs-item:hover{background:rgba(45,212,191,.12);}
+  .wk-cs-item.on{background:rgba(45,212,191,.20);color:#5eead4;font-weight:600;}
   .wk-cs-item.wk-cs-off{opacity:.35;}
   /* discreet guard toast */
-  .wk-toast{position:absolute;left:50%;bottom:40px;transform:translateX(-50%);z-index:8;background:rgba(20,24,33,.95);border:1px solid #2a3040;border-radius:9px;padding:8px 13px;font-size:12px;color:#e8ecf2;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .25s;pointer-events:none;max-width:80%;text-align:center;}
+  .wk-toast{position:absolute;left:50%;bottom:40px;transform:translateX(-50%);z-index:8;background:rgba(10,24,29,.96);border:1px solid #1a3a44;border-radius:9px;padding:8px 13px;font-size:12px;color:#e6f1f2;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .25s;pointer-events:none;max-width:80%;text-align:center;}
   .wk-toast.show{opacity:1;}
-  .wk-modetog{position:absolute;left:8px;bottom:8px;z-index:6;display:flex;flex-direction:column;gap:2px;background:rgba(13,16,22,.8);border:1px solid #1f2430;border-radius:8px;padding:2px;}
-  .wk-mode-b{width:28px;height:24px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#5a6273;cursor:pointer;border-radius:6px;padding:0;}
-  .wk-mode-b.on{background:rgba(91,140,255,.22);color:#a9c2ff;}
-  .wk-legend{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;color:#cdd5e0;background:rgba(13,16,22,.72);border:1px solid #1f2430;border-radius:7px;padding:5px 8px;pointer-events:none;line-height:1.5;display:none;}
+  .wk-modetog{position:absolute;left:8px;bottom:8px;z-index:6;display:flex;flex-direction:column;gap:2px;background:rgba(8,23,28,.85);border:1px solid #1a3a44;border-radius:999px;padding:3px;}
+  .wk-mode-b{width:28px;height:24px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#4f7780;cursor:pointer;border-radius:999px;padding:0;}
+  .wk-mode-b.on{background:rgba(45,212,191,.22);color:#5eead4;}
+  .wk-legend{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;color:#a9c7cd;background:rgba(8,23,28,.78);border:1px solid #1a3a44;border-radius:7px;padding:5px 8px;pointer-events:none;line-height:1.5;display:none;}
   .wk-legend b{color:#fff;font-weight:600;}
-  .wk-sub{font-size:11px;color:#8a93a3;margin-top:8px;line-height:1.5;}
-  .wk-attribution{font-size:9px;color:#5a6273;text-align:right;margin-top:5px;}
-  .wk-attribution a{color:#5a6273;}
-  .wk-loading{display:flex;align-items:center;justify-content:center;height:72dvh;color:#5a6273;font-size:13px;}
+  .wk-sub{font-size:11px;color:#7fa6ad;margin-top:8px;line-height:1.5;}
+  .wk-attribution{font-size:9px;color:#4f7780;text-align:right;margin-top:5px;}
+  .wk-attribution a{color:#4f7780;}
+  .wk-loading{display:flex;align-items:center;justify-content:center;height:72dvh;color:#4f7780;font-size:13px;}
 </style>
 <div id="screenB">
   <div class="wk-wrap">
@@ -556,11 +566,34 @@
         <button class="wk-layer" data-layer="maw">MA 50/200W</button>
         <button class="wk-layer" data-layer="mad">MA 50/200D</button>
       </div>
-      <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div>
+      <div class="wk-stage">
+        <!-- Fase V: left drawing toolbar. Visual-only / no-op until Fase VII. EASY TO PRUNE:
+             each tool is one <button> below — delete the line to drop a tool. data-tool=key,
+             class wk-tool-mom = momentary (pulse) tool, no class = selectable tool. -->
+        <div class="wk-drawbar" id="wk-drawbar" aria-label="Ferramentas de desenho">
+          <button class="wk-tool on" data-tool="cursor" title="Cursor / seleção" aria-label="Cursor"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M5 3l14 8-5.6 1.4L16 19l-2.4 1-2.6-5.6L7 18z"/></svg></button>
+          <button class="wk-tool" data-tool="crosshair" title="Crosshair" aria-label="Crosshair"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+          <button class="wk-tool" data-tool="trend" title="Linha de tendência" aria-label="Linha de tendência"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg></button>
+          <button class="wk-tool" data-tool="hline" title="Linha horizontal" aria-label="Linha horizontal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"/><circle cx="7" cy="12" r="1.7"/><circle cx="17" cy="12" r="1.7"/></svg></button>
+          <button class="wk-tool" data-tool="ray" title="Raio / ângulo" aria-label="Raio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20L20 4M13 4h7v7"/></svg></button>
+          <button class="wk-tool" data-tool="rect" title="Retângulo" aria-label="Retângulo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1"/></svg></button>
+          <button class="wk-tool" data-tool="text" title="Texto" aria-label="Texto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5h14M12 5v14M9 19h6"/></svg></button>
+          <button class="wk-tool" data-tool="arrow" title="Seta" aria-label="Seta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19L19 5M12 5h7v7"/></svg></button>
+          <button class="wk-tool" data-tool="marker" title="Marcador" aria-label="Marcador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></button>
+          <button class="wk-tool" data-tool="layers" title="Camadas" aria-label="Camadas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg></button>
+          <button class="wk-tool" data-tool="ruler" title="Medição / régua" aria-label="Régua"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg></button>
+          <button class="wk-tool" data-tool="pencil" title="Lápis" aria-label="Lápis"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg></button>
+          <div class="wk-tool-sep"></div>
+          <button class="wk-tool wk-tool-mom" data-tool="lock" title="Bloquear" aria-label="Bloquear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></button>
+          <button class="wk-tool wk-tool-mom" data-tool="eye" title="Esconder / mostrar" aria-label="Esconder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button class="wk-tool wk-tool-mom" data-tool="trash" title="Apagar desenhos" aria-label="Apagar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button>
+        </div>
+        <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div>
         <div class="wk-modetog" id="wk-modetog">
           <button class="wk-mode-b on" data-mode="line" title="Linha" aria-label="Linha"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-6 4 3 6-8"/></svg></button>
           <button class="wk-mode-b" data-mode="candle" title="Velas" aria-label="Velas"><svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.5" fill="currentColor"><line x1="7" y1="3" x2="7" y2="21"/><rect x="5" y="8" width="4" height="8" rx="0.5"/><line x1="17" y1="5" x2="17" y2="19"/><rect x="15" y="10" width="4" height="6" rx="0.5"/></svg></button>
         </div></div>
+      </div>
     </div>
   </div>
   <div class="wk-cfg-back" id="wk-cfgBack"></div>
@@ -570,6 +603,20 @@
     <div class="wk-cfg-foot"><button id="wk-cfg-reset">Repor</button><button id="wk-cfg-apply">Aplicar</button></div>
   </div>
 </div>
+<script>
+  /* Fase V: left drawing toolbar is visual-only until Fase VII. Selectable tools highlight as the
+     single active tool; momentary tools (lock/eye/trash) just pulse. No chart logic is touched. */
+  (function(){
+    var bar=document.getElementById('wk-drawbar'); if(!bar) return; var hinted=false;
+    bar.addEventListener('click',function(e){
+      var b=e.target.closest('.wk-tool'); if(!b) return;
+      if(b.classList.contains('wk-tool-mom')){ b.classList.add('on'); setTimeout(function(){ b.classList.remove('on'); },180); }
+      else { [].forEach.call(bar.querySelectorAll('.wk-tool'),function(x){ if(!x.classList.contains('wk-tool-mom')) x.classList.remove('on'); }); b.classList.add('on');
+        var t=document.getElementById('wk-toast');
+        if(t && !hinted){ hinted=true; t.textContent='Ferramentas de desenho chegam em breve'; t.classList.add('show'); clearTimeout(t._dh); t._dh=setTimeout(function(){ t.classList.remove('show'); },2200); } }
+    });
+  })();
+</script>
 <script src="https://unpkg.com/lightweight-charts@5/dist/lightweight-charts.standalone.production.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
@@ -1940,11 +1987,11 @@
     if(!L){ document.getElementById('wk-loading').textContent='Lightweight Charts não carregou.'; return; }
     chart=L.createChart(el,{
       autoSize:true,
-      layout:{background:{color:'#0d1016'},textColor:'#8a93a3',attributionLogo:false,fontSize:10,
-              panes:{enableResize:true,separatorColor:'#262c3a',separatorHoverColor:'#3a4150'}},
-      grid:{vertLines:{color:'rgba(255,255,255,.04)'},horzLines:{color:'rgba(255,255,255,.04)'}},
-      rightPriceScale:{borderColor:'#1f2430',mode:1,entireTextOnly:true},
-      timeScale:{borderColor:'#1f2430',timeVisible:false,minBarSpacing:0.02,rightOffset:3,tickMarkFormatter:wkTick},
+      layout:{background:{color:'#0a1b21'},textColor:'#7fa6ad',attributionLogo:false,fontSize:10,
+              panes:{enableResize:true,separatorColor:'#16323b',separatorHoverColor:'#1f4a55'}},
+      grid:{vertLines:{color:'rgba(94,234,212,.05)'},horzLines:{color:'rgba(94,234,212,.05)'}},
+      rightPriceScale:{borderColor:'#16323b',mode:1,entireTextOnly:true},
+      timeScale:{borderColor:'#16323b',timeVisible:false,minBarSpacing:0.02,rightOffset:3,tickMarkFormatter:wkTick},
       crosshair:{mode:1}, handleScroll:true, handleScale:true,
       localization:{priceFormatter:wkFmtPrice,locale:'pt-PT'},
     });
