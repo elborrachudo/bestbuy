@@ -511,7 +511,7 @@
   .wk-mode-b{width:28px;height:24px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#4f7780;cursor:pointer;border-radius:999px;padding:0;}
   .wk-mode-b.on{background:rgba(45,212,191,.22);color:#5eead4;}
   /* live BTC price tag on the right axis (Fase L) — teal bg, black text, slightly larger, always green */
-  .wk-livetag{position:absolute;right:1px;z-index:7;background:#2dd4bf;color:#04201c;font-weight:700;font-size:11px;line-height:1;padding:3px 5px;border-radius:3px;pointer-events:none;transform:translateY(-50%);white-space:nowrap;display:none;font-variant-numeric:tabular-nums;box-shadow:0 1px 4px rgba(0,0,0,.4);}
+  .wk-livetag{position:absolute;right:0;z-index:7;background:#2dd4bf;color:#04201c;font-weight:700;line-height:1;padding:3px 0;border-radius:3px 0 0 3px;pointer-events:none;transform:translateY(-50%);white-space:nowrap;text-align:center;display:none;font-variant-numeric:tabular-nums;box-shadow:0 1px 4px rgba(0,0,0,.4);box-sizing:border-box;overflow:hidden;}
   .wk-legend{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;color:#a9c7cd;background:rgba(8,23,28,.78);border:1px solid #1a3a44;border-radius:7px;padding:5px 8px;pointer-events:none;line-height:1.5;display:none;}
   .wk-legend b{color:#fff;font-weight:600;}
   .wk-sub{font-size:11px;color:#7fa6ad;margin-top:8px;line-height:1.5;}
@@ -2336,11 +2336,21 @@
     try{ area.update({time:lb.time,value:livePrice}); }catch(e){}
     try{ candle.update({time:lb.time,open:lb.open,high:lb.high,low:lb.low,close:livePrice}); }catch(e){}
     positionLiveTag(); }
+  var _measCtx=null;   // shared canvas for shrink-to-fit text measurement
+  function measureTagPx(s,size){ if(!_measCtx) _measCtx=document.createElement('canvas').getContext('2d'); _measCtx.font='700 '+size+'px -apple-system,system-ui,sans-serif'; return _measCtx.measureText(s).width; }
   function positionLiveTag(){ if(!liveTag) liveTag=document.getElementById('wk-livetag'); if(!liveTag) return;
     if(livePrice==null||!area){ liveTag.style.display='none'; return; }
     var y=null; try{ y=area.priceToCoordinate(livePrice); }catch(e){}
     if(y==null||!isFinite(y)){ liveTag.style.display='none'; return; }
-    liveTag.textContent=wkFmtPrice(livePrice); liveTag.style.top=y+'px'; liveTag.style.display='block'; }
+    // full number, comma thousands, no decimals, no "$" (e.g. 59,632)
+    var txt=Math.round(livePrice).toLocaleString('en-US');
+    // tag stretches to the right page margin and spans the price-axis column; the font shrinks so any
+    // digit-count (9,500 … 1,260,000) always fits without clipping.
+    var axisW=56; try{ var w=chart.priceScale('right').width(); if(w&&w>20) axisW=w; }catch(e){}
+    var BASE=13, MIN=7, PAD=8, avail=axisW-PAD;
+    var tw=measureTagPx(txt,BASE), size=(tw>avail && tw>0)?Math.max(MIN,Math.floor(BASE*avail/tw)):BASE;
+    liveTag.textContent=txt; liveTag.style.width=axisW+'px'; liveTag.style.fontSize=size+'px';
+    liveTag.style.top=y+'px'; liveTag.style.display='block'; }
 
   function rebuildPhase(){ try{ if(phasePrim) area.detachPrimitive(phasePrim); }catch(e){} phasesAttached=false; try{ phasePrim=makePhasePrimitive(buildRuns(ACTIVE)); if(ind.phases){ area.attachPrimitive(phasePrim); phasesAttached=true; } }catch(e){}
     try{ if(manipPrim) area.detachPrimitive(manipPrim); }catch(e){} manipAttached=false; try{ manipPrim=makeManipPrimitive(); if(layers.manip){ area.attachPrimitive(manipPrim); manipAttached=true; } }catch(e){} }
