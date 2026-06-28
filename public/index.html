@@ -419,7 +419,34 @@
   .wk-layer{font-size:11px;font-weight:600;color:#7fa6ad;border:1px solid #1a3a44;background:rgba(45,212,191,.04);border-radius:999px;padding:5px 11px;cursor:pointer;line-height:1;}
   .wk-layer.on{background:rgba(45,212,191,.16);border-color:rgba(45,212,191,.42);color:#5eead4;}
   .wk-layer-soon{opacity:.45;}
-  .wk-layer[data-layer="halvings"].on{background:rgba(200,164,21,.18);border-color:#7a6512;color:#e4c64a;}
+  /* ── Fase T: Kiyotaka-style top bar — icons over text, teal when on, big price + 24h ── */
+  .wk-topbar{display:flex;flex-direction:column;gap:8px;margin-bottom:9px;}
+  .wk-tb1{display:flex;align-items:center;gap:9px;min-width:0;}
+  .wk-tb2{display:flex;align-items:center;gap:7px;min-width:0;overflow-x:auto;-ms-overflow-style:none;scrollbar-width:none;}
+  .wk-tb2::-webkit-scrollbar{height:0;}
+  .wk-pairwrap{display:flex;align-items:center;gap:7px;flex:0 0 auto;}
+  .wk-nav{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid #1a3a44;border-radius:9px;background:rgba(45,212,191,.06);color:#5eead4;cursor:pointer;padding:0;flex:0 0 auto;}
+  .wk-nav svg{width:16px;height:16px;}
+  .wk-pair{font-size:18px;font-weight:800;letter-spacing:.02em;color:#e6f1f2;cursor:pointer;white-space:nowrap;}
+  .wk-quote{margin-left:auto;display:flex;align-items:baseline;gap:7px;flex:0 0 auto;}
+  .wk-bigprice{font-size:21px;font-weight:800;letter-spacing:-.01em;color:#e6f1f2;font-variant-numeric:tabular-nums;line-height:1;white-space:nowrap;}
+  .wk-chg24{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:#7fa6ad;white-space:nowrap;}
+  .wk-chg24.up{color:#22c55e;} .wk-chg24.down{color:#f43f5e;}
+  .wk-mayer{font-weight:600;}
+  .wk-tb2-left{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
+  .wk-tb2-right{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
+  .wk-icobtn svg{width:14px;height:14px;flex:0 0 auto;}
+  .wk-dots{padding:7px 9px;}
+  .wk-dots svg{width:18px;height:18px;}
+  .wk-hbtc{font-weight:800;letter-spacing:.01em;}
+  @media (max-width:560px){ .wk-mayer{display:none;} .wk-bigprice{font-size:19px;} .wk-pair{font-size:16px;} }
+  @media (min-width:880px){
+    .wk-topbar{flex-direction:row;flex-wrap:nowrap;align-items:center;gap:8px;overflow:visible;}
+    .wk-tb1,.wk-tb2,.wk-tb2-left,.wk-tb2-right{display:contents;}
+    .wk-pairwrap{order:1;} .wk-cs-wrap{order:2;} .wk-per-wrap:not(.wk-cs-wrap){order:3;} .wk-ind-wrap{order:4;} .wk-scaletoggle{order:5;}
+    .wk-tb2-right .wk-layer{order:6;} .wk-tb2-right .wk-layer:first-child{margin-left:auto;}
+    .wk-phasetag{order:7;} .wk-quote{order:8;margin-left:6px;}
+  }
   .wk-ind-wrap{position:relative;}
   .wk-ind-btn{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;border:1px solid #1a3a44;border-radius:999px;padding:7px 13px;color:#5eead4;background:rgba(45,212,191,.10);cursor:pointer;}
   .wk-ind-menu{position:absolute;top:42px;left:0;z-index:30;width:235px;background:#0e242c;border:1px solid #1a3a44;border-radius:12px;padding:6px;box-shadow:0 12px 40px rgba(0,0,0,.55);display:none;}
@@ -522,15 +549,20 @@
 <div id="screenB">
   <div class="wk-wrap">
     <div class="wk-card">
-      <div class="wk-head">
-        <div class="wk-title" id="wk-title">WAKAWAKA charting <span class="wk-arrow">⇄</span></div>
-        <span class="wk-phasetag" id="wk-phasetag"><span class="wk-sw" id="wk-phasesw"></span><span id="wk-phasetxt">—</span></span>
-      </div>
-      <div class="wk-toolbar">
+      <div class="wk-topbar">
+        <div class="wk-tb1">
+          <div class="wk-pairwrap">
+            <button class="wk-nav" id="wk-navA" title="Trocar de ecrã" aria-label="Trocar de ecrã"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg></button>
+            <span class="wk-pair" id="wk-pair" title="BTC — mais tokens em breve">BTC</span>
+          </div>
+          <span class="wk-phasetag" id="wk-phasetag"><span class="wk-sw" id="wk-phasesw"></span><span id="wk-phasetxt">—</span></span>
+          <div class="wk-quote"><span class="wk-bigprice" id="wk-bigprice">—</span><span class="wk-chg24" id="wk-chg24"></span></div>
+        </div>
+        <div class="wk-tb2">
+          <div class="wk-tb2-left">
         <div class="wk-ind-wrap">
-          <div class="wk-ind-btn" id="wk-indBtn">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 3 4-6"/></svg>
-            Indicadores ▾
+          <div class="wk-ind-btn wk-dots" id="wk-indBtn" title="Definições / indicadores" aria-label="Definições / indicadores">
+            <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
           </div>
           <div class="wk-ind-menu" id="wk-indMenu">
             <div class="wk-ind-head">Detetor de ciclo</div>
@@ -549,9 +581,8 @@
             <div class="wk-ind-item" data-ind="pct"><span class="wk-ind-radio"></span><span class="wk-nm">Percentil histórico</span><span class="wk-csw" style="background:#22d3ee"></span></div>
           </div>
         </div>
-        <div class="wk-spacer"></div>
         <div class="wk-per-wrap wk-cs-wrap">
-          <div class="wk-per-btn" id="wk-csBtn" title="Tamanho de vela"><span id="wk-csLabel">1D</span> <span class="wk-per-caret">▾</span></div>
+          <div class="wk-per-btn wk-icobtn" id="wk-csBtn" title="Tamanho de vela"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="21"/><rect x="5.5" y="7" width="5" height="9" rx="1"/><line x1="16" y1="5" x2="16" y2="19"/><rect x="13.5" y="9.5" width="5" height="6" rx="1"/></svg> <span id="wk-csLabel">1D</span> <span class="wk-per-caret">▾</span></div>
           <div class="wk-per-menu wk-cs-menu" id="wk-csMenu">
             <div class="wk-cs-item" data-cs="1m">1m</div>
             <div class="wk-cs-item" data-cs="5m">5m</div>
@@ -568,7 +599,7 @@
           </div>
         </div>
         <div class="wk-per-wrap">
-          <div class="wk-per-btn" id="wk-perBtn"><span id="wk-perLabel">90D</span> <span class="wk-per-caret">▾</span></div>
+          <div class="wk-per-btn wk-icobtn" id="wk-perBtn" title="Período visualizado"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg> <span id="wk-perLabel">90D</span> <span class="wk-per-caret">▾</span></div>
           <div class="wk-per-menu" id="wk-perMenu">
             <div class="wk-per-item" data-d="1">1D</div>
             <div class="wk-per-item" data-d="7">7D</div>
@@ -583,13 +614,15 @@
           </div>
         </div>
         <div class="wk-scaletoggle" id="wk-scaleToggle">LOG</div>
-      </div>
-      <div class="wk-layers" id="wk-layers">
-        <button class="wk-layer" data-layer="phases">Fases</button>
-        <button class="wk-layer" data-layer="halvings">Halvings</button>
-        <button class="wk-layer" data-layer="manip">Manip.</button>
-        <button class="wk-layer" data-layer="maw">MA 50/200W</button>
-        <button class="wk-layer" data-layer="mad">MA 50/200D</button>
+          </div>
+          <div class="wk-tb2-right" id="wk-layers">
+            <button class="wk-layer" data-layer="phases">Fases</button>
+            <button class="wk-layer" data-layer="halvings" title="Halvings"><span class="wk-hbtc">H₿</span></button>
+            <button class="wk-layer" data-layer="manip">Manip</button>
+            <button class="wk-layer" data-layer="maw">50/200W</button>
+            <button class="wk-layer" data-layer="mad">50/200D</button>
+          </div>
+        </div>
       </div>
       <div class="wk-stage">
         <!-- Fase V (ajuste): minimal left bar = a single pencil handle that expands the stack.
@@ -1739,7 +1772,7 @@
   var HALV_COLOR='#C8A415';
   var inited=false, chart=null, L=null, area=null, candle=null, ma=null, halvPrim=null, halvAttached=false, phasePrim=null, manipPrim=null, manipAttached=false;
   var DATA=null, byTime={}, isLog=true, mode='line';
-  var livePrice=null, liveTimer=null, liveTag=null;   // Fase L: live BTC price (5s, display-only)
+  var livePrice=null, live24h=null, liveTimer=null, liveTag=null;   // Fase L/T: live BTC price + 24h change (5s, display-only)
   var CLOSE=[], oscReg={};   // CLOSE: active close series · oscReg: id -> {series:[…],pane,priceLines:[…],kind}
   // ── candle-size tiers (price granularity) ─────────────────────────────────────
   // The price candles can be served at 12 resolutions from 3 stored tiers (daily=btc_history,
@@ -2051,13 +2084,13 @@
   function applyEntry(){ var s='A'; try{ s=sessionStorage.getItem('waka_screen')||'A'; }catch(e){} showScreen(s==='B'?'B':'A'); }
   window.WAKA={showScreen:showScreen, applyEntry:applyEntry};
 
-  var ttl=document.getElementById('wk-title'); if(ttl) ttl.onclick=function(){ showScreen('A'); };
+  var ttl=document.getElementById('wk-navA'); if(ttl) ttl.onclick=function(){ showScreen('A'); };
 
   function setPhaseTag(cur){
-    var ph=ANCHOR.curPhase, col=(ph&&PHC2[ph])?PHC2[ph]:'#a78bfa', txt=ph?PHEN[ph]:'—';
-    if(cur&&cur.mayer!=null) txt+=' · Mayer '+Number(cur.mayer).toFixed(2);
+    var ph=ANCHOR.curPhase, col=(ph&&PHC2[ph])?PHC2[ph]:'#a78bfa', nm=ph?PHEN[ph]:'—';
+    var html=nm; if(cur&&cur.mayer!=null) html+='<span class="wk-mayer"> · Mayer '+Number(cur.mayer).toFixed(2)+'</span>';   // Mayer hides on narrow screens
     document.getElementById('wk-phasesw').style.background=col;
-    document.getElementById('wk-phasetxt').textContent=txt;
+    document.getElementById('wk-phasetxt').innerHTML=html;
     var tag=document.getElementById('wk-phasetag'); tag.style.background='rgba('+hexRgb(col)+',.16)'; tag.style.color=col;
   }
 
@@ -2133,7 +2166,7 @@
     // tracks the live level even in wide views. Nothing is written to Supabase — the cron still closes
     // the real candles; this only mutates the in-memory last bar + the chart series for display.
     livePrice = ACTIVE.length ? ACTIVE[ACTIVE.length-1].close : null;   // seed from last close → no empty gap
-    positionLiveTag();
+    positionLiveTag(); updateQuote();
     chart.subscribeCrosshairMove(function(){ positionLiveTag(); });
     try{ chart.timeScale().subscribeVisibleLogicalRangeChange(function(){ positionLiveTag(); }); }catch(e){}
     if(!liveTimer){ fetchLive(); liveTimer=setInterval(fetchLive, 5000); }
@@ -2327,16 +2360,22 @@
 
   // ── Fase L: live BTC price (CoinGecko, client-side, 5s, fault-tolerant, display-only) ──────────
   function fetchLive(){ if(!bodyEl.classList.contains('wk-b')) return;   // only poll while Screen B is showing
-    fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',{cache:'no-store'})
+    fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true',{cache:'no-store'})
       .then(function(r){ return r.ok?r.json():null; })
-      .then(function(j){ var p=j&&j.bitcoin&&j.bitcoin.usd; if(p&&isFinite(p)&&p>0){ livePrice=p; applyLive(); } })
+      .then(function(j){ var b=j&&j.bitcoin, p=b&&b.usd; if(b&&b.usd_24h_change!=null&&isFinite(b.usd_24h_change)) live24h=b.usd_24h_change;
+        if(p&&isFinite(p)&&p>0){ livePrice=p; applyLive(); } else updateQuote(); })
       .catch(function(){ /* network blip → keep last value, never break the chart */ }); }
-  function applyLive(){ if(livePrice==null||!area||!ACTIVE.length) return; var lb=ACTIVE[ACTIVE.length-1];
+  function applyLive(){ if(livePrice==null||!area||!ACTIVE.length){ updateQuote(); return; } var lb=ACTIVE[ACTIVE.length-1];
     // develop the latest candle: close follows live; high/low expand if exceeded (the bar "breathes")
     if(lb.high==null||livePrice>lb.high) lb.high=livePrice; if(lb.low==null||livePrice<lb.low) lb.low=livePrice; lb.close=livePrice; lb.value=livePrice;
     try{ area.update({time:lb.time,value:livePrice}); }catch(e){}
     try{ candle.update({time:lb.time,open:lb.open,high:lb.high,low:lb.low,close:livePrice}); }catch(e){}
-    positionLiveTag(); }
+    positionLiveTag(); updateQuote(); }
+  // Fase T: big headline price + 24h change in the top bar (green/red on the %)
+  function updateQuote(){ var bp=document.getElementById('wk-bigprice'), ch=document.getElementById('wk-chg24'); if(!bp) return;
+    if(livePrice!=null) bp.textContent=Math.round(livePrice).toLocaleString('en-US');
+    if(ch){ if(live24h==null){ ch.textContent=''; ch.className='wk-chg24'; }
+      else { var up=live24h>=0; ch.textContent=(up?'+':'')+live24h.toFixed(2)+'%'; ch.className='wk-chg24 '+(up?'up':'down'); } } }
   var _measCtx=null;   // shared canvas for shrink-to-fit text measurement
   function measureTagPx(s,size){ if(!_measCtx) _measCtx=document.createElement('canvas').getContext('2d'); _measCtx.font='700 '+size+'px -apple-system,system-ui,sans-serif'; return _measCtx.measureText(s).width; }
   function positionLiveTag(){ if(!liveTag) liveTag=document.getElementById('wk-livetag'); if(!liveTag) return;
