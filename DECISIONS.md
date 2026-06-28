@@ -332,6 +332,35 @@ noted it here.
   log with phase ribbon + halvings + all 5 indicator overlays; the live screen uses the full
   daily series. Screen A and Phases 1-3 untouched.
 
+## Charting Fase IV — fases ancoradas + cycle high/low + manipulação + animações (IMPLEMENTED)
+Frontend-only (chart bands). The backend cycle detector / Screen A signals are NOT touched — the
+anchored re-detection runs client-side for the chart only.
+- **Part 0.1 — fade in/out (0.5s):** every signal layer animates on its toggle (phases, manip via
+  `layerAlpha` + the shared easing engine; MAs via line color-alpha; halvings keep their richer
+  draw-in animation). Not re-triggered on pan/zoom.
+- **Part 0.2 — cascading crossover glow:** the MA crossover circles are drawn by a primitive; on each
+  MA toggle-ON they pulse 3× over 0.5s, cascading left→right, the whole cascade always ~1s total
+  regardless of count.
+- **Anchored phases (anti-fragmentation):** the chart bands no longer use the per-day market_cycle
+  consensus (which fragmented into stripes). `computeAnchor()` splits history by halvings, takes each
+  cycle's high/low, and derives **4 wide contiguous blocks** per cycle: Markdown (high→low), Accumulation
+  (around low until +50% off the low), Markup (→ high), Distribution (around high until −25% off the
+  high). Boundaries come ONLY from price vs the extremes — indicators are never consulted. Current cycle
+  painted up to the current phase only (no future). Colors at 0.13 opacity (accumulation amber, markup
+  green, distribution orange, markdown red); EN name in black above the timeline per block. Header tag +
+  legend now show the anchored phase (today = "Markdown").
+- **Cycle high/low (all cycles):** green dot (high) / red dot (low) at each extreme, a dotted horizontal
+  line to the price axis, and a white price box on the axis.
+- **Manipulation ("Manip." toggle):** historical = white-10% vertical bands over every window where close
+  < the previous cycle's high; current = white-10% horizontal band between today's price and that prior
+  top + the deviation in % and USD (e.g. −18.2% · −$13.4k vs ~$73.8k). Reference is the detected cycle
+  high, never a fixed number.
+- **Verified** headless (real daily series, 0 errors): 4 clean anchored blocks (no stripes) + EN labels;
+  cycle dots/lines/boxes (126k/73.8k/19.7k/8.2k/1.2k/465/2…); manip current band + %/USD + historical
+  bands; MA crossover glow mid-pulse. Screen A, PINs, detector/signals, oscillators, intraday, médias,
+  halvings untouched. NOTE: accumulation/distribution blocks are intentionally short (thresholds) so the
+  4 colours are subtle at full-ALL zoom; they separate on zoom-in.
+
 ## Charting Fase III — médias móveis 50W/200W + 50D/200D + cruzamentos (IMPLEMENTED)
 Two client-side MA layers on the price pane (pane 0), activating the Fase II placeholder toggles.
 - **Computed CLIENT-SIDE** as SMA × close over the **daily** series, carried on each day (and through

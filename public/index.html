@@ -552,7 +552,7 @@
       <div class="wk-layers" id="wk-layers">
         <button class="wk-layer" data-layer="phases">Fases</button>
         <button class="wk-layer" data-layer="halvings">Halvings</button>
-        <button class="wk-layer wk-layer-soon" data-layer="manip">Manip.</button>
+        <button class="wk-layer" data-layer="manip">Manip.</button>
         <button class="wk-layer" data-layer="maw">MA 50/200W</button>
         <button class="wk-layer" data-layer="mad">MA 50/200D</button>
       </div>
@@ -1647,7 +1647,7 @@
     {year:2024, date:'2024-04-20', dm:'20/04', hm:'00:09'},
   ];
   var HALV_COLOR='#C8A415';
-  var inited=false, chart=null, L=null, area=null, candle=null, ma=null, halvPrim=null, halvAttached=false, phasePrim=null;
+  var inited=false, chart=null, L=null, area=null, candle=null, ma=null, halvPrim=null, halvAttached=false, phasePrim=null, manipPrim=null, manipAttached=false;
   var DATA=null, byTime={}, isLog=true, mode='line';
   var CLOSE=[], oscReg={};   // CLOSE: active close series · oscReg: id -> {series:[…],pane,priceLines:[…],kind}
   // ── candle-size tiers (price granularity) ─────────────────────────────────────
@@ -1678,6 +1678,14 @@
   function animate(key, ms, fn, done){ if(_anims[key]) cancelAnimationFrame(_anims[key]); var t0=performance.now();
     function step(now){ var p=Math.min(1,(now-t0)/ms); fn(easeOut(p)); if(p<1){ _anims[key]=requestAnimationFrame(step); } else { delete _anims[key]; if(done) done(); } }
     _anims[key]=requestAnimationFrame(step); }
+  // Part 0.1 — every signal layer fades in/out over 0.5s on its toggle. layerAlpha multiplies each
+  // primitive's fill alpha; primReqs are the primitives' requestUpdate fns, ticked during the fade.
+  var layerAlpha={phases:1, halvings:1, maw:1, mad:1, manip:1};
+  var primReqs=[]; function tickPrims(){ primReqs.forEach(function(f){ try{ f(); }catch(e){} }); }
+  function fadeLayer(layer, to, onDone){ var from=(layerAlpha[layer]!=null)?layerAlpha[layer]:(to?0:1);
+    animate('fade_'+layer, ANIM_MS, function(e){ layerAlpha[layer]=from+(to-from)*e; tickPrims(); if(maFade[layer]) maFade[layer](layerAlpha[layer]); },
+      function(){ layerAlpha[layer]=to; tickPrims(); if(maFade[layer]) maFade[layer](to); if(onDone) onDone(); }); }
+  var maFade={};   // per-MA-layer color-alpha applier (line series can't use layerAlpha directly)
   var ind={phases:true,halving:true,ma200w:false,rsi:false,stoch:false,macd:false,mayer:false,pct:false};
   var cfgId=null;            // oscillator id currently open in the configurator
 
@@ -1716,16 +1724,80 @@
   var PTM=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
   function wkTick(time,tmType){ var y,m,d; if(typeof time==='string'){ var pp=time.split('-'); y=+pp[0]; m=+pp[1]; d=+pp[2]; } else if(time&&time.year){ y=time.year; m=time.month; d=time.day; } else { var dt=new Date(time*1000); y=dt.getUTCFullYear(); m=dt.getUTCMonth()+1; d=dt.getUTCDate(); } if(tmType===0) return ''+y; if(tmType===1) return PTM[m-1]; return ''+d; }
 
+  // ── ANCHORED phase detection (Fase IV) — 4 wide contiguous blocks per cycle, derived ONLY from
+  // the Cycle high/low extremes (halving→halving), never from indicator consensus (anti-fragmentation).
+  // Boundaries: accumulation→markup when price recovers +ACC_EXIT off the cycle low; distribution→
+  // markdown when price falls −DIST_EXIT off the cycle high. Current cycle painted up to the current
+  // phase only (no future). Indicators (Mayer/percentil/MAs/oscillators) stay purely visual.
+  var PHC2={accumulation:'#c8a415', markup:'#22c55e', distribution:'#fb923c', markdown:'#ef4444', none:null};
+  var PHEN={accumulation:'Accumulation', markup:'Markup', distribution:'Distribution', markdown:'Markdown'};
+  var ACC_EXIT=0.5, DIST_EXIT=0.25;
+  var ANCHOR={runs:[], dayPhase:{}, extremes:[], curPhase:null, manipRuns:[], prevHighNow:null};
+  function computeAnchor(daily){
+    var empty={runs:[],dayPhase:{},extremes:[],curPhase:null,manipRuns:[],prevHighNow:null};
+    if(!daily||!daily.length) return empty;
+    var dates=daily.map(function(d){return d.t;}); var byd={}; daily.forEach(function(d){byd[d.t]=d;});
+    var hd=HALVINGS.map(function(h){return h.date;}).filter(function(p){return p>dates[0] && p<dates[dates.length-1];});
+    var pts=[dates[0]].concat(hd).concat([dates[dates.length-1]]);
+    var intervals=[]; for(var k=0;k<pts.length-1;k++) intervals.push([pts[k],pts[k+1],k===pts.length-2]);
+    var highOf=[], ex=[];
+    intervals.forEach(function(iv,ix){ var a=iv[0],b=iv[1],cur=iv[2], hi=null,lo=null;
+      for(var i=0;i<daily.length;i++){ var d=daily[i]; if(d.t<a) continue; if(!cur && d.t>=b) break;
+        var hv=(d.h!=null?d.h:d.c), lv=(d.l!=null?d.l:d.c);
+        if(!hi||hv>hi.price) hi={date:d.t,price:hv}; if(!lo||lv<lo.price) lo={date:d.t,price:lv}; }
+      highOf[ix]=hi;
+      if(cur){ if(hi) ex.push({date:hi.date,price:hi.price,kind:'high',current:true}); }
+      else if(hi&&lo){ [{date:hi.date,price:hi.price,kind:'high'},{date:lo.date,price:lo.price,kind:'low'}].sort(function(x,y){return x.date<y.date?-1:1;}).forEach(function(e){ex.push(e);}); }
+    });
+    ex.sort(function(x,y){return x.date<y.date?-1:1;});
+    function idxGE(dt){ for(var i=0;i<dates.length;i++) if(dates[i]>=dt) return i; return dates.length-1; }
+    var runs=[];
+    for(var k=0;k<ex.length;k++){ var e=ex[k], nxt=ex[k+1]; var endDate=nxt?nxt.date:dates[dates.length-1]; var i0=idxGE(e.date), i1=idxGE(endDate), i, split;
+      if(e.kind==='high'){ split=null; for(i=i0;i<=i1;i++){ if(byd[dates[i]].c<=e.price*(1-DIST_EXIT)){ split=dates[i]; break; } }
+        if(split){ runs.push({from:e.date,to:split,phase:'distribution'}); runs.push({from:split,to:endDate,phase:'markdown'}); } else runs.push({from:e.date,to:endDate,phase:'distribution'}); }
+      else { split=null; for(i=i0;i<=i1;i++){ if(byd[dates[i]].c>=e.price*(1+ACC_EXIT)){ split=dates[i]; break; } }
+        if(split){ runs.push({from:e.date,to:split,phase:'accumulation'}); runs.push({from:split,to:endDate,phase:'markup'}); } else runs.push({from:e.date,to:endDate,phase:'accumulation'}); }
+    }
+    var dayPhase={}; runs.forEach(function(r){ var i0=idxGE(r.from); for(var i=i0;i<dates.length && dates[i]<=r.to;i++) dayPhase[dates[i]]=r.phase; });
+    var curPhase=dayPhase[dates[dates.length-1]]||null;
+    // manipulation: days where close < the PREVIOUS cycle's high (per interval, k≥1)
+    var ds={}; intervals.forEach(function(iv,ix){ if(ix===0) return; var prev=highOf[ix-1]; if(!prev) return; var a=iv[0],b=iv[1],cur=iv[2];
+      for(var i=0;i<daily.length;i++){ var d=daily[i]; if(d.t<a) continue; if(!cur && d.t>=b) break; if(d.c<prev.price) ds[d.t]=1; } });
+    var manipRuns=[], run=null; dates.forEach(function(dt){ if(ds[dt]){ if(!run) run={from:dt,to:dt}; else run.to=dt; } else if(run){ manipRuns.push(run); run=null; } }); if(run) manipRuns.push(run);
+    var prevHighNow=highOf.length>=2 ? highOf[highOf.length-2] : null;
+    return {runs:runs, dayPhase:dayPhase, extremes:ex, curPhase:curPhase, manipRuns:manipRuns, prevHighNow:prevHighNow};
+  }
+
   // ── phase background bands (custom v5 series primitive on pane 0, behind price) ─
-  function phaseBg(p){ return 'rgba('+hexRgb(PHC[p]||'#a78bfa')+',0.13)'; }
+  function phaseBg(p,a){ var c=PHC2[p]; if(!c) return null; return 'rgba('+hexRgb(c)+','+(0.13*(a==null?1:a))+')'; }
   function buildRuns(ser){ if(!ser.length) return []; var runs=[],start=0,i; for(i=1;i<ser.length;i++){ if(ser[i].p!==ser[start].p){ runs.push({from:ser[start].time,to:ser[i].time,p:ser[start].p}); start=i; } } runs.push({from:ser[start].time,to:ser[ser.length-1].time,p:ser[start].p}); return runs; }
   function makePhasePrimitive(runs){
     var ch=null;
     function keyOf(t){ if(typeof t==='string') return t; if(t&&t.year) return t.year+'-'+String(t.month).padStart(2,'0')+'-'+String(t.day).padStart(2,'0'); return ''+t; }
-    var renderer={ draw:function(target){ if(!ch||!ind.phases) return; var ts=ch.timeScale(); var vr=null; try{ vr=ts.getVisibleRange(); }catch(e){} if(!vr) return; var vf=keyOf(vr.from), vt=keyOf(vr.to);
+    // bands behind the price (bitmap space for crisp fills)
+    var bands={ draw:function(target){ if(!ch||!ind.phases||layerAlpha.phases<=0.01) return; var ts=ch.timeScale(); var vr=null; try{ vr=ts.getVisibleRange(); }catch(e){} if(!vr) return; var vf=keyOf(vr.from), vt=keyOf(vr.to);
       target.useBitmapCoordinateSpace(function(scope){ var ctx=scope.context,hpr=scope.horizontalPixelRatio,H=scope.bitmapSize.height,W=scope.bitmapSize.width;
-        runs.forEach(function(run){ if(run.to<vf||run.from>vt) return; var x0=(run.from<=vf)?0:ts.timeToCoordinate(run.from); var x1=(run.to>=vt)?(W/hpr):ts.timeToCoordinate(run.to); if(x0==null) x0=0; if(x1==null) x1=W/hpr; var bx0=Math.round(x0*hpr),bx1=Math.round(x1*hpr); if(bx1<=bx0) return; ctx.fillStyle=phaseBg(run.p); ctx.fillRect(bx0,0,bx1-bx0,H); }); }); } };
-    return { attached:function(pp){ ch=pp.chart; }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'bottom'; }, renderer:function(){ return renderer; } } ]; } };
+        runs.forEach(function(run){ var col=phaseBg(run.p, layerAlpha.phases); if(!col) return; if(run.to<vf||run.from>vt) return; var x0=(run.from<=vf)?0:ts.timeToCoordinate(run.from); var x1=(run.to>=vt)?(W/hpr):ts.timeToCoordinate(run.to); if(x0==null) x0=0; if(x1==null) x1=W/hpr; var bx0=Math.round(x0*hpr),bx1=Math.round(x1*hpr); if(bx1<=bx0) return; ctx.fillStyle=col; ctx.fillRect(bx0,0,bx1-bx0,H); }); }); } };
+    // EN phase names (black, just above the time axis) + Cycle high/low dots, dotted price lines & boxes
+    var labels={ draw:function(target){ if(!ch||!ind.phases||isIntra()||layerAlpha.phases<=0.01) return; var ts=ch.timeScale();
+      target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save(); ctx.globalAlpha=layerAlpha.phases;
+        ctx.font='700 9px -apple-system,system-ui,sans-serif'; ctx.fillStyle='#000'; ctx.textBaseline='bottom'; ctx.textAlign='center';
+        runs.forEach(function(run){ if(!PHC2[run.p]) return; var x0=ts.timeToCoordinate(run.from), x1=ts.timeToCoordinate(run.to); if(x0==null)x0=0; if(x1==null)x1=W; var a=Math.max(0,x0), bx=Math.min(W,x1); if(bx-a<46) return; ctx.fillText(PHEN[run.p], (a+bx)/2, H-3); });
+        // cycle extremes
+        ctx.textAlign='left'; ctx.textBaseline='middle';
+        ANCHOR.extremes.forEach(function(e){ var y; try{ y=area.priceToCoordinate(e.price); }catch(_){ y=null; } if(y==null) return; var x; try{ x=ts.timeToCoordinate(e.date); }catch(_){ x=null; }
+          var col=(e.kind==='high')?'#22c55e':'#ef4444';
+          // dotted horizontal line to the right price axis
+          ctx.strokeStyle=col; ctx.lineWidth=1; ctx.setLineDash([2,3]); ctx.beginPath(); ctx.moveTo(Math.max(0,(x==null?0:x)), y+0.5); ctx.lineTo(W, y+0.5); ctx.stroke(); ctx.setLineDash([]);
+          if(x!=null && x>=-2 && x<=W+2){ ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI*2); ctx.fill(); }
+          // white price box at the right edge
+          var txt=wkFmtPrice(e.price); ctx.font='700 9px -apple-system,system-ui,sans-serif'; var w=ctx.measureText(txt).width+8;
+          ctx.fillStyle='#fff'; ctx.fillRect(W-w-1, y-8, w, 16); ctx.fillStyle='#000'; ctx.fillText(txt, W-w+3, y);
+        });
+        ctx.restore();
+      }); } };
+    return { attached:function(pp){ ch=pp.chart; if(pp.requestUpdate) primReqs.push(pp.requestUpdate); }, updateAllViews:function(){},
+      paneViews:function(){ return [ { zOrder:function(){ return 'bottom'; }, renderer:function(){ return bands; } }, { zOrder:function(){ return 'top'; }, renderer:function(){ return labels; } } ]; } };
   }
 
   // ── halvings: dotted burnt-yellow full-height lines + H<year> box (custom v5 primitive) ──
@@ -1792,6 +1864,7 @@
     if(k==='phases'){ setPhases(!layers.phases); }
     else if(k==='halvings'){ setHalvings(!layers.halvings); }
     else if(k==='maw' || k==='mad'){ if(b.classList.contains('wk-cs-off')){ notify('MAs de ciclo só em velas ≥ 1D'); return; } setMaLayer(k, !layers[k]); }
+    else if(k==='manip'){ setManip(!layers.manip); }
     else { layers[k]=!layers[k]; saveLayers(); b.classList.toggle('on',layers[k]); notify('Camada "'+b.textContent.trim()+'" chega numa fase futura'); }
   }; }); syncLayerUI(); }
 
@@ -1833,13 +1906,11 @@
   var ttl=document.getElementById('wk-title'); if(ttl) ttl.onclick=function(){ showScreen('A'); };
 
   function setPhaseTag(cur){
-    if(!cur) return;
-    var pc=FULL[cur.phase]||'corr', txt=PHPT[pc];
-    if(cur.confidence!=null) txt+=' · '+cur.confidence+'%';
-    if(cur.mayer!=null) txt+=' · Mayer '+Number(cur.mayer).toFixed(2);
-    document.getElementById('wk-phasesw').style.background=PHC[pc];
+    var ph=ANCHOR.curPhase, col=(ph&&PHC2[ph])?PHC2[ph]:'#a78bfa', txt=ph?PHEN[ph]:'—';
+    if(cur&&cur.mayer!=null) txt+=' · Mayer '+Number(cur.mayer).toFixed(2);
+    document.getElementById('wk-phasesw').style.background=col;
     document.getElementById('wk-phasetxt').textContent=txt;
-    var tag=document.getElementById('wk-phasetag'); tag.style.background='rgba('+hexRgb(PHC[pc])+',.16)'; tag.style.color=PHC[pc];
+    var tag=document.getElementById('wk-phasetag'); tag.style.background='rgba('+hexRgb(col)+',.16)'; tag.style.color=col;
   }
 
   function initChart(){
@@ -1874,6 +1945,11 @@
     (function(){ var dc=tierCache.daily.map(function(d){ return d.c; });
       var w50=smaArr(dc,350), w200=smaArr(dc,1400), d50=smaArr(dc,50), d200=smaArr(dc,200);
       tierCache.daily.forEach(function(d,i){ d.ma50w=w50[i]; d.ma200w=w200[i]; d.ma50d=d50[i]; d.ma200d=d200[i]; }); })();
+    // ANCHORED phases (Fase IV) — replace the per-day market_cycle phase used for the chart bands with
+    // the cycle-high/low-anchored phases (the backend detector / signals are untouched).
+    ANCHOR=computeAnchor(tierCache.daily);
+    tierCache.daily.forEach(function(d){ d.p=ANCHOR.dayPhase[d.t]||'none'; });
+    Object.keys(byTime).forEach(function(t){ byTime[t].p=ANCHOR.dayPhase[t]||'none'; });
     ACTIVE=buildActive('1D'); CLOSE=ACTIVE.map(function(d){ return d.close; });
 
     // PRICE pane (0): area (always present — carries the phase primitive + markers) + candles
@@ -1883,8 +1959,10 @@
     candle.setData(ACTIVE.map(function(d){ return {time:d.time,open:d.open,high:d.high,low:d.low,close:d.close}; }));
     // phase bands + halving lines as custom v5 primitives on pane 0 (init from persisted layers)
     ind.phases=layers.phases; ind.halving=layers.halvings;
-    try{ phasePrim=makePhasePrimitive(buildRuns(ACTIVE)); if(layers.phases) area.attachPrimitive(phasePrim); }catch(e){}
+    try{ phasePrim=makePhasePrimitive(buildRuns(ACTIVE)); if(layers.phases){ area.attachPrimitive(phasePrim); phasesAttached=true; } }catch(e){}
     try{ halvPrim=makeHalvingPrimitive(); if(layers.halvings){ area.attachPrimitive(halvPrim); halvAttached=true; } }catch(e){}
+    try{ manipPrim=makeManipPrimitive(); if(layers.manip){ area.attachPrimitive(manipPrim); manipAttached=true; } }catch(e){}
+    try{ crossPrim=makeCrossPrimitive(); area.attachPrimitive(crossPrim); }catch(e){}   // MA crossover circles + glow
 
     setMode(initialMode());
     setPhaseTag(j.current);
@@ -1899,7 +1977,7 @@
       var px=null; try{ var cv=param.seriesData&&(param.seriesData.get(area)||param.seriesData.get(candle)); if(cv) px=(cv.value!=null?cv.value:cv.close); }catch(e){}
       var b=byTime[day]; if(px==null&&b) px=b.c;
       if(px==null){ leg.style.display='none'; return; }
-      leg.innerHTML='<b>'+label+'</b> · BTC <b>$'+Math.round(px).toLocaleString()+'</b>'+(b?(' · '+PHPT[b.p]):''); leg.style.display='block';
+      leg.innerHTML='<b>'+label+'</b> · BTC <b>$'+Math.round(px).toLocaleString()+'</b>'+((b&&PHEN[b.p])?(' · '+PHEN[b.p]):''); leg.style.display='block';
     });
 
     // autoSize:true handles width from the container's ResizeObserver; relayout() snaps the
@@ -1993,22 +2071,77 @@
   function updateMenuLabels(){ try{ var set=function(k,t){ var it=document.querySelector('.wk-ind-item[data-ind="'+k+'"] .wk-nm'); if(it) it.textContent=t; };
     set('rsi','RSI ('+oscCfg.rsi.length+')'); set('stoch','StochRSI ('+oscCfg.stoch.length+')'); set('macd','MACD ('+oscCfg.macd.fast+','+oscCfg.macd.slow+','+oscCfg.macd.signal+')'); }catch(e){} }
   // ── moving-average layers on the price pane (Fase III) — client-side, toggled via the top bar ──
-  // Weekly (50W=350d cyan + 200W=1400d amber) and Daily (50D lime + 200D pink). A white 3px circle
-  // marks each fast×slow crossover. Cycle MAs are hidden at intraday (like halvings).
+  // Weekly (50W=350d cyan + 200W=1400d amber) and Daily (50D lime + 200D pink). White circles mark
+  // each fast×slow crossover (drawn by a primitive so they can glow). Hidden at intraday.
   var MA_COL={ma50w:'#22d3ee', ma200w:'#f59e0b', ma50d:'#a3e635', ma200d:'#f472b6'};
-  var maSeries={maw:[], mad:[]};
-  function maCrossMarkers(fastArr, slowArr){ var m=[],i; for(i=1;i<ACTIVE.length;i++){ var pf=fastArr[i-1],ps=slowArr[i-1],cf=fastArr[i],cs=slowArr[i]; if(pf==null||ps==null||cf==null||cs==null) continue; var prev=pf-ps,cur=cf-cs; if(prev===0) continue; if((prev<0&&cur>=0)||(prev>0&&cur<=0)) m.push({time:ACTIVE[i].time, position:'inBar', color:'#ffffff', shape:'circle', size:1}); } return m; }
-  function removeMaLayer(which){ (maSeries[which]||[]).forEach(function(s){ try{ chart.removeSeries(s); }catch(e){} }); maSeries[which]=[]; }
+  var maSeries={maw:[], mad:[]}, maCross={maw:[], mad:[]}, crossPrim=null, crossReq=null, _glow={maw:0, mad:0};
+  function rgbaOf(hex,a){ return 'rgba('+hexRgb(hex)+','+(a==null?1:a)+')'; }
+  function maCrossPoints(which){ var fastK=(which==='maw')?'ma50w':'ma50d', slowK=(which==='maw')?'ma200w':'ma200d', out=[],i;
+    for(i=1;i<ACTIVE.length;i++){ var pf=ACTIVE[i-1][fastK],ps=ACTIVE[i-1][slowK],cf=ACTIVE[i][fastK],cs=ACTIVE[i][slowK]; if(pf==null||ps==null||cf==null||cs==null) continue; var prev=pf-ps,cur=cf-cs; if(prev===0) continue; if((prev<0&&cur>=0)||(prev>0&&cur<=0)) out.push({time:ACTIVE[i].time, price:cf}); } return out; }
+  function removeMaLayer(which){ (maSeries[which]||[]).forEach(function(s){ try{ chart.removeSeries(s); }catch(e){} }); maSeries[which]=[]; maCross[which]=[]; if(crossReq) crossReq(); }
   function buildMaLayer(which){ removeMaLayer(which); if(isIntra()) return;   // cycle MAs make no sense in the 60-day intraday window
-    var fastK=(which==='maw')?'ma50w':'ma50d', slowK=(which==='maw')?'ma200w':'ma200d';
-    var fast=chart.addSeries(L.LineSeries,{color:MA_COL[fastK],lineWidth:1,priceLineVisible:false,lastValueVisible:false},0); fast.setData(arrData(ACTIVE.map(function(d){ return d[fastK]; })));
-    var slow=chart.addSeries(L.LineSeries,{color:MA_COL[slowK],lineWidth:1,priceLineVisible:false,lastValueVisible:false},0); slow.setData(arrData(ACTIVE.map(function(d){ return d[slowK]; })));
-    try{ L.createSeriesMarkers(fast, maCrossMarkers(ACTIVE.map(function(d){return d[fastK];}), ACTIVE.map(function(d){return d[slowK];}))); }catch(e){}
-    maSeries[which]=[fast,slow]; }
-  function setMaLayer(which,on){ layers[which]=on; saveLayers(); if(on) buildMaLayer(which); else removeMaLayer(which); syncLayerUI(); }
+    var fastK=(which==='maw')?'ma50w':'ma50d', slowK=(which==='maw')?'ma200w':'ma200d', a=(layerAlpha[which]==null?1:layerAlpha[which]);
+    var fast=chart.addSeries(L.LineSeries,{color:rgbaOf(MA_COL[fastK],a),lineWidth:1,priceLineVisible:false,lastValueVisible:false},0); fast.setData(arrData(ACTIVE.map(function(d){ return d[fastK]; })));
+    var slow=chart.addSeries(L.LineSeries,{color:rgbaOf(MA_COL[slowK],a),lineWidth:1,priceLineVisible:false,lastValueVisible:false},0); slow.setData(arrData(ACTIVE.map(function(d){ return d[slowK]; })));
+    maSeries[which]=[fast,slow]; maCross[which]=maCrossPoints(which);
+    maFade[which]=function(al){ try{ fast.applyOptions({color:rgbaOf(MA_COL[fastK],al)}); slow.applyOptions({color:rgbaOf(MA_COL[slowK],al)}); }catch(e){} if(crossReq) crossReq(); };
+    if(crossReq) crossReq(); }
+  function setMaLayer(which,on){ layers[which]=on; saveLayers();
+    if(on){ buildMaLayer(which); layerAlpha[which]=0; fadeLayer(which,1); triggerGlow(which); }
+    else { fadeLayer(which,0, function(){ removeMaLayer(which); }); }
+    syncLayerUI(); }
   function rebuildMaLayers(){ ['maw','mad'].forEach(function(w){ if(layers[w]) buildMaLayer(w); else removeMaLayer(w); }); }
+
+  // Part 0.2 — cascading glow on crossovers: each circle pulses 3× over 0.5s; the whole cascade
+  // (left→right) always lasts ~1s regardless of count. Fires every time the MA toggle is switched on.
+  var GLOW_TOTAL=1000, GLOW_PULSE=500;
+  function triggerGlow(which){ if(!maCross[which] || !maCross[which].length) return; _glow[which]=performance.now();
+    animate('glow_'+which, GLOW_TOTAL+GLOW_PULSE+40, function(){ if(crossReq) crossReq(); }, function(){ _glow[which]=0; if(crossReq) crossReq(); }); }
+  function makeCrossPrimitive(){ var ch=null;
+    var r={ draw:function(target){ if(!ch || isIntra()) return; var ts=ch.timeScale(); var now=performance.now();
+      target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width; ctx.save();
+        ['maw','mad'].forEach(function(which){ if(!maSeries[which].length) return; var pts=maCross[which], n=pts.length, gStart=_glow[which];
+          pts.forEach(function(pt,i){ var x; try{ x=ts.timeToCoordinate(pt.time); }catch(e){ x=null; } if(x==null||x<-4||x>W+4) return; var y; try{ y=area.priceToCoordinate(pt.price); }catch(e){ y=null; } if(y==null) return;
+            var glow=0; if(gStart){ var startOff=(n>1)?(i/(n-1))*(GLOW_TOTAL-GLOW_PULSE):0; var e=now-gStart-startOff; if(e>0&&e<GLOW_PULSE) glow=Math.abs(Math.sin(e/GLOW_PULSE*Math.PI*3)); }
+            var la=(layerAlpha[which]==null?1:layerAlpha[which]);
+            if(glow>0.01){ ctx.beginPath(); ctx.arc(x,y,3+glow*7,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,'+(glow*0.55*la)+')'; ctx.fill(); }
+            ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,'+la+')'; ctx.fill();
+            ctx.lineWidth=1; ctx.strokeStyle='rgba(0,0,0,'+(0.5*la)+')'; ctx.stroke();
+          }); });
+        ctx.restore();
+      }); } };
+    return { attached:function(p){ ch=p.chart; crossReq=p.requestUpdate; if(p.requestUpdate) primReqs.push(p.requestUpdate); }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'top'; }, renderer:function(){ return r; } } ]; } };
+  }
+
+  // ── manipulation layer (Fase IV) — toggle "Manip." ────────────────────────────
+  // Historical: white-10% vertical bands over every window where close < the previous cycle's high.
+  // Current: white-10% horizontal band between today's price and that previous top + deviation %/USD.
+  function makeManipPrimitive(){ var ch=null;
+    var r={ draw:function(target){ if(!ch || !layers.manip || isIntra() || layerAlpha.manip<=0.01) return; var ts=ch.timeScale();
+      target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save(); var al=0.10*layerAlpha.manip;
+        ctx.fillStyle='rgba(255,255,255,'+al+')';
+        ANCHOR.manipRuns.forEach(function(run){ var x0,x1; try{ x0=ts.timeToCoordinate(run.from); x1=ts.timeToCoordinate(run.to); }catch(e){ return; } if(x0==null&&x1==null) return; if(x0==null)x0=0; if(x1==null)x1=W; if(x1<0||x0>W) return; var a=Math.max(0,x0), b=Math.min(W,x1); if(b<=a) return; ctx.fillRect(a,0,b-a,H); });
+        var prev=ANCHOR.prevHighNow, today=ACTIVE.length?ACTIVE[ACTIVE.length-1].close:null;
+        if(prev && today!=null && today<prev.price){ var yT,yP; try{ yT=area.priceToCoordinate(prev.price); yP=area.priceToCoordinate(today); }catch(e){ yT=null; }
+          if(yT!=null&&yP!=null){ ctx.fillStyle='rgba(255,255,255,'+al+')'; ctx.fillRect(0,Math.min(yT,yP),W,Math.abs(yP-yT));
+            var pct=(today-prev.price)/prev.price*100, usd=today-prev.price, txt=pct.toFixed(1)+'% · -$'+wkFmtPrice(Math.abs(usd));
+            ctx.font='700 10px -apple-system,system-ui,sans-serif'; var w=ctx.measureText(txt).width+10; ctx.globalAlpha=Math.min(1,layerAlpha.manip);
+            ctx.fillStyle='rgba(13,16,22,.82)'; ctx.fillRect(W-w-4, yP+6, w, 17); ctx.fillStyle='#fff'; ctx.textBaseline='top'; ctx.fillText(txt, W-w, yP+9); ctx.globalAlpha=1;
+          } }
+        ctx.restore();
+      }); } };
+    return { attached:function(p){ ch=p.chart; if(p.requestUpdate) primReqs.push(p.requestUpdate); }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'bottom'; }, renderer:function(){ return r; } } ]; } };
+  }
+  function setManip(on){ layers.manip=on; saveLayers();
+    if(on){ if(!manipAttached){ try{ area.attachPrimitive(manipPrim); manipAttached=true; }catch(e){} } layerAlpha.manip=0; fadeLayer('manip',1); }
+    else { fadeLayer('manip',0, function(){ try{ area.detachPrimitive(manipPrim); manipAttached=false; }catch(e){} }); }
+    syncLayerUI(); }
   function updateHalvings(){ applyHalvLayer(); }   // primitive redraws itself; this just manages attach state
-  function setPhases(on){ ind.phases=on; layers.phases=on; saveLayers(); try{ if(on) area.attachPrimitive(phasePrim); else area.detachPrimitive(phasePrim); }catch(e){} syncLayerUI(); }
+  var phasesAttached=false;
+  function setPhases(on){ layers.phases=on; saveLayers();
+    if(on){ if(!phasesAttached){ try{ area.attachPrimitive(phasePrim); phasesAttached=true; }catch(e){} } ind.phases=true; layerAlpha.phases=0; fadeLayer('phases',1); }
+    else { fadeLayer('phases',0, function(){ ind.phases=false; }); }   // keep drawing during fade-out
+    syncLayerUI(); }
   function setHalvings(on){ ind.halving=on; layers.halvings=on; saveLayers();
     if(on){ if(!halvAttached){ try{ area.attachPrimitive(halvPrim); halvAttached=true; }catch(e){} } playHalv('in'); }   // animated entry
     else { playHalv('out'); }   // quick fade-out, then detach on completion
@@ -2032,7 +2165,8 @@
   function buildActive(size){ var spec=CSPEC[size]||CSPEC['1D']; var cands=tierCache[spec.tier]||[]; return spec.kind==='intra' ? aggIntra(cands, spec.sec) : aggDay(cands, spec.grp); }
   function loadTier(tier, cb){ if(tierCache[tier]){ cb(tierCache[tier]); return; } fetch('/api/btc-candles?tier='+tier).then(function(r){return r.json();}).then(function(j){ tierCache[tier]=(j&&j.ok&&j.candles)?j.candles:[]; cb(tierCache[tier]); }).catch(function(){ tierCache[tier]=[]; cb([]); }); }
 
-  function rebuildPhase(){ try{ if(phasePrim) area.detachPrimitive(phasePrim); }catch(e){} try{ phasePrim=makePhasePrimitive(buildRuns(ACTIVE)); if(ind.phases) area.attachPrimitive(phasePrim); }catch(e){} }
+  function rebuildPhase(){ try{ if(phasePrim) area.detachPrimitive(phasePrim); }catch(e){} phasesAttached=false; try{ phasePrim=makePhasePrimitive(buildRuns(ACTIVE)); if(ind.phases){ area.attachPrimitive(phasePrim); phasesAttached=true; } }catch(e){}
+    try{ if(manipPrim) area.detachPrimitive(manipPrim); }catch(e){} manipAttached=false; try{ manipPrim=makeManipPrimitive(); if(layers.manip){ area.attachPrimitive(manipPrim); manipAttached=true; } }catch(e){} }
   function rebuildOpenOscillators(){ Object.keys(oscReg).forEach(function(id){ rebuildOsc(id); }); }
   // Mayer / 200W MA / percentil are DAILY cycle indicators — grey them out and switch them off at
   // intraday resolutions (they have no sub-daily values); they ride along on the daily-family buckets.
