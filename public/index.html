@@ -506,9 +506,6 @@
             <div class="wk-ind-item on" data-ind="phases"><span class="wk-ind-radio"></span><span class="wk-nm">Fases do ciclo</span><span class="wk-csw" style="background:linear-gradient(90deg,#22c55e,#fb923c)"></span></div>
             <div class="wk-ind-item on" data-ind="halving"><span class="wk-ind-radio"></span><span class="wk-nm">Halvings</span><span class="wk-csw" style="background:#8a93a3"></span></div>
             <div class="wk-ind-sep"></div>
-            <div class="wk-ind-head">Preço</div>
-            <div class="wk-ind-item" data-ind="ma200w"><span class="wk-ind-radio"></span><span class="wk-nm">200W MA</span><span class="wk-csw" style="background:#f59e0b"></span></div>
-            <div class="wk-ind-sep"></div>
             <div class="wk-ind-head">Osciladores (painel próprio)</div>
             <div class="wk-ind-item" data-ind="rsi"><span class="wk-ind-radio"></span><span class="wk-nm">RSI (14)</span><span class="wk-csw" style="background:#5b8cff"></span></div>
             <div class="wk-ind-item" data-ind="stoch"><span class="wk-ind-radio"></span><span class="wk-nm">StochRSI</span><span class="wk-csw" style="background:#22d3ee"></span></div>
@@ -556,8 +553,8 @@
         <button class="wk-layer" data-layer="phases">Fases</button>
         <button class="wk-layer" data-layer="halvings">Halvings</button>
         <button class="wk-layer wk-layer-soon" data-layer="manip">Manip.</button>
-        <button class="wk-layer wk-layer-soon" data-layer="maw">MA 50/200W</button>
-        <button class="wk-layer wk-layer-soon" data-layer="mad">MA 50/200D</button>
+        <button class="wk-layer" data-layer="maw">MA 50/200W</button>
+        <button class="wk-layer" data-layer="mad">MA 50/200D</button>
       </div>
       <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div>
         <div class="wk-modetog" id="wk-modetog">
@@ -1667,7 +1664,7 @@
     '3M':{tier:'daily',kind:'day',grp:'Q'}, '6M':{tier:'daily',kind:'day',grp:'H'}, '1A':{tier:'daily',kind:'day',grp:'Y'}, '2A':{tier:'daily',kind:'day',grp:'2Y'},
   };
   var CS_WIN={'1m':0.25,'5m':1,'15m':3,'1H':14,'4H':60,'1D':90,'1W':365,'1M':1460,'3M':2920,'6M':0,'1A':0,'2A':0};  // default visible window (days); 0=ALL
-  var DAILY_ONLY=['ma200w','mayer','pct'];   // cycle indicators valid only on daily-family buckets
+  var DAILY_ONLY=['mayer','pct'];   // dropdown cycle indicators valid only on daily-family buckets
   var INTRADAY_WINDOW_DAYS=60;               // rolling minute window (must match lib/btcintraday.js)
   // top toggle bar: independent layers, persisted. phases/halvings are live; manip/maw/mad are
   // placeholders for Fases III/IV (present but inactive — they just persist + hint for now).
@@ -1794,6 +1791,7 @@
   function wireLayers(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-layer'),function(b){ b.onclick=function(){ var k=b.dataset.layer;
     if(k==='phases'){ setPhases(!layers.phases); }
     else if(k==='halvings'){ setHalvings(!layers.halvings); }
+    else if(k==='maw' || k==='mad'){ if(b.classList.contains('wk-cs-off')){ notify('MAs de ciclo só em velas ≥ 1D'); return; } setMaLayer(k, !layers[k]); }
     else { layers[k]=!layers[k]; saveLayers(); b.classList.toggle('on',layers[k]); notify('Camada "'+b.textContent.trim()+'" chega numa fase futura'); }
   }; }); syncLayerUI(); }
 
@@ -1870,7 +1868,12 @@
     ser.forEach(function(d){ byTime[d.t]={c:d.c,mayer:d.mayer,pct:d.pct,p:d.p}; });
     // daily tier (1D, the default) from the cycle-series payload — carries the daily cycle
     // indicators (mayer/ma200w/pct/phase) so the daily-family buckets can ride them along.
-    tierCache.daily=DATA.series.map(function(d){ return {t:d.t,o:(d.o!=null?d.o:d.c),h:(d.h!=null?d.h:d.c),l:(d.l!=null?d.l:d.c),c:d.c,mayer:d.mayer,ma200w:d.ma200w,pct:d.pct,p:d.p}; });
+    tierCache.daily=DATA.series.map(function(d){ return {t:d.t,o:(d.o!=null?d.o:d.c),h:(d.h!=null?d.h:d.c),l:(d.l!=null?d.l:d.c),c:d.c,mayer:d.mayer,pct:d.pct,p:d.p}; });
+    // moving averages computed CLIENT-SIDE (SMA × close) over the DAILY series — 50W=350d, 200W=1400d,
+    // 50D=50, 200D=200 — and carried on each day so the daily-family buckets ride them along.
+    (function(){ var dc=tierCache.daily.map(function(d){ return d.c; });
+      var w50=smaArr(dc,350), w200=smaArr(dc,1400), d50=smaArr(dc,50), d200=smaArr(dc,200);
+      tierCache.daily.forEach(function(d,i){ d.ma50w=w50[i]; d.ma200w=w200[i]; d.ma50d=d50[i]; d.ma200d=d200[i]; }); })();
     ACTIVE=buildActive('1D'); CLOSE=ACTIVE.map(function(d){ return d.close; });
 
     // PRICE pane (0): area (always present — carries the phase primitive + markers) + candles
@@ -1911,6 +1914,7 @@
     try{ el.addEventListener('pointerdown', panDown); el.addEventListener('pointermove', panMove, {passive:true}); el.addEventListener('pointerup', panUp); el.addEventListener('pointercancel', function(){ _pan.tracking=false; }); }catch(e){}
     wireTitles(); wireConfigurator(); updateMenuLabels();
     relayout(); wireToolbar(); wireLayers(); applyInitialPeriod(); applyInitialCandleSize();
+    rebuildMaLayers();   // build any MA layers persisted on (applyInitialCandleSize only builds them for non-1D)
   }
 
   // ── pane / oscillator machinery (v5) — snap-to-height + stretch factors ─────────
@@ -1988,8 +1992,21 @@
     if(x) x.onclick=closeCfg; if(bk) bk.onclick=closeCfg; if(ap) ap.onclick=applyCfg; if(rs) rs.onclick=resetCfg; }
   function updateMenuLabels(){ try{ var set=function(k,t){ var it=document.querySelector('.wk-ind-item[data-ind="'+k+'"] .wk-nm'); if(it) it.textContent=t; };
     set('rsi','RSI ('+oscCfg.rsi.length+')'); set('stoch','StochRSI ('+oscCfg.stoch.length+')'); set('macd','MACD ('+oscCfg.macd.fast+','+oscCfg.macd.slow+','+oscCfg.macd.signal+')'); }catch(e){} }
-  function addMa(){ if(ma) return; ma=chart.addSeries(L.LineSeries,{color:'#f59e0b',lineWidth:1,priceLineVisible:false,lastValueVisible:false},0); ma.setData(arrData(ACTIVE.map(function(d){ return d.ma200w; }))); }
-  function rmMa(){ if(ma){ try{ chart.removeSeries(ma); }catch(e){} ma=null; } }
+  // ── moving-average layers on the price pane (Fase III) — client-side, toggled via the top bar ──
+  // Weekly (50W=350d cyan + 200W=1400d amber) and Daily (50D lime + 200D pink). A white 3px circle
+  // marks each fast×slow crossover. Cycle MAs are hidden at intraday (like halvings).
+  var MA_COL={ma50w:'#22d3ee', ma200w:'#f59e0b', ma50d:'#a3e635', ma200d:'#f472b6'};
+  var maSeries={maw:[], mad:[]};
+  function maCrossMarkers(fastArr, slowArr){ var m=[],i; for(i=1;i<ACTIVE.length;i++){ var pf=fastArr[i-1],ps=slowArr[i-1],cf=fastArr[i],cs=slowArr[i]; if(pf==null||ps==null||cf==null||cs==null) continue; var prev=pf-ps,cur=cf-cs; if(prev===0) continue; if((prev<0&&cur>=0)||(prev>0&&cur<=0)) m.push({time:ACTIVE[i].time, position:'inBar', color:'#ffffff', shape:'circle', size:1}); } return m; }
+  function removeMaLayer(which){ (maSeries[which]||[]).forEach(function(s){ try{ chart.removeSeries(s); }catch(e){} }); maSeries[which]=[]; }
+  function buildMaLayer(which){ removeMaLayer(which); if(isIntra()) return;   // cycle MAs make no sense in the 60-day intraday window
+    var fastK=(which==='maw')?'ma50w':'ma50d', slowK=(which==='maw')?'ma200w':'ma200d';
+    var fast=chart.addSeries(L.LineSeries,{color:MA_COL[fastK],lineWidth:1,priceLineVisible:false,lastValueVisible:false},0); fast.setData(arrData(ACTIVE.map(function(d){ return d[fastK]; })));
+    var slow=chart.addSeries(L.LineSeries,{color:MA_COL[slowK],lineWidth:1,priceLineVisible:false,lastValueVisible:false},0); slow.setData(arrData(ACTIVE.map(function(d){ return d[slowK]; })));
+    try{ L.createSeriesMarkers(fast, maCrossMarkers(ACTIVE.map(function(d){return d[fastK];}), ACTIVE.map(function(d){return d[slowK];}))); }catch(e){}
+    maSeries[which]=[fast,slow]; }
+  function setMaLayer(which,on){ layers[which]=on; saveLayers(); if(on) buildMaLayer(which); else removeMaLayer(which); syncLayerUI(); }
+  function rebuildMaLayers(){ ['maw','mad'].forEach(function(w){ if(layers[w]) buildMaLayer(w); else removeMaLayer(w); }); }
   function updateHalvings(){ applyHalvLayer(); }   // primitive redraws itself; this just manages attach state
   function setPhases(on){ ind.phases=on; layers.phases=on; saveLayers(); try{ if(on) area.attachPrimitive(phasePrim); else area.detachPrimitive(phasePrim); }catch(e){} syncLayerUI(); }
   function setHalvings(on){ ind.halving=on; layers.halvings=on; saveLayers();
@@ -2009,7 +2026,9 @@
     if(grp==='Q'){ var q=Math.floor((m-1)/3)*3+1; return y+'-'+String(q).padStart(2,'0')+'-01'; }
     if(grp==='H'){ return y+'-'+(m<=6?'01':'07')+'-01'; }
     if(grp==='2Y'){ return (y-(y%2))+'-01-01'; } return dstr; }
-  function aggDay(cands, grp){ var out=[],cur=null,key=null,i; for(i=0;i<cands.length;i++){ var c=cands[i]; var k=dayKey(c.t,grp); if(k!==key){ if(cur)out.push(cur); cur={time:k,open:c.o,high:c.h,low:c.l,close:c.c,value:c.c,p:c.p,mayer:c.mayer,ma200w:c.ma200w,pct:c.pct}; key=k; } else { if(c.h>cur.high)cur.high=c.h; if(c.l<cur.low)cur.low=c.l; cur.close=c.c; cur.value=c.c; cur.p=c.p; cur.mayer=c.mayer; cur.ma200w=c.ma200w; cur.pct=c.pct; } } if(cur)out.push(cur); return out; }
+  function aggDay(cands, grp){ var out=[],cur=null,key=null,i; for(i=0;i<cands.length;i++){ var c=cands[i]; var k=dayKey(c.t,grp);
+    if(k!==key){ if(cur)out.push(cur); cur={time:k,open:c.o,high:c.h,low:c.l,close:c.c,value:c.c,p:c.p,mayer:c.mayer,pct:c.pct,ma50w:c.ma50w,ma200w:c.ma200w,ma50d:c.ma50d,ma200d:c.ma200d}; key=k; }
+    else { if(c.h>cur.high)cur.high=c.h; if(c.l<cur.low)cur.low=c.l; cur.close=c.c; cur.value=c.c; cur.p=c.p; cur.mayer=c.mayer; cur.pct=c.pct; cur.ma50w=c.ma50w; cur.ma200w=c.ma200w; cur.ma50d=c.ma50d; cur.ma200d=c.ma200d; } } if(cur)out.push(cur); return out; }
   function buildActive(size){ var spec=CSPEC[size]||CSPEC['1D']; var cands=tierCache[spec.tier]||[]; return spec.kind==='intra' ? aggIntra(cands, spec.sec) : aggDay(cands, spec.grp); }
   function loadTier(tier, cb){ if(tierCache[tier]){ cb(tierCache[tier]); return; } fetch('/api/btc-candles?tier='+tier).then(function(r){return r.json();}).then(function(j){ tierCache[tier]=(j&&j.ok&&j.candles)?j.candles:[]; cb(tierCache[tier]); }).catch(function(){ tierCache[tier]=[]; cb([]); }); }
 
@@ -2017,7 +2036,10 @@
   function rebuildOpenOscillators(){ Object.keys(oscReg).forEach(function(id){ rebuildOsc(id); }); }
   // Mayer / 200W MA / percentil are DAILY cycle indicators — grey them out and switch them off at
   // intraday resolutions (they have no sub-daily values); they ride along on the daily-family buckets.
-  function refreshIndicatorAvailability(){ var intra=isIntra(); DAILY_ONLY.forEach(function(k){ var it=document.querySelector('.wk-ind-item[data-ind="'+k+'"]'); if(it) it.classList.toggle('wk-cs-off', intra); if(intra && ind[k]){ ind[k]=false; if(it) it.classList.remove('on'); if(k==='ma200w') rmMa(); else removeOsc(k); } }); }
+  function refreshIndicatorAvailability(){ var intra=isIntra();
+    DAILY_ONLY.forEach(function(k){ var it=document.querySelector('.wk-ind-item[data-ind="'+k+'"]'); if(it) it.classList.toggle('wk-cs-off', intra); if(intra && ind[k]){ ind[k]=false; if(it) it.classList.remove('on'); removeOsc(k); } });
+    // weekly/daily cycle-MA toggle buttons — greyed at intraday (layer state kept; rebuilt on return)
+    ['maw','mad'].forEach(function(k){ var b=document.querySelector('.wk-layer[data-layer="'+k+'"]'); if(b) b.classList.toggle('wk-cs-off', intra); }); }
   function setRangeDays(days){ if(!chart||!ACTIVE.length) return; if(days===0){ chart.timeScale().fitContent(); return; } var last=ACTIVE[ACTIVE.length-1].time;
     try{ if(isIntra()){ chart.timeScale().setVisibleRange({from:last-days*86400, to:last}); }
       else { var dt=new Date(last+'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate()-days); var from=dt.toISOString().slice(0,10); if(from<ACTIVE[0].time) from=ACTIVE[0].time; chart.timeScale().setVisibleRange({from:from,to:last}); }
@@ -2034,7 +2056,7 @@
       try{ chart.applyOptions({timeScale:{timeVisible:intra, secondsVisible:false}}); }catch(e){}
       area.setData(ACTIVE.map(function(d){ return {time:d.time,value:d.close}; }));
       candle.setData(ACTIVE.map(function(d){ return {time:d.time,open:d.open,high:d.high,low:d.low,close:d.close}; }));
-      updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators();
+      updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators(); rebuildMaLayers();
       var lab=document.getElementById('wk-csLabel'); if(lab) lab.textContent=size;
       Array.prototype.forEach.call(document.querySelectorAll('.wk-cs-item'),function(it){ it.classList.toggle('on', it.dataset.cs===size); });
       if(opt.keepRange){ /* keep current view */ }
@@ -2087,7 +2109,6 @@
     ind[k]=on;
     if(k==='halving') return setHalvings(on);
     if(k==='phases') return setPhases(on);
-    if(k==='ma200w') return on?addMa():rmMa();
     if(['rsi','stoch','macd','mayer','pct'].indexOf(k)>=0){ if(on) addOsc(k); else removeOsc(k); }
   }
 

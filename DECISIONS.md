@@ -332,6 +332,23 @@ noted it here.
   log with phase ribbon + halvings + all 5 indicator overlays; the live screen uses the full
   daily series. Screen A and Phases 1-3 untouched.
 
+## Charting Fase III — médias móveis 50W/200W + 50D/200D + cruzamentos (IMPLEMENTED)
+Two client-side MA layers on the price pane (pane 0), activating the Fase II placeholder toggles.
+- **Computed CLIENT-SIDE** as SMA × close over the **daily** series, carried on each day (and through
+  the daily-family aggregation buckets): **50W = 350d, 200W = 1400d, 50D = 50, 200D = 200** (correct
+  week→day mapping, not 50W=1400). Reuses the existing `smaArr`.
+- **Weekly layer (toggle "MA 50/200W"):** 50W (cyan `#22d3ee`) + 200W (amber `#f59e0b`, the existing
+  cycle anchor — folded in here; its isolated dropdown item removed). **Daily layer ("MA 50/200D"):**
+  50D (lime `#a3e635`) + 200D (pink `#f472b6`). Four distinct colors vs the purple price; 1px thin.
+- **White 3px circle at every fast×slow crossover** (50W×200W cycle cross, 50D×200D golden/death cross)
+  via `createSeriesMarkers` on the fast line at the sign-change point.
+- **Independent + persisted** (`wk_layers.maw/.mad`); hidden + greyed at intraday (like halvings,
+  cycle MAs are meaningless in the 60-day window) and rebuilt on return to a daily-family size.
+- **Visual only** — MAs never touch phases/the cycle detector. LOG respected.
+- **Verified** headless (0 errors): both layers render 4 distinct MAs + crossover circles over ALL;
+  rebuild on 1W; grey/hide at 1m with the "≥ 1D" hint; rebuild back on 1D. Screen A, PINs, detector,
+  phase bands, oscillators, halvings, intraday untouched.
+
 ## Charting Fase II — interação + intraday a/b + toggle bar + halvings redesenhados (IMPLEMENTED)
 Frontend-only on Screen B. Shared **easing engine** (~0.5s ease-out, rAF) reused by auto-fit and
 the intraday auto-adjust.
