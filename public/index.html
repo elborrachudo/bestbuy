@@ -1734,21 +1734,38 @@
   // ── halvings: dotted burnt-yellow full-height lines + H<year> box (custom v5 primitive) ──
   // Drawn on the price pane (pane 0). Skipped at intraday resolutions (halvings are years apart,
   // outside the 60-day intraday window). Replaces the old arrow/pickaxe markers.
+  // Entry animation (toggle ON): the line draws top→bottom and the box fades-in + slides down,
+  // ~0.5s ease-out with a light left→right stagger. Toggle OFF: a quick fade-out. Boxes all sit
+  // at the TOP (same Y); a horizontal collision is pushed sideways, never down.
+  var halvReq=null, _halvAnim=null;            // _halvAnim={dir:'in'|'out', start:ms}
+  var HALV_DUR=460, HALV_STAG=70, HALV_FADEOUT=220, HALV_BOXY=1;
   function makeHalvingPrimitive(){
     var ch=null;
-    var renderer={ draw:function(target){ if(!ch || !layers.halvings || isIntra()) return;
+    var renderer={ draw:function(target){ if(!ch || isIntra()) return;
+      var out=_halvAnim && _halvAnim.dir==='out';
+      if(!layers.halvings && !out) return;
       var ts=ch.timeScale();
+      var now=performance.now(), el=_halvAnim ? (now-_halvAnim.start) : null;
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height;
+        var lastRight=-1e9;   // for horizontal collision (boxes ordered left→right)
         HALVINGS.forEach(function(hv,i){ var x; try{ x=ts.timeToCoordinate(hv.date); }catch(e){ x=null; } if(x==null || x<-2 || x>W+2) return;
+          // per-halving animation progress
+          var p=1, alpha=1, slide=0;
+          if(_halvAnim){ if(_halvAnim.dir==='in'){ p=easeOut(Math.max(0,Math.min(1,(el - i*HALV_STAG)/HALV_DUR))); alpha=p; slide=-(1-p)*8; }
+                         else { alpha=1-Math.max(0,Math.min(1,el/HALV_FADEOUT)); p=1; slide=0; } }
+          if(alpha<=0.01) return;
           var xl=Math.round(x)+0.5;
-          ctx.save();
+          ctx.save(); ctx.globalAlpha=alpha;
           ctx.strokeStyle=HALV_COLOR; ctx.lineWidth=1; ctx.setLineDash([2,3]);
-          ctx.beginPath(); ctx.moveTo(xl,0); ctx.lineTo(xl,H); ctx.stroke(); ctx.setLineDash([]);
+          ctx.beginPath(); ctx.moveTo(xl,0); ctx.lineTo(xl, H*p); ctx.stroke(); ctx.setLineDash([]);
           var t1='H'+hv.year, t2=hv.dm+' '+hv.hm;
           ctx.font='700 10px -apple-system,system-ui,sans-serif'; var w1=ctx.measureText(t1).width;
           ctx.font='700 8px -apple-system,system-ui,sans-serif';  var w2=ctx.measureText(t2).width;
-          var bw=Math.max(w1,w2)+8, bh=23, bx=x+3; if(bx+bw>W) bx=x-bw-3; if(bx<2) bx=2;
-          var by=1+(i%2)*(bh+3);   // stagger adjacent boxes so they never overlap when halvings are close
+          var bw=Math.max(w1,w2)+8, bh=23, bx=x+3;
+          if(bx+bw>W) bx=x-bw-3; if(bx<2) bx=2;
+          if(bx<lastRight+8) bx=lastRight+8;          // horizontal collision → push sideways (never down)
+          if(bx+bw>W) bx=W-bw-1; lastRight=bx+bw;
+          var by=HALV_BOXY+slide;                      // all boxes at the same top Y (+ slide while entering)
           ctx.fillStyle=HALV_COLOR; ctx.fillRect(bx,by,bw,bh);
           ctx.fillStyle='#000'; ctx.textBaseline='top';
           ctx.font='700 10px -apple-system,system-ui,sans-serif'; ctx.fillText(t1, bx+4, by+2);
@@ -1757,9 +1774,16 @@
         });
       });
     } };
-    return { attached:function(p){ ch=p.chart; }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'top'; }, renderer:function(){ return renderer; } } ]; } };
+    return { attached:function(p){ ch=p.chart; halvReq=p.requestUpdate; }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'top'; }, renderer:function(){ return renderer; } } ]; } };
   }
-  function applyHalvLayer(){ try{ if(!halvPrim) return; if(layers.halvings && !halvAttached){ area.attachPrimitive(halvPrim); halvAttached=true; } else if(!layers.halvings && halvAttached){ area.detachPrimitive(halvPrim); halvAttached=false; } }catch(e){} }
+  function applyHalvLayer(){ try{ if(!halvPrim) return; if(layers.halvings && !halvAttached){ area.attachPrimitive(halvPrim); halvAttached=true; } else if(!layers.halvings && halvAttached && !(_halvAnim&&_halvAnim.dir==='out')){ area.detachPrimitive(halvPrim); halvAttached=false; } }catch(e){} }
+  // drive the entry/exit animation by forcing primitive redraws (reuses the shared easing engine
+  // only to tick frames; the per-halving easing/timing is computed inside draw)
+  function playHalv(dir){ if(!halvPrim) return; _halvAnim={dir:dir, start:performance.now()};
+    var total=(dir==='in') ? (HALV_DUR + HALVINGS.length*HALV_STAG + 80) : (HALV_FADEOUT + 40);
+    animate('halv', total, function(){ if(halvReq) halvReq(); }, function(){ _halvAnim=null;
+      if(dir==='out' && halvAttached){ try{ area.detachPrimitive(halvPrim); halvAttached=false; }catch(e){} }
+      if(halvReq) halvReq(); }); }
 
   // ── top toggle bar (layers) ───────────────────────────────────────────────────
   function syncLayerUI(){ try{
@@ -1968,7 +1992,10 @@
   function rmMa(){ if(ma){ try{ chart.removeSeries(ma); }catch(e){} ma=null; } }
   function updateHalvings(){ applyHalvLayer(); }   // primitive redraws itself; this just manages attach state
   function setPhases(on){ ind.phases=on; layers.phases=on; saveLayers(); try{ if(on) area.attachPrimitive(phasePrim); else area.detachPrimitive(phasePrim); }catch(e){} syncLayerUI(); }
-  function setHalvings(on){ ind.halving=on; layers.halvings=on; saveLayers(); applyHalvLayer(); syncLayerUI(); }
+  function setHalvings(on){ ind.halving=on; layers.halvings=on; saveLayers();
+    if(on){ if(!halvAttached){ try{ area.attachPrimitive(halvPrim); halvAttached=true; }catch(e){} } playHalv('in'); }   // animated entry
+    else { playHalv('out'); }   // quick fade-out, then detach on completion
+    syncLayerUI(); }
 
   // ── candle-size tiers: load tier · aggregate OHLC on the fly · apply ───────────
   function isIntra(){ return CSPEC[CSIZE] && CSPEC[CSIZE].kind==='intra'; }
