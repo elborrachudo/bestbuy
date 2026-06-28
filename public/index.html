@@ -1819,6 +1819,8 @@
   // phase only (no future). Indicators (Mayer/percentil/MAs/oscillators) stay purely visual.
   var PHC2={accumulation:'#c8a415', markup:'#22c55e', distribution:'#fb923c', markdown:'#ef4444', none:null};
   var PHEN={accumulation:'Accumulation', markup:'Markup', distribution:'Distribution', markdown:'Markdown'};
+  // short labels for the on-timeline phase tags (long names collided in the ALL view)
+  var PHAB={accumulation:'Acc', markup:'MkUP', distribution:'Dist', markdown:'MkDWN'};
   // Swing-structure sensitivity — the SINGLE knob for the lateral-zone width (ZigZag reversal %).
   // Bigger ⇒ only larger swings count ⇒ wider Accumulation/Distribution ranges. Tune here only.
   var SWING_PCT=0.28;
@@ -1919,11 +1921,12 @@
     // EN phase names (black, just above the time axis) + Cycle high/low dots, dotted price lines & boxes
     var labels={ draw:function(target){ if(!ch||!ind.phases||isIntra()||layerAlpha.phases<=0.01) return; var ts=ch.timeScale();
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save(); ctx.globalAlpha=layerAlpha.phases;
-        ctx.font='700 9px -apple-system,system-ui,sans-serif'; ctx.fillStyle='#000'; ctx.textBaseline='bottom'; ctx.textAlign='center';
-        // two staggered baselines + per-row overlap guard: adjacent blocks land on alternating rows so a
-        // thin Accumulation/Distribution never collides with the wide Markup/Markdown beside it.
+        ctx.font='700 10px -apple-system,system-ui,sans-serif'; ctx.textBaseline='bottom'; ctx.textAlign='center';
+        ctx.lineJoin='round'; ctx.lineWidth=2.5; ctx.strokeStyle='rgba(0,0,0,.85)';   // dark outline → readable on any band (incl. yellow Accumulation)
+        // short burnt-yellow tags (halvings colour) on two staggered baselines + per-row overlap guard, so a
+        // thin Acc/Dist never collides with the wide MkUP/MkDWN beside it; the most-recent block wins ties.
         var lastR=[-1e9,-1e9];
-        runs.forEach(function(run,idx){ if(!PHC2[run.p]) return; var x0=ts.timeToCoordinate(run.from), x1=ts.timeToCoordinate(run.to); if(x0==null)x0=0; if(x1==null)x1=W; var a=Math.max(0,x0), bx=Math.min(W,x1); var w=bx-a; if(w<24) return; var cx=(a+bx)/2, tw=ctx.measureText(PHEN[run.p]).width, row=idx%2; if(cx-tw/2<lastR[row]+4) return; ctx.fillText(PHEN[run.p], cx, row===0?H-3:H-15); lastR[row]=cx+tw/2; });
+        runs.forEach(function(run,idx){ if(!PHC2[run.p]) return; var x0=ts.timeToCoordinate(run.from), x1=ts.timeToCoordinate(run.to); if(x0==null)x0=0; if(x1==null)x1=W; var a=Math.max(0,x0), bx=Math.min(W,x1); var w=bx-a; if(w<20) return; var lbl=PHAB[run.p], cx=(a+bx)/2, tw=ctx.measureText(lbl).width, row=idx%2; if(cx-tw/2<lastR[row]+4) return; var y=row===0?H-3:H-15; ctx.strokeText(lbl, cx, y); ctx.fillStyle='#C8A415'; ctx.fillText(lbl, cx, y); lastR[row]=cx+tw/2; });
         // cycle extremes
         ctx.textAlign='left'; ctx.textBaseline='middle';
         ANCHOR.extremes.forEach(function(e){ var y; try{ y=area.priceToCoordinate(e.price); }catch(_){ y=null; } if(y==null) return; var x; try{ x=ts.timeToCoordinate(e.date); }catch(_){ x=null; }
