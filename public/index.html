@@ -2104,9 +2104,11 @@
           pts.forEach(function(pt,i){ var x; try{ x=ts.timeToCoordinate(pt.time); }catch(e){ x=null; } if(x==null||x<-4||x>W+4) return; var y; try{ y=area.priceToCoordinate(pt.price); }catch(e){ y=null; } if(y==null) return;
             var glow=0; if(gStart){ var startOff=(n>1)?(i/(n-1))*(GLOW_TOTAL-GLOW_PULSE):0; var e=now-gStart-startOff; if(e>0&&e<GLOW_PULSE) glow=Math.abs(Math.sin(e/GLOW_PULSE*Math.PI*3)); }
             var la=(layerAlpha[which]==null?1:layerAlpha[which]);
-            if(glow>0.01){ ctx.beginPath(); ctx.arc(x,y,3+glow*7,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,'+(glow*0.55*la)+')'; ctx.fill(); }
-            ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,'+la+')'; ctx.fill();
-            ctx.lineWidth=1; ctx.strokeStyle='rgba(0,0,0,'+(0.5*la)+')'; ctx.stroke();
+            if(glow>0.01){ var gr=3+glow*5;   // feathered halo, at most 5px larger than the 3px circle
+              var grad=ctx.createRadialGradient(x,y,2,x,y,gr);
+              grad.addColorStop(0,'rgba(255,255,255,'+(glow*0.5*la)+')'); grad.addColorStop(1,'rgba(255,255,255,0)');
+              ctx.beginPath(); ctx.arc(x,y,gr,0,Math.PI*2); ctx.fillStyle=grad; ctx.fill(); }
+            ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fillStyle='rgba(255,255,255,'+la+')'; ctx.fill();   // solid circle, no black outline
           }); });
         ctx.restore();
       }); } };
