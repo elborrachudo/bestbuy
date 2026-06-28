@@ -1957,14 +1957,15 @@
   var HALV_DUR=460, HALV_STAG=70, HALV_FADEOUT=220, HALV_BOXY=1;
   function makeHalvingPrimitive(){
     var ch=null;
-    var renderer={ draw:function(target){ if(!ch || isIntra()) return;
+    var renderer={ draw:function(target){ if(!ch) return;
       var out=_halvAnim && _halvAnim.dir==='out';
       if(!layers.halvings && !out) return;
       var ts=ch.timeScale();
+      var intra=isIntra();   // intraday axes key on epoch-seconds; daily axes key on the date string
       var now=performance.now(), el=_halvAnim ? (now-_halvAnim.start) : null;
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height;
         var lastRight=-1e9;   // for horizontal collision (boxes ordered left→right)
-        HALVINGS.forEach(function(hv,i){ var x; try{ x=ts.timeToCoordinate(hv.date); }catch(e){ x=null; } if(x==null || x<-2 || x>W+2) return;
+        HALVINGS.forEach(function(hv,i){ var tt=intra?Math.floor(Date.parse(hv.date+'T00:00:00Z')/1000):hv.date; var x; try{ x=ts.timeToCoordinate(tt); }catch(e){ x=null; } if(x==null || x<-2 || x>W+2) return;
           // per-halving animation progress
           var p=1, alpha=1, slide=0;
           if(_halvAnim){ if(_halvAnim.dir==='in'){ p=easeOut(Math.max(0,Math.min(1,(el - i*HALV_STAG)/HALV_DUR))); alpha=p; slide=-(1-p)*8; }
