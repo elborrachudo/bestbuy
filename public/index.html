@@ -1738,18 +1738,29 @@
     if(!daily||!daily.length) return empty;
     var dates=daily.map(function(d){return d.t;}); var byd={}; daily.forEach(function(d){byd[d.t]=d;});
     var hd=HALVINGS.map(function(h){return h.date;}).filter(function(p){return p>dates[0] && p<dates[dates.length-1];});
-    var pts=[dates[0]].concat(hd).concat([dates[dates.length-1]]);
-    var intervals=[]; for(var k=0;k<pts.length-1;k++) intervals.push([pts[k],pts[k+1],k===pts.length-2]);
-    var highOf=[], ex=[];
-    intervals.forEach(function(iv,ix){ var a=iv[0],b=iv[1],cur=iv[2], hi=null,lo=null;
-      for(var i=0;i<daily.length;i++){ var d=daily[i]; if(d.t<a) continue; if(!cur && d.t>=b) break;
-        var hv=(d.h!=null?d.h:d.c), lv=(d.l!=null?d.l:d.c);
-        if(!hi||hv>hi.price) hi={date:d.t,price:hv}; if(!lo||lv<lo.price) lo={date:d.t,price:lv}; }
-      highOf[ix]=hi;
-      if(cur){ if(hi) ex.push({date:hi.date,price:hi.price,kind:'high',current:true}); }
-      else if(hi&&lo){ [{date:hi.date,price:hi.price,kind:'high'},{date:lo.date,price:lo.price,kind:'low'}].sort(function(x,y){return x.date<y.date?-1:1;}).forEach(function(e){ex.push(e);}); }
-    });
-    ex.sort(function(x,y){return x.date<y.date?-1:1;});
+    // Cycle intervals = halving→halving (+ current halving→today). The pre-first-halving data stays
+    // unpainted. Cycle HIGH = absolute max in each interval. Cycle LOW = min BETWEEN this cycle's high
+    // and the NEXT cycle's high (the bear bottom AFTER the top — NOT the min of the whole halving window,
+    // which was the bug that picked up the pre-top low).
+    var pts=hd.concat([dates[dates.length-1]]);
+    function dayDiff(a,c){ return (Date.parse(c)-Date.parse(a))/86400000; }
+    // Cycle HIGH = the bull top, which lands ~12–20 months after the halving. Capping the high-search
+    // to HIGH_WIN days (for completed cycles) excludes the NEXT cycle's pre-halving rally (e.g. Mar-2024
+    // hit $73.8k > the 2021 $69k top inside the 2020-halving window). The current cycle uses the full
+    // window. `highsAbs` keeps the uncapped window max — used ONLY by manipulation (so its −18.2% vs the
+    // prior-cycle high stays exactly as before); `highs` (capped) drives the phase bands + green/red dots.
+    var HIGH_WIN=620;
+    var highs=[], highsAbs=[];
+    for(var k=0;k<pts.length-1;k++){ var a=pts[k], b=pts[k+1], cur=(k===pts.length-2), hiC=null, hiA=null;
+      for(var i=0;i<daily.length;i++){ var d=daily[i]; if(d.t<a) continue; if(!cur && d.t>=b) break; var hv=(d.h!=null?d.h:d.c);
+        if(hiA==null||hv>hiA.price) hiA={date:d.t,price:hv};
+        if((cur || dayDiff(a,d.t)<=HIGH_WIN) && (hiC==null||hv>hiC.price)) hiC={date:d.t,price:hv,current:cur}; }
+      if(hiC) highs.push(hiC); if(hiA) highsAbs.push(hiA); }
+    var highOf=highsAbs.slice();   // manipulation reference (unchanged)
+    function minBetween(a,b){ var lo=null; for(var i=0;i<daily.length;i++){ var d=daily[i]; if(d.t<=a) continue; if(d.t>=b) break; var lv=(d.l!=null?d.l:d.c); if(lo==null||lv<lo.price) lo={date:d.t,price:lv}; } return lo; }
+    var ex=[];
+    highs.forEach(function(hi,i){ ex.push({date:hi.date,price:hi.price,kind:'high',current:hi.current});
+      if(i<highs.length-1){ var lo=minBetween(hi.date, highs[i+1].date); if(lo) ex.push({date:lo.date,price:lo.price,kind:'low'}); } });
     function idxGE(dt){ for(var i=0;i<dates.length;i++) if(dates[i]>=dt) return i; return dates.length-1; }
     var runs=[];
     for(var k=0;k<ex.length;k++){ var e=ex[k], nxt=ex[k+1]; var endDate=nxt?nxt.date:dates[dates.length-1]; var i0=idxGE(e.date), i1=idxGE(endDate), i, split;
@@ -1760,9 +1771,12 @@
     }
     var dayPhase={}; runs.forEach(function(r){ var i0=idxGE(r.from); for(var i=i0;i<dates.length && dates[i]<=r.to;i++) dayPhase[dates[i]]=r.phase; });
     var curPhase=dayPhase[dates[dates.length-1]]||null;
-    // manipulation: days where close < the PREVIOUS cycle's high (per interval, k≥1)
-    var ds={}; intervals.forEach(function(iv,ix){ if(ix===0) return; var prev=highOf[ix-1]; if(!prev) return; var a=iv[0],b=iv[1],cur=iv[2];
-      for(var i=0;i<daily.length;i++){ var d=daily[i]; if(d.t<a) continue; if(!cur && d.t>=b) break; if(d.c<prev.price) ds[d.t]=1; } });
+    // manipulation: days where close < the PREVIOUS cycle's high. Uses the UNCAPPED highsAbs (window
+    // absolute max) so the manipulation layer (current −18.2% AND historical bands) stays exactly as
+    // it was before the extremes fix — only the phase bands / dots switched to the capped `highs`.
+    var ds={};
+    for(var mk=1;mk<pts.length-1;mk++){ var ma=pts[mk], mb=pts[mk+1], mcur=(mk===pts.length-2), mprev=highsAbs[mk-1]; if(!mprev) continue;
+      for(var mi=0;mi<daily.length;mi++){ var md=daily[mi]; if(md.t<ma) continue; if(!mcur && md.t>=mb) break; if(md.c<mprev.price) ds[md.t]=1; } }
     var manipRuns=[], run=null; dates.forEach(function(dt){ if(ds[dt]){ if(!run) run={from:dt,to:dt}; else run.to=dt; } else if(run){ manipRuns.push(run); run=null; } }); if(run) manipRuns.push(run);
     var prevHighNow=highOf.length>=2 ? highOf[highOf.length-2] : null;
     return {runs:runs, dayPhase:dayPhase, extremes:ex, curPhase:curPhase, manipRuns:manipRuns, prevHighNow:prevHighNow};
