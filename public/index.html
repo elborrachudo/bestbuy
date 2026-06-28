@@ -510,6 +510,8 @@
   .wk-modetog{position:absolute;left:8px;bottom:8px;z-index:6;display:flex;flex-direction:column;gap:2px;background:rgba(8,23,28,.85);border:1px solid #1a3a44;border-radius:999px;padding:3px;}
   .wk-mode-b{width:28px;height:24px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#4f7780;cursor:pointer;border-radius:999px;padding:0;}
   .wk-mode-b.on{background:rgba(45,212,191,.22);color:#5eead4;}
+  /* live BTC price tag on the right axis (Fase L) — teal bg, black text, slightly larger, always green */
+  .wk-livetag{position:absolute;right:1px;z-index:7;background:#2dd4bf;color:#04201c;font-weight:700;font-size:11px;line-height:1;padding:3px 5px;border-radius:3px;pointer-events:none;transform:translateY(-50%);white-space:nowrap;display:none;font-variant-numeric:tabular-nums;box-shadow:0 1px 4px rgba(0,0,0,.4);}
   .wk-legend{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;color:#a9c7cd;background:rgba(8,23,28,.78);border:1px solid #1a3a44;border-radius:7px;padding:5px 8px;pointer-events:none;line-height:1.5;display:none;}
   .wk-legend b{color:#fff;font-weight:600;}
   .wk-sub{font-size:11px;color:#7fa6ad;margin-top:8px;line-height:1.5;}
@@ -613,7 +615,7 @@
             <button class="wk-tool" data-tool="trash" title="Apagar desenhos" aria-label="Apagar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button>
           </div>
         </div>
-        <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div>
+        <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div><div class="wk-livetag" id="wk-livetag"></div>
         <div class="wk-modetog" id="wk-modetog">
           <button class="wk-mode-b wk-rulertog" id="wk-rulertog" title="Régua / medição" aria-label="Régua"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg></button>
           <div class="wk-mode-sep"></div>
@@ -1737,6 +1739,7 @@
   var HALV_COLOR='#C8A415';
   var inited=false, chart=null, L=null, area=null, candle=null, ma=null, halvPrim=null, halvAttached=false, phasePrim=null, manipPrim=null, manipAttached=false;
   var DATA=null, byTime={}, isLog=true, mode='line';
+  var livePrice=null, liveTimer=null, liveTag=null;   // Fase L: live BTC price (5s, display-only)
   var CLOSE=[], oscReg={};   // CLOSE: active close series · oscReg: id -> {series:[…],pane,priceLines:[…],kind}
   // ── candle-size tiers (price granularity) ─────────────────────────────────────
   // The price candles can be served at 12 resolutions from 3 stored tiers (daily=btc_history,
@@ -2097,9 +2100,9 @@
     ACTIVE=buildActive('1D'); CLOSE=ACTIVE.map(function(d){ return d.close; });
 
     // PRICE pane (0): area (always present — carries the phase primitive + markers) + candles
-    area=chart.addSeries(L.AreaSeries,{lineColor:'#a78bfa',topColor:'rgba(167,139,250,.18)',bottomColor:'rgba(167,139,250,0)',lineWidth:1,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
+    area=chart.addSeries(L.AreaSeries,{lineColor:'#a78bfa',topColor:'rgba(167,139,250,.18)',bottomColor:'rgba(167,139,250,0)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
     area.setData(ACTIVE.map(function(d){ return {time:d.time,value:d.close}; }));
-    candle=chart.addSeries(L.CandlestickSeries,{upColor:'#22c55e',downColor:'#f43f5e',wickUpColor:'#22c55e',wickDownColor:'#f43f5e',borderVisible:false,priceLineVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
+    candle=chart.addSeries(L.CandlestickSeries,{upColor:'#22c55e',downColor:'#f43f5e',wickUpColor:'#22c55e',wickDownColor:'#f43f5e',borderVisible:false,priceLineVisible:false,lastValueVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
     candle.setData(ACTIVE.map(function(d){ return {time:d.time,open:d.open,high:d.high,low:d.low,close:d.close}; }));
     // phase bands + halving lines as custom v5 primitives on pane 0 (init from persisted layers)
     ind.phases=layers.phases; ind.halving=layers.halvings;
@@ -2123,6 +2126,16 @@
       if(px==null){ leg.style.display='none'; return; }
       leg.innerHTML='<b>'+label+'</b> · BTC <b>$'+Math.round(px).toLocaleString()+'</b>'+((b&&PHEN[b.p])?(' · '+PHEN[b.p]):''); leg.style.display='block';
     });
+
+    // ── Fase L: live BTC price (client-side CoinGecko, every 5s, always-on; display-only) ─────────
+    // The latest candle "breathes" (close moves; high/low expand if exceeded) and the right-axis tag
+    // tracks the live level even in wide views. Nothing is written to Supabase — the cron still closes
+    // the real candles; this only mutates the in-memory last bar + the chart series for display.
+    livePrice = ACTIVE.length ? ACTIVE[ACTIVE.length-1].close : null;   // seed from last close → no empty gap
+    positionLiveTag();
+    chart.subscribeCrosshairMove(function(){ positionLiveTag(); });
+    try{ chart.timeScale().subscribeVisibleLogicalRangeChange(function(){ positionLiveTag(); }); }catch(e){}
+    if(!liveTimer){ fetchLive(); liveTimer=setInterval(fetchLive, 5000); }
 
     // autoSize:true handles width from the container's ResizeObserver; relayout() snaps the
     // container to the available viewport height (dvh) and redistributes panes via stretch
@@ -2152,7 +2165,7 @@
   function relayout(){ if(!chart) return; var n=Object.keys(oscReg).length; var el=document.getElementById('wk-chart');
     var avail=availH(), minTotal=OSC_MIN*(PRICE_STRETCH+n);
     el.style.height=(n>0 ? Math.max(avail, minTotal) : avail)+'px';   // snap to screen; grow→scroll only if min won't fit
-    applyStretch(); positionTitles(); try{ requestAnimationFrame(positionTitles); }catch(e){} }
+    applyStretch(); positionTitles(); positionLiveTag(); try{ requestAnimationFrame(function(){ positionTitles(); positionLiveTag(); }); }catch(e){} }
   function lin(s){ try{ s.priceScale().applyOptions({mode:0,borderColor:'#1f2430',scaleMargins:{top:0.16,bottom:0.1}}); }catch(e){} }   // oscillator panes are LINEAR (chart log mode breaks MACD negatives)
   function addOsc(id){ if(oscReg[id]||!OSC[id]) return; var paneIdx=chart.panes().length; var built=OSC[id].build(paneIdx, oscCfg[id]); lin(built.series[0]);
     oscReg[id]={series:built.series, pane:chart.panes()[paneIdx], priceLines:built.priceLines, kind:id}; relayout(); }
@@ -2311,6 +2324,24 @@
   function buildActive(size){ var spec=CSPEC[size]||CSPEC['1D']; var cands=tierCache[spec.tier]||[]; return spec.kind==='intra' ? aggIntra(cands, spec.sec) : aggDay(cands, spec.grp); }
   function loadTier(tier, cb){ if(tierCache[tier]){ cb(tierCache[tier]); return; } fetch('/api/btc-candles?tier='+tier).then(function(r){return r.json();}).then(function(j){ tierCache[tier]=(j&&j.ok&&j.candles)?j.candles:[]; cb(tierCache[tier]); }).catch(function(){ tierCache[tier]=[]; cb([]); }); }
 
+  // ── Fase L: live BTC price (CoinGecko, client-side, 5s, fault-tolerant, display-only) ──────────
+  function fetchLive(){ if(!bodyEl.classList.contains('wk-b')) return;   // only poll while Screen B is showing
+    fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',{cache:'no-store'})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(j){ var p=j&&j.bitcoin&&j.bitcoin.usd; if(p&&isFinite(p)&&p>0){ livePrice=p; applyLive(); } })
+      .catch(function(){ /* network blip → keep last value, never break the chart */ }); }
+  function applyLive(){ if(livePrice==null||!area||!ACTIVE.length) return; var lb=ACTIVE[ACTIVE.length-1];
+    // develop the latest candle: close follows live; high/low expand if exceeded (the bar "breathes")
+    if(lb.high==null||livePrice>lb.high) lb.high=livePrice; if(lb.low==null||livePrice<lb.low) lb.low=livePrice; lb.close=livePrice; lb.value=livePrice;
+    try{ area.update({time:lb.time,value:livePrice}); }catch(e){}
+    try{ candle.update({time:lb.time,open:lb.open,high:lb.high,low:lb.low,close:livePrice}); }catch(e){}
+    positionLiveTag(); }
+  function positionLiveTag(){ if(!liveTag) liveTag=document.getElementById('wk-livetag'); if(!liveTag) return;
+    if(livePrice==null||!area){ liveTag.style.display='none'; return; }
+    var y=null; try{ y=area.priceToCoordinate(livePrice); }catch(e){}
+    if(y==null||!isFinite(y)){ liveTag.style.display='none'; return; }
+    liveTag.textContent=wkFmtPrice(livePrice); liveTag.style.top=y+'px'; liveTag.style.display='block'; }
+
   function rebuildPhase(){ try{ if(phasePrim) area.detachPrimitive(phasePrim); }catch(e){} phasesAttached=false; try{ phasePrim=makePhasePrimitive(buildRuns(ACTIVE)); if(ind.phases){ area.attachPrimitive(phasePrim); phasesAttached=true; } }catch(e){}
     try{ if(manipPrim) area.detachPrimitive(manipPrim); }catch(e){} manipAttached=false; try{ manipPrim=makeManipPrimitive(); if(layers.manip){ area.attachPrimitive(manipPrim); manipAttached=true; } }catch(e){} }
   function rebuildOpenOscillators(){ Object.keys(oscReg).forEach(function(id){ rebuildOsc(id); }); }
@@ -2336,6 +2367,7 @@
       try{ chart.applyOptions({timeScale:{timeVisible:intra, secondsVisible:false}}); }catch(e){}
       area.setData(ACTIVE.map(function(d){ return {time:d.time,value:d.close}; }));
       candle.setData(ACTIVE.map(function(d){ return {time:d.time,open:d.open,high:d.high,low:d.low,close:d.close}; }));
+      applyLive();   // re-develop the new last bar + reposition the live tag for this view
       updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators(); rebuildMaLayers();
       var lab=document.getElementById('wk-csLabel'); if(lab) lab.textContent=size;
       Array.prototype.forEach.call(document.querySelectorAll('.wk-cs-item'),function(it){ it.classList.toggle('on', it.dataset.cs===size); });
