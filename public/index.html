@@ -433,6 +433,12 @@
   .wk-ind-item .wk-csw{width:10px;height:10px;border-radius:2px;}
   .wk-ind-sep{height:1px;background:#1a3a44;margin:5px 8px;}
   .wk-ind-head{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#4f7780;padding:6px 10px 3px;}
+  /* phase-method selector (Estrutural active · Wyckoff placeholder) */
+  .wk-pm-row{display:flex;gap:6px;padding:2px 10px 6px 46px;}
+  .wk-pm{font-size:11px;font-weight:600;color:#7fa6ad;border:1px solid #1a3a44;background:rgba(45,212,191,.04);border-radius:999px;padding:5px 10px;cursor:pointer;line-height:1;display:inline-flex;align-items:center;gap:5px;}
+  .wk-pm.on{background:rgba(45,212,191,.16);border-color:rgba(45,212,191,.42);color:#5eead4;}
+  .wk-pm-soon{opacity:.55;cursor:not-allowed;}
+  .wk-pm-soon span{font-size:8px;letter-spacing:.05em;text-transform:uppercase;color:#4f7780;border:1px solid #1a3a44;border-radius:6px;padding:1px 4px;}
   .wk-spacer{flex:1;}
   .wk-ranges{display:flex;gap:5px;}
   .wk-rng{font-size:11px;color:#7fa6ad;padding:6px 9px;border-radius:999px;background:#0e242c;cursor:pointer;}
@@ -527,6 +533,10 @@
           <div class="wk-ind-menu" id="wk-indMenu">
             <div class="wk-ind-head">Detetor de ciclo</div>
             <div class="wk-ind-item on" data-ind="phases"><span class="wk-ind-radio"></span><span class="wk-nm">Fases do ciclo</span><span class="wk-csw" style="background:linear-gradient(90deg,#22c55e,#fb923c)"></span></div>
+            <div class="wk-pm-row" id="wk-pmRow">
+              <button class="wk-pm on" data-pm="structural">Estrutural</button>
+              <button class="wk-pm wk-pm-soon" data-pm="wyckoff" disabled title="Em breve — Wyckoff por eventos/volume">Wyckoff <span>em breve</span></button>
+            </div>
             <div class="wk-ind-item on" data-ind="halving"><span class="wk-ind-radio"></span><span class="wk-nm">Halvings</span><span class="wk-csw" style="background:#8a93a3"></span></div>
             <div class="wk-ind-sep"></div>
             <div class="wk-ind-head">Osciladores (painel próprio)</div>
@@ -1809,7 +1819,13 @@
   // phase only (no future). Indicators (Mayer/percentil/MAs/oscillators) stay purely visual.
   var PHC2={accumulation:'#c8a415', markup:'#22c55e', distribution:'#fb923c', markdown:'#ef4444', none:null};
   var PHEN={accumulation:'Accumulation', markup:'Markup', distribution:'Distribution', markdown:'Markdown'};
-  var ACC_EXIT=0.5, DIST_EXIT=0.25;
+  // Swing-structure sensitivity — the SINGLE knob for the lateral-zone width (ZigZag reversal %).
+  // Bigger ⇒ only larger swings count ⇒ wider Accumulation/Distribution ranges. Tune here only.
+  var SWING_PCT=0.28;
+  // Phase-detection method: 'structural' (functional swing algo) | 'wyckoff' (placeholder/future). Persisted.
+  function loadPhaseMode(){ try{ var m=sessionStorage.getItem('wk_phaseMode'); if(m==='structural'||m==='wyckoff') return m; }catch(e){} return 'structural'; }
+  var PHASE_MODE=loadPhaseMode();
+  function savePhaseMode(){ try{ sessionStorage.setItem('wk_phaseMode', PHASE_MODE); }catch(e){} }
   var ANCHOR={runs:[], dayPhase:{}, extremes:[], curPhase:null, manipRuns:[], prevHighNow:null};
   function computeAnchor(daily){
     var empty={runs:[],dayPhase:{},extremes:[],curPhase:null,manipRuns:[],prevHighNow:null};
@@ -1840,12 +1856,42 @@
     highs.forEach(function(hi,i){ ex.push({date:hi.date,price:hi.price,kind:'high',current:hi.current});
       if(i<highs.length-1){ var lo=minBetween(hi.date, highs[i+1].date); if(lo) ex.push({date:lo.date,price:lo.price,kind:'low'}); } });
     function idxGE(dt){ for(var i=0;i<dates.length;i++) if(dates[i]>=dt) return i; return dates.length-1; }
+    // ── STRUCTURAL (swing) segmentation ──────────────────────────────────────────
+    // Wyckoff grounding: Accumulation/Distribution are the LATERAL ranges hugging the extremes;
+    // Markup/Markdown are the DIRECTIONAL trends between them. Boundaries come from swing structure
+    // (a ZigZag pivot scan at SWING_PCT), never from fixed percentages or indicators.
+    function HH(b){ return b.h!=null?b.h:b.c; } function LL(b){ return b.l!=null?b.l:b.c; }
+    function zigzag(bars){ var piv=[],n=bars.length; if(n<2) return piv;
+      var hiP=HH(bars[0]),hiI=0, loP=LL(bars[0]),loI=0, dir=0;
+      for(var i=1;i<n;i++){ var hi=HH(bars[i]), lo=LL(bars[i]);
+        if(dir>=0){ if(hi>hiP){hiP=hi;hiI=i;} if(lo<=hiP*(1-SWING_PCT)){ piv.push({date:bars[hiI].t,price:hiP,type:'H'}); dir=-1; loP=lo; loI=i; continue; } }
+        if(dir<=0){ if(lo<loP){loP=lo;loI=i;} if(hi>=loP*(1+SWING_PCT)){ piv.push({date:bars[loI].t,price:loP,type:'L'}); dir=1; hiP=hi; hiI=i; continue; } }
+      }
+      return piv; }
+    function barsBetween(d0,d1){ var out=[]; for(var i=0;i<daily.length;i++){ var d=daily[i]; if(d.t<d0) continue; if(d.t>d1) break; out.push(d); } return out; }
+    function fracDate(seg,fr){ if(seg.length<3) return null; var j=Math.max(1,Math.min(seg.length-2,Math.round(seg.length*fr))); return seg[j].t; }
+    // The DIRECTIONAL trend (Markup / Markdown) is the sustained swing run into the next extreme; the
+    // LATERAL range (Accumulation / Distribution) is what precedes it. Markup = the longest unbroken
+    // higher-low sequence ending at the cycle high; Markdown = the longest lower-high sequence ending at
+    // the cycle low. FLOOR/CAP (12%–60% of the leg) keep BOTH the lateral and the trend visibly present
+    // even when the structure is lopsided — so each of the 4 blocks always exists and gets a label.
+    // Lateral (Accumulation/Distribution) width guards: at least LAT_DAYS (so the band is visible AND its
+    // label fits) or LAT_MIN of the leg, whichever is larger; never more than LAT_MAX of the leg (so the
+    // directional trend always dominates). Within those bounds the boundary sits on real swing structure.
+    var LAT_MIN=0.10, LAT_MAX=0.55, LAT_DAYS=120;
+    function legSplit(d0,d1,up){ var seg=barsBetween(d0,d1); if(seg.length<3) return null; var pv=zigzag(seg); var bnd=null,i;
+      if(up){ var lows=pv.filter(function(p){return p.type==='L';}); if(lows.length){ var s=lows.length-1; for(i=lows.length-1;i>0;i--){ if(lows[i-1].price<lows[i].price) s=i-1; else break; } bnd=lows[s].date; } }
+      else   { var his=pv.filter(function(p){return p.type==='H';}); if(his.length){ var t=his.length-1; for(i=his.length-1;i>0;i--){ if(his[i-1].price>his[i].price) t=i-1; else break; } bnd=his[t].date; } }
+      function addDays(n){ var lim=Date.parse(d0)+n*86400000; for(var j=0;j<seg.length;j++){ if(Date.parse(seg[j].t)>=lim) return seg[j].t; } return seg[seg.length-1].t; }
+      var capD=fracDate(seg,LAT_MAX); var floD=addDays(LAT_DAYS); var floPct=fracDate(seg,LAT_MIN); if(floPct&&floPct>floD) floD=floPct;
+      if(capD&&floD>capD) floD=capD;          // tiny legs: floor can't exceed the cap
+      if(!bnd) bnd=fracDate(seg,0.30);
+      if(floD&&bnd<floD) bnd=floD; if(capD&&bnd>capD) bnd=capD;
+      return bnd; }
     var runs=[];
-    for(var k=0;k<ex.length;k++){ var e=ex[k], nxt=ex[k+1]; var endDate=nxt?nxt.date:dates[dates.length-1]; var i0=idxGE(e.date), i1=idxGE(endDate), i, split;
-      if(e.kind==='high'){ split=null; for(i=i0;i<=i1;i++){ if(byd[dates[i]].c<=e.price*(1-DIST_EXIT)){ split=dates[i]; break; } }
-        if(split){ runs.push({from:e.date,to:split,phase:'distribution'}); runs.push({from:split,to:endDate,phase:'markdown'}); } else runs.push({from:e.date,to:endDate,phase:'distribution'}); }
-      else { split=null; for(i=i0;i<=i1;i++){ if(byd[dates[i]].c>=e.price*(1+ACC_EXIT)){ split=dates[i]; break; } }
-        if(split){ runs.push({from:e.date,to:split,phase:'accumulation'}); runs.push({from:split,to:endDate,phase:'markup'}); } else runs.push({from:e.date,to:endDate,phase:'accumulation'}); }
+    for(var k=0;k<ex.length;k++){ var e=ex[k], nxt=ex[k+1]; var endDate=nxt?nxt.date:dates[dates.length-1], b=legSplit(e.date,endDate,e.kind!=='high');
+      if(e.kind==='high'){ if(b&&b>e.date&&b<endDate){ runs.push({from:e.date,to:b,phase:'distribution'}); runs.push({from:b,to:endDate,phase:'markdown'}); } else runs.push({from:e.date,to:endDate,phase:'distribution'}); }
+      else { if(b&&b>e.date&&b<endDate){ runs.push({from:e.date,to:b,phase:'accumulation'}); runs.push({from:b,to:endDate,phase:'markup'}); } else runs.push({from:e.date,to:endDate,phase:'accumulation'}); }
     }
     var dayPhase={}; runs.forEach(function(r){ var i0=idxGE(r.from); for(var i=i0;i<dates.length && dates[i]<=r.to;i++) dayPhase[dates[i]]=r.phase; });
     var curPhase=dayPhase[dates[dates.length-1]]||null;
@@ -1874,7 +1920,10 @@
     var labels={ draw:function(target){ if(!ch||!ind.phases||isIntra()||layerAlpha.phases<=0.01) return; var ts=ch.timeScale();
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save(); ctx.globalAlpha=layerAlpha.phases;
         ctx.font='700 9px -apple-system,system-ui,sans-serif'; ctx.fillStyle='#000'; ctx.textBaseline='bottom'; ctx.textAlign='center';
-        runs.forEach(function(run){ if(!PHC2[run.p]) return; var x0=ts.timeToCoordinate(run.from), x1=ts.timeToCoordinate(run.to); if(x0==null)x0=0; if(x1==null)x1=W; var a=Math.max(0,x0), bx=Math.min(W,x1); if(bx-a<46) return; ctx.fillText(PHEN[run.p], (a+bx)/2, H-3); });
+        // two staggered baselines + per-row overlap guard: adjacent blocks land on alternating rows so a
+        // thin Accumulation/Distribution never collides with the wide Markup/Markdown beside it.
+        var lastR=[-1e9,-1e9];
+        runs.forEach(function(run,idx){ if(!PHC2[run.p]) return; var x0=ts.timeToCoordinate(run.from), x1=ts.timeToCoordinate(run.to); if(x0==null)x0=0; if(x1==null)x1=W; var a=Math.max(0,x0), bx=Math.min(W,x1); var w=bx-a; if(w<24) return; var cx=(a+bx)/2, tw=ctx.measureText(PHEN[run.p]).width, row=idx%2; if(cx-tw/2<lastR[row]+4) return; ctx.fillText(PHEN[run.p], cx, row===0?H-3:H-15); lastR[row]=cx+tw/2; });
         // cycle extremes
         ctx.textAlign='left'; ctx.textBaseline='middle';
         ANCHOR.extremes.forEach(function(e){ var y; try{ y=area.priceToCoordinate(e.price); }catch(_){ y=null; } if(y==null) return; var x; try{ x=ts.timeToCoordinate(e.date); }catch(_){ x=null; }
@@ -2348,6 +2397,12 @@
     Array.prototype.forEach.call(document.querySelectorAll('.wk-ind-item'),function(it){ it.onclick=function(){
       if(it.classList.contains('wk-cs-off')){ notify('Mayer / 200W / percentil só em velas ≥ 1D'); return; }   // daily-only, disabled at intraday
       var on=!it.classList.contains('on'); it.classList.toggle('on',on); toggleInd(it.dataset.ind,on); }; });
+    // phase-method selector: Estrutural is the only functional mode; Wyckoff is a disabled placeholder.
+    // Switching method only changes which algorithm paints the bands (the "Fases" toggle still owns the layer).
+    Array.prototype.forEach.call(document.querySelectorAll('.wk-pm'),function(pm){ pm.onclick=function(e){ e.stopPropagation();
+      if(pm.disabled || pm.classList.contains('wk-pm-soon')){ notify('Wyckoff (eventos/volume) — em breve'); return; }
+      var m=pm.dataset.pm; if(m===PHASE_MODE) return; PHASE_MODE=m; savePhaseMode();
+      Array.prototype.forEach.call(document.querySelectorAll('.wk-pm'),function(x){ x.classList.toggle('on', x.dataset.pm===m); }); }; });
     var perBtn=document.getElementById('wk-perBtn');
     perBtn.onclick=function(e){ e.stopPropagation(); csMenu.classList.remove('open'); perMenu.classList.toggle('open'); };
     document.addEventListener('click',function(e){ if(!e.target.closest('#wk-perBtn') && !e.target.closest('#wk-perMenu')) perMenu.classList.remove('open'); });
