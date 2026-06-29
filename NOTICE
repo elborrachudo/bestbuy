@@ -1,0 +1,22 @@
+WAKAWAKA / "Compro o quê?!" — third-party attribution
+======================================================
+
+Screen B charting (public/index.html) loads two third-party libraries from a CDN at
+runtime (buildless; they are NOT vendored/redistributed in this repository):
+
+1) TradingView Lightweight Charts™
+   - Source: https://github.com/tradingview/lightweight-charts (v5)
+   - License: Apache License 2.0
+   - © TradingView, Inc. Used under the terms of the Apache-2.0 license, which requires
+     attribution to TradingView. The on-chart attribution logo is intentionally disabled
+     in this private/internal tool; this NOTICE preserves the required attribution.
+
+2) lightweight-charts-drawing (drawing tools — Fase VII)
+   - Package: lightweight-charts-drawing@0.1.1 (deepentropy)
+   - License: MIT
+   - Loaded via CDN (unpkg) as a UMD bundle; `lightweight-charts` is its peer dependency,
+     so it operates on this app's existing v5 chart instance (no second copy).
+   - Note: at v0.1.1 the library renders/edits/persists drawings and handles selection +
+     anchor-dragging, but it does not implement interactive *creation* from the active tool;
+     the click-to-place-anchors creation flow is implemented in public/index.html on top of
+     the library's tool registry (createDrawing) + DrawingManager (addDrawing/export/import).

@@ -479,24 +479,24 @@
   .wk-per-item{font-size:12px;color:#a9c7cd;padding:7px 10px;border-radius:999px;cursor:pointer;text-align:center;}
   .wk-per-item:hover{background:rgba(45,212,191,.12);}
   .wk-per-item.on{background:rgba(45,212,191,.20);color:#5eead4;font-weight:600;}
-  /* ── Fase V (ajuste): minimal left bar = pencil handle that expands a stack; no-op until Fase VII ── */
+  /* ── Fase VII: drawing toolbar (6 parent groups + cursor/trash, flyout submenus) ── */
   .wk-stage{display:flex;align-items:stretch;}
-  .wk-drawbar{flex:0 0 36px;width:36px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#0a181d;border-right:1px solid #16323b;padding:6px 0;}
-  .wk-tool{flex:0 0 auto;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#80a8af;border-radius:8px;cursor:pointer;padding:0;}
+  .wk-drawbar{flex:0 0 36px;width:36px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#0a181d;border-right:1px solid #16323b;padding:6px 0;overflow:visible;}
+  .wk-tool{flex:0 0 auto;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#80a8af;border-radius:8px;cursor:pointer;padding:0;position:relative;}
   .wk-tool:hover{background:rgba(45,212,191,.12);color:#5eead4;}
   .wk-tool.on{background:rgba(45,212,191,.18);color:#5eead4;}
   .wk-tool svg{width:18px;height:18px;display:block;}
-  /* pencil/active handle */
-  .wk-draw-active{background:rgba(45,212,191,.08);}
-  .wk-draw-active.armed{background:rgba(45,212,191,.20);color:#5eead4;}
-  /* ease-out-cubic curve (matches the canvas easing engine) for the column grow/collapse */
-  .wk-drawstack{display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;overflow:hidden;max-height:0;opacity:0;transition:max-height .5s cubic-bezier(.215,.61,.355,1),opacity .3s ease;}
-  .wk-drawbar.open .wk-drawstack{opacity:1;}
-  .wk-draw-reset{flex:0 0 auto;width:26px;height:18px;display:none;align-items:center;justify-content:center;border:none;background:transparent;color:#5f8088;font-size:16px;line-height:1;cursor:pointer;border-radius:6px;padding:0;}
-  .wk-drawbar.has-active .wk-draw-reset{display:flex;}
-  .wk-draw-reset:hover{color:#5eead4;background:rgba(45,212,191,.12);}
-  @keyframes wk-pop{0%{transform:scale(.55);opacity:.15;}100%{transform:scale(1);opacity:1;}}
-  .wk-draw-active.swap svg{animation:wk-pop .5s cubic-bezier(.215,.61,.355,1);}
+  /* parent groups have a tiny corner caret to hint a submenu */
+  .wk-dgroup{position:relative;flex:0 0 auto;}
+  .wk-dparent::after{content:'';position:absolute;right:3px;bottom:3px;width:0;height:0;border-left:4px solid transparent;border-bottom:4px solid currentColor;opacity:.6;}
+  .wk-tool-sep{flex:0 0 auto;height:1px;width:18px;margin:3px auto;background:#16323b;}
+  /* flyout submenu — opens to the right of the bar */
+  .wk-dflyout{position:absolute;left:38px;top:0;z-index:9;display:none;flex-direction:column;gap:2px;background:#0e242c;border:1px solid #1a3a44;border-radius:10px;padding:4px;box-shadow:0 10px 30px rgba(0,0,0,.55);min-width:150px;}
+  .wk-dgroup.open .wk-dflyout{display:flex;}
+  .wk-dfly{display:flex;align-items:center;gap:9px;width:100%;border:none;background:transparent;color:#cdd5e0;border-radius:7px;padding:7px 9px;cursor:pointer;font-size:12px;text-align:left;white-space:nowrap;}
+  .wk-dfly:hover{background:rgba(45,212,191,.12);color:#5eead4;}
+  .wk-dfly.on{background:rgba(45,212,191,.2);color:#5eead4;}
+  .wk-dfly svg{width:17px;height:17px;flex:0 0 auto;}
   /* régua: top item of the mode-toggle pill — i.e. immediately above the line/candle toggle */
   .wk-mode-sep{height:1px;width:18px;margin:1px auto;background:#1a3a44;}
   .wk-rulertog svg{width:16px;height:16px;}
@@ -625,29 +625,10 @@
         </div>
       </div>
       <div class="wk-stage">
-        <!-- Fase V (ajuste): minimal left bar = a single pencil handle that expands the stack.
-             EASY TO PRUNE: each drawing tool is one <button> inside #wk-drawStack — delete the
-             line to drop it. The pencil (#wk-drawActive) is the neutral handle; the chosen tool's
-             icon replaces it when selected. Ruler lives by the mode toggle now; one of the two
-             identical arrows was removed (kept "arrow", removed the duplicate "ray"). No-op until Fase VII. -->
-        <div class="wk-drawbar" id="wk-drawbar" aria-label="Ferramentas de desenho">
-          <button class="wk-tool wk-draw-active" id="wk-drawActive" data-tool="pencil" title="Ferramentas de desenho" aria-label="Ferramentas de desenho"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 20l4-1 11-11-3-3L5 16z"/></svg></button>
-          <button class="wk-draw-reset" id="wk-drawReset" title="Repor (lápis)" aria-label="Repor ferramenta">×</button>
-          <div class="wk-drawstack" id="wk-drawStack">
-            <button class="wk-tool" data-tool="cursor" title="Cursor / seleção" aria-label="Cursor"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M5 3l14 8-5.6 1.4L16 19l-2.4 1-2.6-5.6L7 18z"/></svg></button>
-            <button class="wk-tool" data-tool="crosshair" title="Crosshair" aria-label="Crosshair"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
-            <button class="wk-tool" data-tool="trend" title="Linha de tendência" aria-label="Linha de tendência"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19L19 5"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></svg></button>
-            <button class="wk-tool" data-tool="hline" title="Linha horizontal" aria-label="Linha horizontal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18"/><circle cx="7" cy="12" r="1.7"/><circle cx="17" cy="12" r="1.7"/></svg></button>
-            <button class="wk-tool" data-tool="rect" title="Retângulo" aria-label="Retângulo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="6" width="16" height="12" rx="1"/></svg></button>
-            <button class="wk-tool" data-tool="text" title="Texto" aria-label="Texto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 5h14M12 5v14M9 19h6"/></svg></button>
-            <button class="wk-tool" data-tool="arrow" title="Seta" aria-label="Seta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19L19 5M12 5h7v7"/></svg></button>
-            <button class="wk-tool" data-tool="marker" title="Marcador" aria-label="Marcador"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></button>
-            <button class="wk-tool" data-tool="layers" title="Camadas" aria-label="Camadas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M3 13l9 5 9-5"/></svg></button>
-            <button class="wk-tool" data-tool="lock" title="Bloquear" aria-label="Bloquear"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></button>
-            <button class="wk-tool" data-tool="eye" title="Esconder / mostrar" aria-label="Esconder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
-            <button class="wk-tool" data-tool="trash" title="Apagar desenhos" aria-label="Apagar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg></button>
-          </div>
-        </div>
+        <!-- Fase VII: drawing toolbar built from JS (DRAW_TOOLS) and powered by the
+             lightweight-charts-drawing lib. 6 parent groups (Linhas/Rectangle/Fib/Previsão/Text/Brush)
+             + cursor + trash. Submenus (flyouts) open to the right. -->
+        <div class="wk-drawbar" id="wk-drawbar" aria-label="Ferramentas de desenho"></div>
         <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div><div class="wk-livetag" id="wk-livetag"></div>
         <div class="wk-modetog" id="wk-modetog">
           <button class="wk-mode-b wk-rulertog" id="wk-rulertog" title="Régua / medição" aria-label="Régua"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg></button>
@@ -666,34 +647,16 @@
   </div>
 </div>
 <script>
-  /* Fase V (ajuste): the left bar is a single pencil handle that expands a vertical stack of drawing
-     tools (column grows ~0.5s ease-out). Selecting a tool collapses the stack and that icon replaces
-     the pencil (becomes the active tool, animated pop). Reset to the neutral pencil via the × chip
-     (mobile) or the ESC key (desktop). Tools are visual-only / no-op until Fase VII. */
-  (function(){
-    var bar=document.getElementById('wk-drawbar'); if(!bar) return;
-    var active=document.getElementById('wk-drawActive'), stack=document.getElementById('wk-drawStack'), reset=document.getElementById('wk-drawReset');
-    if(!active||!stack) return;
-    var PENCIL=active.innerHTML, hinted=false;
-    function openStack(){ stack.style.maxHeight=stack.scrollHeight+'px'; bar.classList.add('open'); }
-    function closeStack(){ stack.style.maxHeight='0px'; bar.classList.remove('open'); }
-    function swap(html,tool){ active.classList.remove('swap'); void active.offsetWidth; active.innerHTML=html; active.setAttribute('data-tool',tool); active.classList.add('swap'); }
-    function toPencil(){ swap(PENCIL,'pencil'); active.classList.remove('armed'); bar.classList.remove('has-active'); }
-    active.addEventListener('click',function(){ if(bar.classList.contains('open')) closeStack(); else openStack(); });
-    stack.addEventListener('click',function(e){ var b=e.target.closest('.wk-tool'); if(!b) return;
-      var svg=b.querySelector('svg'); swap(svg?svg.outerHTML:'', b.getAttribute('data-tool'));
-      active.classList.add('armed'); bar.classList.add('has-active'); closeStack();
-      var t=document.getElementById('wk-toast');
-      if(t && !hinted){ hinted=true; t.textContent='Ferramentas de desenho chegam em breve'; t.classList.add('show'); clearTimeout(t._dh); t._dh=setTimeout(function(){ t.classList.remove('show'); },2200); } });
-    if(reset) reset.addEventListener('click',function(){ closeStack(); toPencil(); });
-    document.addEventListener('keydown',function(e){ if(e.key==='Escape' && (bar.classList.contains('open')||bar.classList.contains('has-active'))){ closeStack(); toPencil(); } });
-    // régua: own pill above the mode toggle — visual/no-op for now (real measuring is Fase VII)
-    var ruler=document.getElementById('wk-rulertog');
+  /* régua pill (above the mode toggle) — measurement is part of the drawing lib (future); no-op for now */
+  (function(){ var ruler=document.getElementById('wk-rulertog');
     if(ruler) ruler.addEventListener('click',function(){ ruler.classList.toggle('on');
       var t=document.getElementById('wk-toast'); if(t){ t.textContent='Régua chega em breve'; t.classList.add('show'); clearTimeout(t._dh); t._dh=setTimeout(function(){ t.classList.remove('show'); },2200); } });
   })();
 </script>
 <script src="https://unpkg.com/lightweight-charts@5/dist/lightweight-charts.standalone.production.js"></script>
+<!-- Fase VII: drawing tools (deepentropy lightweight-charts-drawing, MIT). Buildless UMD via CDN; uses
+     our existing v5 chart instance (lightweight-charts is its peerDependency, so no second copy). -->
+<script src="https://unpkg.com/lightweight-charts-drawing@0.1.1/dist/lightweight-charts-drawing.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
@@ -2171,6 +2134,8 @@
     try{ chart.timeScale().subscribeVisibleLogicalRangeChange(function(){ positionLiveTag(); }); }catch(e){}
     if(!liveTimer){ fetchLive(); liveTimer=setInterval(fetchLive, 5000); }
 
+    wireDrawing();   // Fase VII: attach the drawing manager + build the toolbar (no-op if the CDN didn't load)
+
     // autoSize:true handles width from the container's ResizeObserver; relayout() snaps the
     // container to the available viewport height (dvh) and redistributes panes via stretch
     // factors on rotation/resize so everything keeps fitting the screen.
@@ -2376,6 +2341,117 @@
     if(livePrice!=null) bp.textContent=Math.round(livePrice).toLocaleString('en-US');
     if(ch){ if(live24h==null){ ch.textContent=''; ch.className='wk-chg24'; }
       else { var up=live24h>=0; ch.textContent=(up?'+':'')+live24h.toFixed(2)+'%'; ch.className='wk-chg24 '+(up?'up':'down'); } } }
+
+  // ── Fase VII: drawing tools via lightweight-charts-drawing (CDN UMD). The lib renders/edits/persists
+  // the drawings; this layer builds the 6-parent toolbar and adds the click-to-place-anchors creation
+  // flow (the lib leaves creation to the host). If the CDN didn't load, the bar hides — nothing breaks.
+  var drawMgr=null, drawReg=null, drawTool=null, drawPending=[], drawSelId=null, DRAW_OK=false;
+  function dsvg(inner){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">'+inner+'</svg>'; }
+  var DI={
+    cursor:'<path d="M5 3l14 8-5.6 1.4L16 19l-2.4 1-2.6-5.6L7 18z" fill="currentColor" stroke="none"/>',
+    trash:'<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/>',
+    line:'<path d="M5 19L19 5"/><circle cx="5" cy="19" r="2" fill="currentColor" stroke="none"/><circle cx="19" cy="5" r="2" fill="currentColor" stroke="none"/>',
+    hline:'<path d="M3 12h18"/><circle cx="7" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="17" cy="12" r="1.5" fill="currentColor" stroke="none"/>',
+    hray:'<path d="M3 12h13M13 8l4 4-4 4"/>',
+    ray:'<path d="M5 19L16 8M11 8h6v6"/>',
+    vline:'<path d="M12 3v18"/><circle cx="12" cy="7" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="17" r="1.5" fill="currentColor" stroke="none"/>',
+    rect:'<rect x="4" y="6" width="16" height="12" rx="1"/>',
+    fib:'<path d="M4 6h16M4 11h16M4 16h16" stroke-width="1.6"/>',
+    fibret:'<path d="M4 6h16M4 10h16M4 14h16M4 18h16" stroke-width="1.5"/>',
+    fibext:'<path d="M4 7h16M4 12h16M4 17h16M8 4v16" stroke-width="1.5"/>',
+    fibchan:'<path d="M4 9l16-4M4 14l16-4M4 19l16-4" stroke-width="1.5"/>',
+    fcast:'<path d="M3 17l6-6 4 4 8-9"/>',
+    long:'<path d="M5 13h14M12 5v14M9 8l3-3 3 3"/>',
+    short:'<path d="M5 11h14M12 5v14M9 16l3 3 3-3"/>',
+    proj:'<path d="M4 18l6-4 4 2 6-7M14 9h6v6" stroke-dasharray="2.5 2.5"/>',
+    text:'<path d="M5 5h14M12 5v14M9 19h6"/>',
+    brush:'<path d="M4 20l4-1 11-11-3-3L5 16z"/>'
+  };
+  // SINGLE place to prune/extend the exposed tools (the lib loads ~67; the bar shows these 15 in 6 groups)
+  var DRAW_TOOLS=[
+    {label:'Linhas', icon:DI.line, variants:[
+      {id:'horizontal-line', label:'Linha horizontal', icon:DI.hline},
+      {id:'horizontal-ray', label:'Raio horizontal', icon:DI.hray},
+      {id:'trend-line', label:'Linha de tendência', icon:DI.line},
+      {id:'ray', label:'Raio', icon:DI.ray},
+      {id:'vertical-line', label:'Linha vertical', icon:DI.vline}
+    ]},
+    {id:'rectangle', label:'Retângulo', icon:DI.rect},
+    {label:'Fibonacci', icon:DI.fib, variants:[
+      {id:'fib-retracement', label:'Fib · Retração', icon:DI.fibret},
+      {id:'fib-extension', label:'Fib · Extensão', icon:DI.fibext},
+      {id:'fib-channel', label:'Fib · Canal', icon:DI.fibchan}
+    ]},
+    {label:'Previsão', icon:DI.fcast, variants:[
+      {id:'long-position', label:'Long Position', icon:DI.long},
+      {id:'short-position', label:'Short Position', icon:DI.short},
+      {id:'forecast', label:'Forecast', icon:DI.fcast},
+      {id:'projection', label:'Projeção', icon:DI.proj}
+    ]},
+    {id:'text-annotation', label:'Texto', icon:DI.text},
+    {id:'brush', label:'Brush', icon:DI.brush}
+  ];
+  function dtoast(m){ var t=document.getElementById('wk-toast'); if(!t) return; t.textContent=m; t.classList.add('show'); clearTimeout(t._dh); t._dh=setTimeout(function(){ t.classList.remove('show'); },1800); }
+  function closeFlyouts(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-dgroup.open'),function(g){ g.classList.remove('open'); }); }
+  function clearDrawActive(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-drawbar .wk-tool,#wk-drawbar .wk-dfly'),function(b){ b.classList.remove('on'); }); }
+  function exitDraw(){ drawTool=null; drawPending=[]; if(drawMgr){ try{ drawMgr.setActiveTool(null); }catch(e){} } clearDrawActive(); closeFlyouts();
+    var c=document.getElementById('wk-dCursor'); if(c) c.classList.add('on'); }
+  function activateTool(id, btn, parentBtn, parentHost){ if(!DRAW_OK) return; drawTool=id; drawPending=[]; try{ drawMgr.setActiveTool(id); }catch(e){}
+    clearDrawActive(); if(btn) btn.classList.add('on'); if(parentBtn) parentBtn.classList.add('on');
+    if(parentHost && btn){ var sv=btn.querySelector('svg'); if(sv) parentHost.innerHTML=sv.outerHTML; }   // parent remembers last-used icon
+    closeFlyouts();
+    var reg=drawReg&&drawReg.get(id); dtoast('Desenho: '+((reg&&reg.name)||id)+' — toca '+((reg&&reg.requiredAnchors)||1)+'×'); }
+  function buildDrawbar(){ var bar=document.getElementById('wk-drawbar'); if(!bar) return; bar.innerHTML='';
+    var cur=document.createElement('button'); cur.className='wk-tool on'; cur.id='wk-dCursor'; cur.title='Cursor / seleção'; cur.innerHTML=dsvg(DI.cursor);
+    cur.onclick=function(){ exitDraw(); }; bar.appendChild(cur);
+    DRAW_TOOLS.forEach(function(t){
+      if(t.variants){ var g=document.createElement('div'); g.className='wk-dgroup';
+        var p=document.createElement('button'); p.className='wk-tool wk-dparent'; p.title=t.label; var ph=document.createElement('span'); ph.style.display='contents'; ph.innerHTML=dsvg(t.icon); p.appendChild(ph);
+        var fly=document.createElement('div'); fly.className='wk-dflyout';
+        t.variants.forEach(function(v){ var b=document.createElement('button'); b.className='wk-dfly'; b.title=v.label; b.setAttribute('data-tool',v.id); b.innerHTML=dsvg(v.icon)+'<span>'+v.label+'</span>';
+          b.onclick=function(e){ e.stopPropagation(); activateTool(v.id, b, p, ph); }; fly.appendChild(b); });
+        p.onclick=function(e){ e.stopPropagation(); var wasOpen=g.classList.contains('open'); closeFlyouts(); if(!wasOpen) g.classList.add('open'); };
+        g.appendChild(p); g.appendChild(fly); bar.appendChild(g);
+      } else { var d=document.createElement('button'); d.className='wk-tool'; d.title=t.label; d.setAttribute('data-tool',t.id); d.innerHTML=dsvg(t.icon);
+        d.onclick=function(e){ e.stopPropagation(); activateTool(t.id, d, null, null); }; bar.appendChild(d); }
+    });
+    var sep=document.createElement('div'); sep.className='wk-tool-sep'; bar.appendChild(sep);
+    var tr=document.createElement('button'); tr.className='wk-tool'; tr.id='wk-dTrash'; tr.title='Apagar selecionado / todos'; tr.innerHTML=dsvg(DI.trash);
+    tr.onclick=function(e){ e.stopPropagation(); if(!drawMgr) return; if(drawSelId){ try{ drawMgr.removeDrawing(drawSelId); }catch(_){} drawSelId=null; } else { try{ drawMgr.clearAll(); }catch(_){} } saveDrawings(); };
+    bar.appendChild(tr);
+  }
+  function saveDrawings(){ if(!drawMgr) return; try{ localStorage.setItem('wk_drawings', JSON.stringify(drawMgr.exportDrawings())); }catch(e){} }
+  function loadDrawings(){ if(!drawMgr||!drawReg) return; try{ var raw=localStorage.getItem('wk_drawings'); if(!raw) return; var data=JSON.parse(raw); if(!data||!data.length) return;
+    drawMgr.importDrawings(data, function(type,d){ return drawReg.createDrawing(d.type, d.id, d.anchors, d.style, d.options); }); }catch(e){} }
+  function wireDrawing(){
+    var D=window.LightweightChartsDrawing;
+    var bar=document.getElementById('wk-drawbar');
+    if(!D || !chart || !area){ if(bar) bar.style.display='none'; return; }   // CDN failed → hide bar, never break the chart
+    try{ drawReg=D.getToolRegistry(); drawMgr=new D.DrawingManager(); drawMgr.attach(chart, area, document.getElementById('wk-chart')); DRAW_OK=true; }
+    catch(e){ if(bar) bar.style.display='none'; return; }
+    buildDrawbar(); loadDrawings();
+    try{ drawMgr.on('drawing:selected', function(ev){ drawSelId=ev&&ev.drawingId; });
+         drawMgr.on('drawing:deselected', function(){ drawSelId=null; });
+         drawMgr.on('drawing:updated', function(){ saveDrawings(); });
+         drawMgr.on('drawing:removed', function(){ saveDrawings(); });
+         drawMgr.on('drawing:cleared', function(){ saveDrawings(); }); }catch(e){}
+    // creation: each tap places one anchor (coords converted via the chart's scales — LOG aware). When the
+    // active tool's required-anchor count is reached, the drawing is created. Listening on the container's
+    // 'click' (which the browser suppresses after a drag) means panning never accidentally places anchors.
+    var chEl=document.getElementById('wk-chart'); var seq=0;
+    chEl.addEventListener('click', function(ev){ if(!drawTool) return; if(ev.target.closest('.wk-drawbar,.wk-modetog,.wk-legend,.wk-livetag,.wk-titles')) return;
+      var rect=chEl.getBoundingClientRect(), px=ev.clientX-rect.left, py=ev.clientY-rect.top;
+      var t=null,price=null; try{ t=chart.timeScale().coordinateToTime(px); }catch(e){} try{ price=area.coordinateToPrice(py); }catch(e){}
+      if(t==null || price==null) return;
+      drawPending.push({time:t, price:price});
+      var reg=drawReg.get(drawTool), need=(reg&&reg.requiredAnchors)||1;
+      if(drawPending.length>=need){ try{ var dr=drawReg.createDrawing(drawTool,'wkd_'+drawTool+'_'+(seq++)+'_'+px, drawPending.slice());
+          if(dr){ drawMgr.addDrawing(dr); saveDrawings(); } }catch(e){}
+        drawPending=[]; }   // tool stays active for repeated drawing; Cursor or ESC exits draw mode
+    });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape' && drawTool) exitDraw(); });
+    document.addEventListener('click', function(e){ if(!e.target.closest('.wk-dgroup')) closeFlyouts(); });
+  }
   var _measCtx=null;   // shared canvas for shrink-to-fit text measurement
   function measureTagPx(s,size){ if(!_measCtx) _measCtx=document.createElement('canvas').getContext('2d'); _measCtx.font='700 '+size+'px -apple-system,system-ui,sans-serif'; return _measCtx.measureText(s).width; }
   function positionLiveTag(){ if(!liveTag) liveTag=document.getElementById('wk-livetag'); if(!liveTag) return;
