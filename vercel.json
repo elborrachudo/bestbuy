@@ -10,7 +10,7 @@
     "api/cron-fetch.js": { "maxDuration": 300 },
     "api/cron-dominance.js": { "maxDuration": 300 },
     "api/backfill-dominance.js": { "maxDuration": 300 },
-    "api/import-market-history.js": { "maxDuration": 300, "includeFiles": "data/market_history.csv.gz" },
+    "api/import-btc-history.js": { "maxDuration": 300, "includeFiles": "data/market_history.csv.gz" },
     "api/import-btc-intraday.js": { "maxDuration": 300 },
     "api/backfill.js": { "maxDuration": 300 },
     "api/backfill-token.js": { "maxDuration": 300 },
