@@ -1820,7 +1820,7 @@
   var HALV_COLOR='#C8A415';
   var inited=false, chart=null, L=null, area=null, candle=null, ma=null, halvPrim=null, halvAttached=false, phasePrim=null, manipPrim=null, manipAttached=false;
   var DATA=null, byTime={}, isLog=true, mode='line';
-  var livePrice=null, live24h=null, liveTimer=null, liveTag=null;   // Fase L/T: live BTC price + 24h change (5s, display-only)
+  var livePrice=null, live24h=null, liveTimer=null, liveTag=null, livePrim=null;   // Fase L/T: live BTC price + 24h change (5s, display-only)
   var CLOSE=[], oscReg={};   // CLOSE: active close series · oscReg: id -> {series:[…],pane,priceLines:[…],kind}
   // ── candle-size tiers (price granularity) ─────────────────────────────────────
   // The price candles can be served at 12 resolutions from 3 stored tiers (daily=btc_history,
@@ -2224,7 +2224,8 @@
       grid:{vertLines:{color:'rgba(94,234,212,.05)'},horzLines:{color:'rgba(94,234,212,.05)'}},
       rightPriceScale:{borderColor:'#16323b',mode:1,entireTextOnly:true},
       timeScale:{borderColor:'#16323b',timeVisible:false,minBarSpacing:0.02,rightOffset:3,tickMarkFormatter:wkTick},
-      crosshair:{mode:1}, handleScroll:true, handleScale:true,
+      // crosshair: Normal mode (free, NO magnet/snap to candles — snap comes later) + faint 15% guides
+      crosshair:{mode:0, vertLine:{color:'rgba(94,234,212,.15)', width:1, style:0, labelBackgroundColor:'#16323b'}, horzLine:{color:'rgba(94,234,212,.15)', width:1, style:0, labelBackgroundColor:'#16323b'}}, handleScroll:true, handleScale:true,
       localization:{priceFormatter:wkFmtPrice,locale:'pt-PT'},
     });
     var lo=document.getElementById('wk-loading'); if(lo) lo.style.display='none';
@@ -2256,6 +2257,7 @@
     try{ halvPrim=makeHalvingPrimitive(); if(layers.halvings){ area.attachPrimitive(halvPrim); halvAttached=true; } }catch(e){}
     try{ manipPrim=makeManipPrimitive(); if(layers.manip){ area.attachPrimitive(manipPrim); manipAttached=true; } }catch(e){}
     try{ domPrim=makeDomPrimitive(); area.attachPrimitive(domPrim); domAttached=true; }catch(e){}   // Fase D: dominance markers (draw() no-ops until a metric is enabled)
+    try{ livePrim=makeLivePrimitive(); area.attachPrimitive(livePrim); }catch(e){}   // live-price dotted line (draws at the live level each tick)
     try{ crossPrim=makeCrossPrimitive(); area.attachPrimitive(crossPrim); }catch(e){}   // MA crossover circles + glow
 
     setMode(initialMode());
@@ -2425,6 +2427,14 @@
   // ── manipulation layer (Fase IV) — toggle "Manip." ────────────────────────────
   // Historical: white-10% vertical bands over every window where close < the previous cycle's high.
   // Current: white-10% horizontal band between today's price and that previous top + deviation %/USD.
+  // ── live-price line: a 1px teal dotted horizontal at the live level, from the right-axis tag across
+  //   to the forming candle. Redrawn every tick (LOG-aware via priceToCoordinate); above the grid. ──
+  function makeLivePrimitive(){ var ch=null;
+    var r={ draw:function(target){ if(!ch || livePrice==null || !area) return; var y; try{ y=area.priceToCoordinate(livePrice); }catch(e){ return; } if(y==null||!isFinite(y)) return;
+      target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width; ctx.save(); ctx.setLineDash([1.5,3]); ctx.lineWidth=1; ctx.strokeStyle='rgba(45,212,191,.85)';
+        var yy=Math.round(y)+0.5; ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(W,yy); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); }); } };
+    return { attached:function(p){ ch=p.chart; if(p.requestUpdate) primReqs.push(p.requestUpdate); }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'top'; }, renderer:function(){ return r; } } ]; } };
+  }
   function makeManipPrimitive(){ var ch=null;
     var r={ draw:function(target){ if(!ch || !layers.manip || isIntra() || layerAlpha.manip<=0.01) return; var ts=ch.timeScale(); var M=ANCHOR.manip; if(!M||!M.refHigh) return;
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save(); var a=layerAlpha.manip;
@@ -2721,7 +2731,7 @@
     if(lb.high==null||livePrice>lb.high) lb.high=livePrice; if(lb.low==null||livePrice<lb.low) lb.low=livePrice; lb.close=livePrice; lb.value=livePrice;
     try{ area.update({time:lb.time,value:livePrice}); }catch(e){}
     try{ candle.update({time:lb.time,open:lb.open,high:lb.high,low:lb.low,close:livePrice}); }catch(e){}
-    positionLiveTag(); updateQuote(); if(layers.manip) updateManipBox(); }
+    positionLiveTag(); updateQuote(); if(layers.manip) updateManipBox(); tickPrims(); }   // tickPrims → live-price line follows the new tick
   // Fase T: big headline price + 24h change in the top bar (green/red on the %)
   function updateQuote(){ var bp=document.getElementById('wk-bigprice'), ch=document.getElementById('wk-chg24'); if(!bp) return;
     if(livePrice!=null) bp.textContent=Math.round(livePrice).toLocaleString('en-US');
@@ -2968,10 +2978,14 @@
       var t=null,price=null; try{ t=chart.timeScale().coordinateToTime(c.px); }catch(e){} try{ price=area.coordinateToPrice(c.py); }catch(e){}
       if(t==null || price==null) return;
       drawPending.push({time:t, price:price});
-      var reg=drawReg.get(drawTool), need=(reg&&reg.requiredAnchors)||1;
+      var reg=drawReg.get(drawTool);
+      var need=(drawTool==='date-price-range')?2:((reg&&reg.requiredAnchors)||1);   // ruler always needs 2 points (don't depend on the registry for the hidden measurement tool)
       if(drawPending.length>=need){ try{ var nst=(LINE_TOOLS.indexOf(drawTool)>=0)?toolStyle(drawTool):undefined;   // new line inherits its tool's default style
           var nopts=(drawTool==='date-price-range')?{showPrices:true,showPercentage:true,showDays:true,showBars:false,filled:true}:undefined;   // ruler: show Δprice (%/$) + Δdays
-          var dr=drawReg.createDrawing(drawTool,'wkd_'+drawTool+'_'+(seq++)+'_'+c.px, drawPending.slice(), nst, nopts);
+          var nid='wkd_'+drawTool+'_'+(seq++)+'_'+c.px;
+          var dr=null; try{ dr=drawReg.createDrawing(drawTool, nid, drawPending.slice(), nst, nopts); }catch(_){}
+          // fallback: construct the measurement directly from the exported class if the registry can't make it
+          if(!dr && drawTool==='date-price-range'){ var D=window.LightweightChartsDrawing; if(D&&D.DatePriceRange){ try{ dr=new D.DatePriceRange(nid, drawPending.slice(), nst||{}, nopts); }catch(_){} } }
           if(dr){ drawMgr.addDrawing(dr);
             try{ if(drawMgr.selectDrawing){ drawMgr.selectDrawing(dr.id); drawSelId=dr.id; } }catch(e){}   // fixed → show its editable anchor handles
             saveDrawings(); } }catch(e){}
