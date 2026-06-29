@@ -491,6 +491,8 @@
   .wk-cyc-soon span{font-size:8.5px;text-transform:uppercase;letter-spacing:.5px;color:#46606a;border:1px solid #21424b;border-radius:5px;padding:1px 5px;flex:0 0 auto;}
   .wk-cycleoverlay{position:absolute;left:0;top:0;right:0;bottom:0;z-index:7;display:none;opacity:0;transition:opacity .5s ease;background:#0a1b21;}
   .wk-cycleoverlay.on{display:block;opacity:1;}
+  .wk-heatstrip{position:absolute;left:0;right:0;bottom:0;height:46px;z-index:6;display:none;opacity:0;transition:opacity .5s ease;}
+  .wk-heatstrip.on{display:block;opacity:1;}
   /* ── Fase VII: drawing toolbar (6 parent groups + cursor/trash, flyout submenus) ── */
   .wk-stage{display:flex;align-items:stretch;}
   .wk-drawbar{flex:0 0 36px;width:36px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#0a181d;border-right:1px solid #16323b;padding:6px 0;overflow:visible;}
@@ -676,10 +678,10 @@
               <button class="wk-layer" data-layer="phases" id="wk-cycBtn">Fases <span class="wk-per-caret">▾</span></button>
               <div class="wk-cyc-menu" id="wk-cycMenu">
                 <div class="wk-cyc-item" data-mode="overlap">Ciclos sobrepostos</div>
-                <div class="wk-cyc-item wk-cyc-soon" data-mode="clock">Relógio de ciclo <span>em breve</span></div>
+                <div class="wk-cyc-item" data-mode="clock">Relógio de ciclo</div>
                 <div class="wk-cyc-item" data-mode="bands">Bandas de fase</div>
-                <div class="wk-cyc-item wk-cyc-soon" data-mode="heatmap">Heatmap de fases <span>em breve</span></div>
-                <div class="wk-cyc-item wk-cyc-soon" data-mode="bars">Barras de duração <span>em breve</span></div>
+                <div class="wk-cyc-item" data-mode="heatmap">Heatmap de fases</div>
+                <div class="wk-cyc-item" data-mode="bars">Barras de duração</div>
               </div>
             </div>
             <button class="wk-layer" data-layer="halvings" title="Halvings"><span class="wk-hbtc">H₿</span></button>
@@ -694,7 +696,7 @@
              lightweight-charts-drawing lib. 6 parent groups (Linhas/Rectangle/Fib/Previsão/Text/Brush)
              + cursor + trash. Submenus (flyouts) open to the right. -->
         <div class="wk-drawbar" id="wk-drawbar" aria-label="Ferramentas de desenho"></div>
-        <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div><div class="wk-livetag" id="wk-livetag"></div><canvas class="wk-cycleoverlay" id="wk-cycleoverlay"></canvas>
+        <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div><div class="wk-livetag" id="wk-livetag"></div><canvas class="wk-cycleoverlay" id="wk-cycleoverlay"></canvas><canvas class="wk-heatstrip" id="wk-heatstrip"></canvas>
         <div class="wk-modetog" id="wk-modetog">
           <button class="wk-mode-b wk-rulertog" id="wk-rulertog" title="Régua / medição" aria-label="Régua"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg></button>
           <div class="wk-mode-sep"></div>
@@ -711,13 +713,6 @@
     <div class="wk-cfg-foot"><button id="wk-cfg-reset">Repor</button><button id="wk-cfg-apply">Aplicar</button></div>
   </div>
 </div>
-<script>
-  /* régua pill (above the mode toggle) — measurement is part of the drawing lib (future); no-op for now */
-  (function(){ var ruler=document.getElementById('wk-rulertog');
-    if(ruler) ruler.addEventListener('click',function(){ ruler.classList.toggle('on');
-      var t=document.getElementById('wk-toast'); if(t){ t.textContent='Régua chega em breve'; t.classList.add('show'); clearTimeout(t._dh); t._dh=setTimeout(function(){ t.classList.remove('show'); },2200); } });
-  })();
-</script>
 <script src="https://unpkg.com/lightweight-charts@5/dist/lightweight-charts.standalone.production.js"></script>
 <!-- Fase VII: drawing tools (deepentropy lightweight-charts-drawing, MIT). Buildless UMD via CDN; uses
      our existing v5 chart instance (lightweight-charts is its peerDependency, so no second copy). -->
@@ -2485,50 +2480,90 @@
     var ref=comp.length?comp.reduce(function(a,b){return a+b;},0)/comp.length:1460;
     cyc.forEach(function(c){ c.norm=c.incomplete?ref:c.span; });
     return cyc; }
-  var cycOv=null, cycRO=null;
-  function drawCycleOverlay(){ var cv=document.getElementById('wk-cycleoverlay'); if(!cv) return; var host=document.getElementById('wk-chart'); if(!host) return;
-    var W=host.clientWidth, H=host.clientHeight, dpr=window.devicePixelRatio||1; cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
-    var ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle='#0a1b21'; ctx.fillRect(0,0,W,H);
-    if(!cycCache) cycCache=buildCycles(); var cyc=cycCache; if(!cyc.length){ return; }
+  var cycRO=null, CYC_F='-apple-system,system-ui,sans-serif', CYC_REPLACE=['overlap','clock','bars'];
+  function cdd(a,c){ return (Date.parse(c)-Date.parse(a))/86400000; }
+  var PHASE_ORDER=['accumulation','markup','distribution','markdown'];
+  // ─ mode 1: overlapping normalized cycles (built earlier) ─
+  function drawOverlap(ctx,W,H){ if(!cycCache) cycCache=buildCycles(); var cyc=cycCache; if(!cyc.length) return;
     var padL=12, padR=52, padT=46, padB=34;
-    var maxM=1; cyc.forEach(function(c){ if(c.peak>maxM) maxM=c.peak; }); maxM*=1.08;
-    var lminL=0, lmaxL=Math.log10(maxM);   // Y: log10 of the multiple (base ×1 at the bottom)
+    var maxM=1; cyc.forEach(function(c){ if(c.peak>maxM) maxM=c.peak; }); maxM*=1.08; var lmaxL=Math.log10(maxM);
     function xOf(p){ return padL + p*(W-padL-padR); }
-    function yOf(m){ var lp=Math.log10(Math.max(1,m)); return padT + (1-(lp-lminL)/(lmaxL-lminL||1))*(H-padT-padB); }
-    // Y gridlines at nice multiples
-    var ticks=[1,2,3,5,10,20,30,50,100,200,300,500,1000]; ctx.font='10px -apple-system,system-ui,sans-serif'; ctx.textBaseline='middle';
+    function yOf(m){ var lp=Math.log10(Math.max(1,m)); return padT + (1-lp/(lmaxL||1))*(H-padT-padB); }
+    var ticks=[1,2,3,5,10,20,30,50,100,200,300,500,1000]; ctx.font='10px '+CYC_F; ctx.textBaseline='middle';
     ticks.forEach(function(m){ if(m>maxM) return; var y=yOf(m); ctx.strokeStyle='rgba(94,234,212,.07)'; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
       ctx.fillStyle='#5b8a90'; ctx.textAlign='left'; ctx.fillText('×'+m, W-padR+5, y); });
-    // X gridlines (cycle progress)
     ctx.textAlign='center'; ctx.textBaseline='top'; [0,0.25,0.5,0.75,1].forEach(function(p){ var x=xOf(p); ctx.strokeStyle='rgba(94,234,212,.06)'; ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,H-padB); ctx.stroke();
       ctx.fillStyle='#5b8a90'; ctx.fillText(Math.round(p*100)+'%', x, H-padB+6); });
     ctx.fillStyle='#6b9298'; ctx.textAlign='right'; ctx.fillText('progresso do ciclo →', W-padR, H-padB+18);
-    // one polyline per cycle
     cyc.forEach(function(c,ci){ var col=CYC_COLORS[ci%CYC_COLORS.length]; ctx.strokeStyle=col; ctx.lineWidth=c.incomplete?2.4:1.6; ctx.globalAlpha=c.incomplete?1:0.92;
       ctx.beginPath(); var started=false; c.seg.forEach(function(p){ var px=xOf(Math.min(1,c.dd(c.startD,p.t)/c.norm)), py=yOf(p.c/c.base); if(!started){ ctx.moveTo(px,py); started=true; } else ctx.lineTo(px,py); }); ctx.stroke();
-      // endpoint dot for the (incomplete) current cycle
       if(c.incomplete){ var lp=c.seg[c.seg.length-1]; var ex=xOf(Math.min(1,c.dd(c.startD,lp.t)/c.norm)), ey=yOf(lp.c/c.base); ctx.globalAlpha=1; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(ex,ey,3.4,0,6.2832); ctx.fill(); } });
     ctx.globalAlpha=1;
-    // title + legend (top-left)
-    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#cfe7ec'; ctx.font='700 12px -apple-system,system-ui,sans-serif'; ctx.fillText('Ciclos sobrepostos · múltiplo desde o fundo (log)', padL, 18);
-    ctx.font='11px -apple-system,system-ui,sans-serif'; var lx=padL, ly=34;
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#cfe7ec'; ctx.font='700 12px '+CYC_F; ctx.fillText('Ciclos sobrepostos · múltiplo desde o fundo (log)', padL, 18);
+    ctx.font='11px '+CYC_F; var lx=padL, ly=34;
     cyc.forEach(function(c,ci){ var col=CYC_COLORS[ci%CYC_COLORS.length]; var txt=c.label+'  ×'+(c.peak>=10?Math.round(c.peak):c.peak.toFixed(1));
       var tw=ctx.measureText(txt).width+20; if(lx+tw>W-padR){ lx=padL; ly+=15; }
       ctx.fillStyle=col; ctx.fillRect(lx,ly-8,10,3); ctx.fillStyle=c.incomplete?'#dbeee9':'#9bbcc2'; ctx.fillText(txt, lx+14, ly); lx+=tw; }); }
-  function showCycleOverlay(){ var cv=document.getElementById('wk-cycleoverlay'); if(!cv) return; cycCache=buildCycles(); cv.style.display='block'; drawCycleOverlay(); requestAnimationFrame(function(){ cv.classList.add('on'); });
-    if(!cycRO && window.ResizeObserver){ try{ cycRO=new ResizeObserver(function(){ if(cycMode==='overlap') drawCycleOverlay(); }); cycRO.observe(document.getElementById('wk-chart')); }catch(e){} } }
-  function hideCycleOverlay(){ var cv=document.getElementById('wk-cycleoverlay'); if(!cv) return; cv.classList.remove('on'); setTimeout(function(){ if(cycMode!=='overlap') cv.style.display='none'; }, 520); }
+  // ─ mode 2: cycle clock (4 phases as quadrants + pointer at the current phase) ─
+  function drawClock(ctx,W,H){ var cx=W/2, cy=H/2+8, R=Math.min(W,H)*0.30;
+    var cur=ANCHOR&&ANCHOR.curPhase?ANCHOR.curPhase:'markdown';
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#cfe7ec'; ctx.font='700 13px '+CYC_F; ctx.fillText('Relógio de ciclo', cx, cy-R-30);
+    PHASE_ORDER.forEach(function(ph,i){ var a0=-Math.PI/2 + i*Math.PI/2, a1=a0+Math.PI/2, rgb=hexRgb(PHC2[ph]);
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,R,a0,a1); ctx.closePath();
+      ctx.fillStyle='rgba('+rgb+','+(ph===cur?0.34:0.15)+')'; ctx.fill(); ctx.strokeStyle='rgba('+rgb+',.55)'; ctx.lineWidth=1.2; ctx.stroke();
+      var am=(a0+a1)/2, lx=cx+Math.cos(am)*R*0.64, ly=cy+Math.sin(am)*R*0.64; ctx.fillStyle=PHC2[ph]; ctx.font='700 12px '+CYC_F; ctx.textBaseline='middle'; ctx.fillText(PHEN[ph], lx, ly); });
+    var idx=PHASE_ORDER.indexOf(cur); if(idx<0) idx=3; var pa=-Math.PI/2 + idx*Math.PI/2 + Math.PI/4;
+    ctx.strokeStyle='#e9f5f4'; ctx.lineWidth=3; ctx.lineCap='round'; ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(cx+Math.cos(pa)*R*0.86, cy+Math.sin(pa)*R*0.86); ctx.stroke(); ctx.lineCap='butt';
+    ctx.fillStyle='#e9f5f4'; ctx.beginPath(); ctx.arc(cx,cy,4.5,0,6.2832); ctx.fill();
+    ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.fillStyle=PHC2[cur]; ctx.font='700 15px '+CYC_F; ctx.fillText('agora: '+PHEN[cur], cx, cy+R+38); }
+  // ─ mode 3: duration bars (each cycle = horizontal bar segmented by phase, proportional to days) ─
+  function drawBars(ctx,W,H){ if(!cycCache) cycCache=buildCycles(); var cyc=cycCache; if(!cyc.length||!ANCHOR||!ANCHOR.runs) return;
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#cfe7ec'; ctx.font='700 12px '+CYC_F; ctx.fillText('Barras de duração · fases por ciclo (dias)', 12, 18);
+    var padL=88, padR=14, padT=40, padB=30, n=cyc.length, gap=12, rowH=Math.min(50,(H-padT-padB-(n-1)*gap)/n);
+    cyc.forEach(function(c,ci){ var y=padT+ci*(rowH+gap), dur={}; PHASE_ORDER.forEach(function(p){dur[p]=0;});
+      ANCHOR.runs.forEach(function(r){ if(dur[r.phase]==null) return; var f=r.from>c.startD?r.from:c.startD, t=r.to<c.endD?r.to:c.endD; if(t>f) dur[r.phase]+=cdd(f,t); });
+      var total=PHASE_ORDER.reduce(function(s,p){return s+dur[p];},0)||1;
+      ctx.fillStyle=c.incomplete?'#dbeee9':'#9bbcc2'; ctx.font=(c.incomplete?'700 ':'')+'12px '+CYC_F; ctx.textAlign='right'; ctx.textBaseline='middle'; ctx.fillText(c.label, padL-10, y+rowH/2);
+      var x=padL, barW=W-padL-padR;
+      PHASE_ORDER.forEach(function(p){ var w=barW*dur[p]/total; if(w<=0) return; ctx.fillStyle='rgba('+hexRgb(PHC2[p])+',.88)'; ctx.fillRect(x,y,w,rowH);
+        if(w>30){ ctx.fillStyle='#0a1b21'; ctx.font='700 10px '+CYC_F; ctx.textAlign='center'; ctx.fillText(Math.round(dur[p])+'d', x+w/2, y+rowH/2); } x+=w; }); });
+    // legend
+    var lx=12, ly=H-12; ctx.textBaseline='middle'; ctx.font='10px '+CYC_F; PHASE_ORDER.forEach(function(p){ ctx.fillStyle=PHC2[p]; ctx.fillRect(lx,ly-5,10,10); ctx.fillStyle='#9bbcc2'; ctx.textAlign='left'; ctx.fillText(PHEN[p], lx+14, ly); lx+=ctx.measureText(PHEN[p]).width+30; }); }
+  function drawCycleOverlay(){ var cv=document.getElementById('wk-cycleoverlay'); if(!cv) return; var host=document.getElementById('wk-chart'); if(!host) return;
+    var W=host.clientWidth, H=host.clientHeight, dpr=window.devicePixelRatio||1; cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+    var ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle='#0a1b21'; ctx.fillRect(0,0,W,H);
+    if(cycMode==='clock') drawClock(ctx,W,H); else if(cycMode==='bars') drawBars(ctx,W,H); else drawOverlap(ctx,W,H); }
+  // ─ mode 4: phase heatmap strip (additive — the price chart stays visible above) ─
+  function drawHeatStrip(){ var cv=document.getElementById('wk-heatstrip'); if(!cv) return; var host=document.getElementById('wk-chart'); if(!host) return;
+    var W=host.clientWidth, H=46, dpr=window.devicePixelRatio||1; cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+    var ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H);
+    var daily=tierCache.daily; if(!daily||!daily.length||!ANCHOR||!ANCHOR.runs) return;
+    var first=daily[0].t, last=daily[daily.length-1].t, span=cdd(first,last)||1, ribY=20, ribH=18;
+    ctx.fillStyle='rgba(8,20,25,.94)'; ctx.fillRect(0,0,W,H);
+    ANCHOR.runs.forEach(function(r){ var c=PHC2[r.phase]; if(!c) return; var x0=cdd(first,r.from)/span*W, x1=cdd(first,r.to)/span*W; ctx.fillStyle=c; ctx.fillRect(x0,ribY,Math.max(1,x1-x0),ribH); });
+    ctx.fillStyle='#6b9298'; ctx.font='9px '+CYC_F; ctx.textAlign='center'; ctx.textBaseline='top';
+    for(var yy=2012;yy<=+last.slice(0,4);yy+=2){ var x=cdd(first,yy+'-01-01')/span*W; if(x<2||x>W-2) continue; ctx.fillText(String(yy), x, ribY+ribH+1); }
+    ctx.textBaseline='middle'; var lx=6; PHASE_ORDER.forEach(function(p){ ctx.fillStyle=PHC2[p]; ctx.fillRect(lx,6,9,9); ctx.fillStyle='#9bbcc2'; ctx.textAlign='left'; ctx.font='9px '+CYC_F; ctx.fillText(PHEN[p], lx+12, 11); lx+=ctx.measureText(PHEN[p]).width+26; }); }
+  function ensureCycRO(){ if(cycRO||!window.ResizeObserver) return; try{ cycRO=new ResizeObserver(function(){ if(CYC_REPLACE.indexOf(cycMode)>=0) drawCycleOverlay(); else if(cycMode==='heatmap') drawHeatStrip(); }); cycRO.observe(document.getElementById('wk-chart')); }catch(e){} }
+  function showCycleOverlay(){ var cv=document.getElementById('wk-cycleoverlay'); if(!cv) return; if(cycMode==='overlap'||cycMode==='bars') cycCache=buildCycles(); cv.style.display='block'; drawCycleOverlay(); requestAnimationFrame(function(){ cv.classList.add('on'); }); ensureCycRO(); }
+  function hideCycleOverlay(){ var cv=document.getElementById('wk-cycleoverlay'); if(!cv) return; cv.classList.remove('on'); setTimeout(function(){ if(CYC_REPLACE.indexOf(cycMode)<0) cv.style.display='none'; }, 520); }
+  function showHeatStrip(){ var cv=document.getElementById('wk-heatstrip'); if(!cv) return; cv.style.display='block'; drawHeatStrip(); requestAnimationFrame(function(){ cv.classList.add('on'); }); ensureCycRO(); }
+  function hideHeatStrip(){ var cv=document.getElementById('wk-heatstrip'); if(!cv) return; cv.classList.remove('on'); setTimeout(function(){ if(cycMode!=='heatmap') cv.style.display='none'; }, 520); }
   function setCycMode(mode){
-    if(cycMode==='overlap' && mode!=='overlap') hideCycleOverlay();
+    var wasRep=CYC_REPLACE.indexOf(cycMode)>=0, willRep=CYC_REPLACE.indexOf(mode)>=0;
+    if(wasRep && !willRep) hideCycleOverlay();
+    if(cycMode==='heatmap' && mode!=='heatmap') hideHeatStrip();
     if(cycMode==='bands' && mode!=='bands') setPhases(false);
     cycMode=mode||'';
     if(cycMode==='bands') setPhases(true);
-    else if(cycMode==='overlap'){ if(layers.phases) setPhases(false); showCycleOverlay(); }
+    else if(willRep){ if(layers.phases) setPhases(false); showCycleOverlay(); }
+    else if(cycMode==='heatmap'){ showHeatStrip(); }
     try{ sessionStorage.setItem('wk_cycmode', cycMode); }catch(e){}
     updateCycUI(); }
   function updateCycUI(){ var btn=document.getElementById('wk-cycBtn'); if(btn) btn.classList.toggle('on', !!cycMode);
     Array.prototype.forEach.call(document.querySelectorAll('#wk-cycMenu .wk-cyc-item'), function(it){ it.classList.toggle('on', it.dataset.mode===cycMode); }); }
   function toggleCycMenu(force){ var m=document.getElementById('wk-cycMenu'); if(!m) return; var open=(force!=null)?force:!m.classList.contains('open'); m.classList.toggle('open', open); }
+  var CYC_MODES=['overlap','clock','bands','heatmap','bars'];
   function wireCycMenu(){ var m=document.getElementById('wk-cycMenu'); if(!m) return;
     Array.prototype.forEach.call(m.querySelectorAll('.wk-cyc-item'), function(it){ it.onclick=function(e){ e.stopPropagation();
       if(it.classList.contains('wk-cyc-soon')){ notify('"'+it.textContent.replace('em breve','').trim()+'" chega numa fase futura'); return; }
@@ -2537,7 +2572,7 @@
     document.addEventListener('keydown', function(e){ if(e.key==='Escape') toggleCycMenu(false); });
   }
   function initCycMode(){ wireCycMenu(); var saved=''; try{ saved=sessionStorage.getItem('wk_cycmode')||''; }catch(e){}
-    if(saved==='overlap'||saved==='bands') setCycMode(saved); else { cycMode=''; updateCycUI(); } }
+    if(CYC_MODES.indexOf(saved)>=0) setCycMode(saved); else { cycMode=''; updateCycUI(); } }
 
   // ── candle-size tiers: load tier · aggregate OHLC on the fly · apply ───────────
   function isIntra(){ return CSPEC[CSIZE] && CSPEC[CSIZE].kind==='intra'; }
@@ -2644,9 +2679,14 @@
   function closeFlyouts(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-dgroup.open'),function(g){ g.classList.remove('open'); }); }
   function clearDrawActive(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-drawbar .wk-tool,#wk-drawbar .wk-dfly'),function(b){ b.classList.remove('on'); }); }
   function setChartNav(on){ if(!chart) return; try{ chart.applyOptions({handleScroll:on, handleScale:on}); }catch(e){} }
-  function exitDraw(){ drawTool=null; drawPending=[]; try{ clearPrev(); }catch(e){} setChartNav(true); if(drawMgr){ try{ drawMgr.setActiveTool(null); }catch(e){} } clearDrawActive(); closeFlyouts();
+  function clearRulerBtn(){ var r=document.getElementById('wk-rulertog'); if(r) r.classList.remove('on'); }
+  function exitDraw(){ drawTool=null; drawPending=[]; try{ clearPrev(); }catch(e){} setChartNav(true); clearRulerBtn(); if(drawMgr){ try{ drawMgr.setActiveTool(null); }catch(e){} } clearDrawActive(); closeFlyouts();
     var c=document.getElementById('wk-dCursor'); if(c) c.classList.add('on'); }
-  function activateTool(id, btn, parentBtn, parentHost){ if(!DRAW_OK) return; drawTool=id; drawPending=[]; try{ clearPrev(); }catch(e){} setChartNav(false);   // while a tool is active, drag draws (not pans) so the live ghost tracks cleanly
+  // ruler = the lib's DatePriceRange measurement tool (2 anchors → Δtime in days + Δprice in % and $)
+  function activateRuler(){ if(!DRAW_OK) return; drawTool='date-price-range'; drawPending=[]; try{ clearPrev(); }catch(e){} setChartNav(false);
+    try{ drawMgr.setActiveTool('date-price-range'); }catch(e){} clearDrawActive(); var c=document.getElementById('wk-dCursor'); if(c) c.classList.remove('on');
+    var r=document.getElementById('wk-rulertog'); if(r) r.classList.add('on'); dtoast('Régua — toca 2 pontos'); }
+  function activateTool(id, btn, parentBtn, parentHost){ if(!DRAW_OK) return; drawTool=id; drawPending=[]; try{ clearPrev(); }catch(e){} setChartNav(false); clearRulerBtn();   // while a tool is active, drag draws (not pans) so the live ghost tracks cleanly
     try{ drawMgr.setActiveTool(id); }catch(e){}
     clearDrawActive(); if(btn) btn.classList.add('on'); if(parentBtn) parentBtn.classList.add('on');
     if(parentHost && btn){ var sv=btn.querySelector('svg'); if(sv) parentHost.innerHTML=sv.outerHTML; }   // parent remembers last-used icon
@@ -2705,7 +2745,7 @@
   function clearPrev(){ if(prevCtx&&prevCanvas) prevCtx.clearRect(0,0,prevCanvas.width,prevCanvas.height); }
   function anchorPx(a){ var x=null,y=null; try{ x=chart.timeScale().timeToCoordinate(a.time); }catch(e){} try{ y=area.priceToCoordinate(a.price); }catch(e){} return (x==null||y==null||!isFinite(x)||!isFinite(y))?null:{x:x,y:y}; }
   function previewKind(id){
-    if(id==='rectangle'||id==='fib-retracement'||id==='long-position'||id==='short-position') return 'rect';
+    if(id==='rectangle'||id==='fib-retracement'||id==='long-position'||id==='short-position'||id==='date-price-range') return 'rect';
     if(id==='horizontal-line') return 'hline';
     if(id==='horizontal-ray') return 'hray';
     if(id==='vertical-line') return 'vline';
@@ -2813,7 +2853,8 @@
       drawPending.push({time:t, price:price});
       var reg=drawReg.get(drawTool), need=(reg&&reg.requiredAnchors)||1;
       if(drawPending.length>=need){ try{ var nst=(LINE_TOOLS.indexOf(drawTool)>=0)?toolStyle(drawTool):undefined;   // new line inherits its tool's default style
-          var dr=drawReg.createDrawing(drawTool,'wkd_'+drawTool+'_'+(seq++)+'_'+c.px, drawPending.slice(), nst);
+          var nopts=(drawTool==='date-price-range')?{showPrices:true,showPercentage:true,showDays:true,showBars:false,filled:true}:undefined;   // ruler: show Δprice (%/$) + Δdays
+          var dr=drawReg.createDrawing(drawTool,'wkd_'+drawTool+'_'+(seq++)+'_'+c.px, drawPending.slice(), nst, nopts);
           if(dr){ drawMgr.addDrawing(dr);
             try{ if(drawMgr.selectDrawing){ drawMgr.selectDrawing(dr.id); drawSelId=dr.id; } }catch(e){}   // fixed → show its editable anchor handles
             saveDrawings(); } }catch(e){}
@@ -2833,6 +2874,10 @@
     chEl.addEventListener('touchmove', function(ev){ if(!drawTool||!tStart||ev.touches.length!==1) return; var p=ev.touches[0]; var c=toPx(p.clientX,p.clientY); drawPreview(c.px,c.py); ev.preventDefault(); }, {passive:false});
     chEl.addEventListener('touchend', function(ev){ if(!drawTool || !tStart) return; var p=ev.changedTouches[0];
       placeAnchorAt(p.clientX, p.clientY, ev.target); lastTouchPlace=Date.now(); tStart=null; ev.preventDefault(); }, {passive:false});
+    // ruler pill (above the mode toggle) → the lib's DatePriceRange measurement tool (toggle on/off)
+    var rulerBtn=document.getElementById('wk-rulertog');
+    if(rulerBtn) rulerBtn.addEventListener('click', function(){ if(!DRAW_OK){ notify('Régua indisponível (lib não carregou)'); return; }
+      if(drawTool==='date-price-range'){ exitDraw(); } else activateRuler(); });
     // double-click (desktop) on a line drawing → open its per-tool style panel (only when no tool is active)
     chEl.addEventListener('dblclick', function(ev){ if(drawTool||onUI(ev.target)) return; styleFromPoint(ev.clientX, ev.clientY); });
     // double-TAP (mobile) on a line drawing → same panel (cursor mode only)
