@@ -444,7 +444,7 @@
     .wk-topbar{flex-direction:row;flex-wrap:nowrap;align-items:center;gap:8px;overflow:visible;}
     .wk-tb1,.wk-tb2,.wk-tb2-left,.wk-tb2-right{display:contents;}
     .wk-pairwrap{order:1;} .wk-cs-wrap{order:2;} .wk-per-wrap:not(.wk-cs-wrap){order:3;} .wk-ind-wrap{order:4;} .wk-scaletoggle{order:5;}
-    .wk-tb2-right .wk-layer{order:6;} .wk-tb2-right .wk-layer:first-child{margin-left:auto;}
+    .wk-tb2-right .wk-layer{order:6;} .wk-tb2-right .wk-cyc-wrap{order:6;margin-left:auto;}
     .wk-phasetag{order:7;} .wk-quote{order:8;margin-left:6px;}
   }
   .wk-ind-wrap{position:relative;}
@@ -479,6 +479,18 @@
   .wk-per-item{font-size:12px;color:#a9c7cd;padding:7px 10px;border-radius:999px;cursor:pointer;text-align:center;}
   .wk-per-item:hover{background:rgba(45,212,191,.12);}
   .wk-per-item.on{background:rgba(45,212,191,.20);color:#5eead4;font-weight:600;}
+  /* cycle-visualization dropdown (on the "Fases" button) + overlapping-cycles overlay */
+  .wk-cyc-wrap{position:relative;display:inline-flex;}
+  .wk-cyc-menu{position:absolute;top:32px;right:0;z-index:31;width:188px;background:#0e242c;border:1px solid #1a3a44;border-radius:12px;padding:5px;box-shadow:0 14px 44px rgba(0,0,0,.6);display:none;opacity:0;transform:translateY(-6px);transition:opacity .26s ease,transform .26s ease;}
+  .wk-cyc-menu.open{display:block;opacity:1;transform:translateY(0);}
+  .wk-cyc-item{font-size:12px;color:#cfe7ec;padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;white-space:nowrap;}
+  .wk-cyc-item:hover{background:rgba(45,212,191,.12);}
+  .wk-cyc-item.on{background:rgba(45,212,191,.20);color:#5eead4;font-weight:700;}
+  .wk-cyc-soon{color:#5b757c;cursor:not-allowed;}
+  .wk-cyc-soon:hover{background:none;}
+  .wk-cyc-soon span{font-size:8.5px;text-transform:uppercase;letter-spacing:.5px;color:#46606a;border:1px solid #21424b;border-radius:5px;padding:1px 5px;flex:0 0 auto;}
+  .wk-cycleoverlay{position:absolute;left:0;top:0;right:0;bottom:0;z-index:7;display:none;opacity:0;transition:opacity .5s ease;background:#0a1b21;}
+  .wk-cycleoverlay.on{display:block;opacity:1;}
   /* ── Fase VII: drawing toolbar (6 parent groups + cursor/trash, flyout submenus) ── */
   .wk-stage{display:flex;align-items:stretch;}
   .wk-drawbar{flex:0 0 36px;width:36px;display:flex;flex-direction:column;align-items:center;gap:3px;background:#0a181d;border-right:1px solid #16323b;padding:6px 0;overflow:visible;}
@@ -660,7 +672,16 @@
         <div class="wk-scaletoggle" id="wk-scaleToggle">LOG</div>
           </div>
           <div class="wk-tb2-right" id="wk-layers">
-            <button class="wk-layer" data-layer="phases">Fases</button>
+            <div class="wk-cyc-wrap" id="wk-cycWrap">
+              <button class="wk-layer" data-layer="phases" id="wk-cycBtn">Fases <span class="wk-per-caret">▾</span></button>
+              <div class="wk-cyc-menu" id="wk-cycMenu">
+                <div class="wk-cyc-item" data-mode="overlap">Ciclos sobrepostos</div>
+                <div class="wk-cyc-item wk-cyc-soon" data-mode="clock">Relógio de ciclo <span>em breve</span></div>
+                <div class="wk-cyc-item" data-mode="bands">Bandas de fase</div>
+                <div class="wk-cyc-item wk-cyc-soon" data-mode="heatmap">Heatmap de fases <span>em breve</span></div>
+                <div class="wk-cyc-item wk-cyc-soon" data-mode="bars">Barras de duração <span>em breve</span></div>
+              </div>
+            </div>
             <button class="wk-layer" data-layer="halvings" title="Halvings"><span class="wk-hbtc">H₿</span></button>
             <button class="wk-layer" data-layer="manip">Manip</button>
             <button class="wk-layer" data-layer="maw">50/200W</button>
@@ -673,7 +694,7 @@
              lightweight-charts-drawing lib. 6 parent groups (Linhas/Rectangle/Fib/Previsão/Text/Brush)
              + cursor + trash. Submenus (flyouts) open to the right. -->
         <div class="wk-drawbar" id="wk-drawbar" aria-label="Ferramentas de desenho"></div>
-        <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div><div class="wk-livetag" id="wk-livetag"></div>
+        <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div><div class="wk-livetag" id="wk-livetag"></div><canvas class="wk-cycleoverlay" id="wk-cycleoverlay"></canvas>
         <div class="wk-modetog" id="wk-modetog">
           <button class="wk-mode-b wk-rulertog" id="wk-rulertog" title="Régua / medição" aria-label="Régua"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg></button>
           <div class="wk-mode-sep"></div>
@@ -2067,12 +2088,12 @@
 
   // ── top toggle bar (layers) ───────────────────────────────────────────────────
   function syncLayerUI(){ try{
-    Array.prototype.forEach.call(document.querySelectorAll('.wk-layer'),function(b){ b.classList.toggle('on', !!layers[b.dataset.layer]); });
+    Array.prototype.forEach.call(document.querySelectorAll('.wk-layer'),function(b){ if(b.dataset.layer==='phases') return; b.classList.toggle('on', !!layers[b.dataset.layer]); });   // "Fases" is a mode dropdown now (updateCycUI owns its state)
     var pf=document.querySelector('.wk-ind-item[data-ind="phases"]'); if(pf) pf.classList.toggle('on', !!layers.phases);
     var hv=document.querySelector('.wk-ind-item[data-ind="halving"]'); if(hv) hv.classList.toggle('on', !!layers.halvings);
   }catch(e){} }
-  function wireLayers(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-layer'),function(b){ b.onclick=function(){ var k=b.dataset.layer;
-    if(k==='phases'){ setPhases(!layers.phases); }
+  function wireLayers(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-layer'),function(b){ b.onclick=function(e){ var k=b.dataset.layer;
+    if(k==='phases'){ e.stopPropagation(); toggleCycMenu(); }   // the "Fases" button now opens the cycle-mode dropdown
     else if(k==='halvings'){ setHalvings(!layers.halvings); }
     else if(k==='maw' || k==='mad'){ if(b.classList.contains('wk-cs-off')){ notify('MAs de ciclo só em velas ≥ 1D'); return; } setMaLayer(k, !layers[k]); }
     else if(k==='manip'){ setManip(!layers.manip); }
@@ -2256,7 +2277,7 @@
     // momentum pan: track scroll velocity during drag, glide to a stop on release; new touch cancels
     try{ el.addEventListener('pointerdown', panDown); el.addEventListener('pointermove', panMove, {passive:true}); el.addEventListener('pointerup', panUp); el.addEventListener('pointercancel', function(){ _pan.tracking=false; }); }catch(e){}
     wireTitles(); wireConfigurator(); updateMenuLabels();
-    relayout(); wireToolbar(); wireLayers(); applyInitialPeriod(); applyInitialCandleSize();
+    relayout(); wireToolbar(); wireLayers(); initCycMode(); applyInitialPeriod(); applyInitialCandleSize();
     rebuildMaLayers();   // build any MA layers persisted on (applyInitialCandleSize only builds them for non-1D)
   }
 
@@ -2442,6 +2463,81 @@
     if(on){ if(!halvAttached){ try{ area.attachPrimitive(halvPrim); halvAttached=true; }catch(e){} } playHalv('in'); }   // animated entry
     else { playHalv('out'); }   // quick fade-out, then detach on completion
     syncLayerUI(); }
+
+  // ── cycle-visualization modes (the "Fases ▾" dropdown). 'bands' = the old phase-band toggle;
+  //    'overlap' = the normalized overlapping-cycles view. The 3 placeholders are disabled. ────────
+  var cycMode='', cycCache=null;
+  var CYC_COLORS=['#5eead4','#60a5fa','#a78bfa','#f472b6','#fb923c'];
+  // build the cycles (bottom→bottom) from the DETECTED Cycle lows (extremes not recomputed); the first
+  // bottom is the series start, the last cycle runs from the most recent low to today (incomplete).
+  function buildCycles(){ var daily=tierCache.daily; if(!daily||!daily.length||!ANCHOR||!ANCHOR.extremes) return [];
+    function dd(a,c){ return (Date.parse(c)-Date.parse(a))/86400000; }
+    var lows=ANCHOR.extremes.filter(function(e){return e.kind==='low';}).map(function(e){return e.date;});
+    var bottoms=[daily[0].t]; lows.forEach(function(d){ if(bottoms.indexOf(d)<0) bottoms.push(d); }); bottoms.sort();
+    var cyc=[];
+    for(var i=0;i<bottoms.length;i++){ var sD=bottoms[i], incomplete=(i+1>=bottoms.length), eD=incomplete?daily[daily.length-1].t:bottoms[i+1];
+      var seg=[]; for(var j=0;j<daily.length;j++){ var d=daily[j]; if(d.t>=sD && d.t<=eD) seg.push({t:d.t,c:d.c}); }
+      if(seg.length<3) continue; var base=seg[0].c; if(!base||base<=0) continue;
+      var span=dd(sD,eD)||1, peak=1; seg.forEach(function(p){ var m=p.c/base; if(m>peak) peak=m; });
+      var sy=sD.slice(0,4), ey=eD.slice(2,4);
+      cyc.push({startD:sD,endD:eD,incomplete:incomplete,base:base,span:span,peak:peak,seg:seg,label:sy+'–'+(incomplete?'agora':ey),dd:dd}); }
+    var comp=cyc.filter(function(c){return !c.incomplete;}).map(function(c){return c.span;});
+    var ref=comp.length?comp.reduce(function(a,b){return a+b;},0)/comp.length:1460;
+    cyc.forEach(function(c){ c.norm=c.incomplete?ref:c.span; });
+    return cyc; }
+  var cycOv=null, cycRO=null;
+  function drawCycleOverlay(){ var cv=document.getElementById('wk-cycleoverlay'); if(!cv) return; var host=document.getElementById('wk-chart'); if(!host) return;
+    var W=host.clientWidth, H=host.clientHeight, dpr=window.devicePixelRatio||1; cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+    var ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,W,H); ctx.fillStyle='#0a1b21'; ctx.fillRect(0,0,W,H);
+    if(!cycCache) cycCache=buildCycles(); var cyc=cycCache; if(!cyc.length){ return; }
+    var padL=12, padR=52, padT=46, padB=34;
+    var maxM=1; cyc.forEach(function(c){ if(c.peak>maxM) maxM=c.peak; }); maxM*=1.08;
+    var lminL=0, lmaxL=Math.log10(maxM);   // Y: log10 of the multiple (base ×1 at the bottom)
+    function xOf(p){ return padL + p*(W-padL-padR); }
+    function yOf(m){ var lp=Math.log10(Math.max(1,m)); return padT + (1-(lp-lminL)/(lmaxL-lminL||1))*(H-padT-padB); }
+    // Y gridlines at nice multiples
+    var ticks=[1,2,3,5,10,20,30,50,100,200,300,500,1000]; ctx.font='10px -apple-system,system-ui,sans-serif'; ctx.textBaseline='middle';
+    ticks.forEach(function(m){ if(m>maxM) return; var y=yOf(m); ctx.strokeStyle='rgba(94,234,212,.07)'; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke();
+      ctx.fillStyle='#5b8a90'; ctx.textAlign='left'; ctx.fillText('×'+m, W-padR+5, y); });
+    // X gridlines (cycle progress)
+    ctx.textAlign='center'; ctx.textBaseline='top'; [0,0.25,0.5,0.75,1].forEach(function(p){ var x=xOf(p); ctx.strokeStyle='rgba(94,234,212,.06)'; ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,H-padB); ctx.stroke();
+      ctx.fillStyle='#5b8a90'; ctx.fillText(Math.round(p*100)+'%', x, H-padB+6); });
+    ctx.fillStyle='#6b9298'; ctx.textAlign='right'; ctx.fillText('progresso do ciclo →', W-padR, H-padB+18);
+    // one polyline per cycle
+    cyc.forEach(function(c,ci){ var col=CYC_COLORS[ci%CYC_COLORS.length]; ctx.strokeStyle=col; ctx.lineWidth=c.incomplete?2.4:1.6; ctx.globalAlpha=c.incomplete?1:0.92;
+      ctx.beginPath(); var started=false; c.seg.forEach(function(p){ var px=xOf(Math.min(1,c.dd(c.startD,p.t)/c.norm)), py=yOf(p.c/c.base); if(!started){ ctx.moveTo(px,py); started=true; } else ctx.lineTo(px,py); }); ctx.stroke();
+      // endpoint dot for the (incomplete) current cycle
+      if(c.incomplete){ var lp=c.seg[c.seg.length-1]; var ex=xOf(Math.min(1,c.dd(c.startD,lp.t)/c.norm)), ey=yOf(lp.c/c.base); ctx.globalAlpha=1; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(ex,ey,3.4,0,6.2832); ctx.fill(); } });
+    ctx.globalAlpha=1;
+    // title + legend (top-left)
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#cfe7ec'; ctx.font='700 12px -apple-system,system-ui,sans-serif'; ctx.fillText('Ciclos sobrepostos · múltiplo desde o fundo (log)', padL, 18);
+    ctx.font='11px -apple-system,system-ui,sans-serif'; var lx=padL, ly=34;
+    cyc.forEach(function(c,ci){ var col=CYC_COLORS[ci%CYC_COLORS.length]; var txt=c.label+'  ×'+(c.peak>=10?Math.round(c.peak):c.peak.toFixed(1));
+      var tw=ctx.measureText(txt).width+20; if(lx+tw>W-padR){ lx=padL; ly+=15; }
+      ctx.fillStyle=col; ctx.fillRect(lx,ly-8,10,3); ctx.fillStyle=c.incomplete?'#dbeee9':'#9bbcc2'; ctx.fillText(txt, lx+14, ly); lx+=tw; }); }
+  function showCycleOverlay(){ var cv=document.getElementById('wk-cycleoverlay'); if(!cv) return; cycCache=buildCycles(); cv.style.display='block'; drawCycleOverlay(); requestAnimationFrame(function(){ cv.classList.add('on'); });
+    if(!cycRO && window.ResizeObserver){ try{ cycRO=new ResizeObserver(function(){ if(cycMode==='overlap') drawCycleOverlay(); }); cycRO.observe(document.getElementById('wk-chart')); }catch(e){} } }
+  function hideCycleOverlay(){ var cv=document.getElementById('wk-cycleoverlay'); if(!cv) return; cv.classList.remove('on'); setTimeout(function(){ if(cycMode!=='overlap') cv.style.display='none'; }, 520); }
+  function setCycMode(mode){
+    if(cycMode==='overlap' && mode!=='overlap') hideCycleOverlay();
+    if(cycMode==='bands' && mode!=='bands') setPhases(false);
+    cycMode=mode||'';
+    if(cycMode==='bands') setPhases(true);
+    else if(cycMode==='overlap'){ if(layers.phases) setPhases(false); showCycleOverlay(); }
+    try{ sessionStorage.setItem('wk_cycmode', cycMode); }catch(e){}
+    updateCycUI(); }
+  function updateCycUI(){ var btn=document.getElementById('wk-cycBtn'); if(btn) btn.classList.toggle('on', !!cycMode);
+    Array.prototype.forEach.call(document.querySelectorAll('#wk-cycMenu .wk-cyc-item'), function(it){ it.classList.toggle('on', it.dataset.mode===cycMode); }); }
+  function toggleCycMenu(force){ var m=document.getElementById('wk-cycMenu'); if(!m) return; var open=(force!=null)?force:!m.classList.contains('open'); m.classList.toggle('open', open); }
+  function wireCycMenu(){ var m=document.getElementById('wk-cycMenu'); if(!m) return;
+    Array.prototype.forEach.call(m.querySelectorAll('.wk-cyc-item'), function(it){ it.onclick=function(e){ e.stopPropagation();
+      if(it.classList.contains('wk-cyc-soon')){ notify('"'+it.textContent.replace('em breve','').trim()+'" chega numa fase futura'); return; }
+      var mode=it.dataset.mode; setCycMode(mode===cycMode?'':mode); toggleCycMenu(false); }; });
+    document.addEventListener('click', function(e){ if(!e.target.closest('#wk-cycWrap')) toggleCycMenu(false); });
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') toggleCycMenu(false); });
+  }
+  function initCycMode(){ wireCycMenu(); var saved=''; try{ saved=sessionStorage.getItem('wk_cycmode')||''; }catch(e){}
+    if(saved==='overlap'||saved==='bands') setCycMode(saved); else { cycMode=''; updateCycUI(); } }
 
   // ── candle-size tiers: load tier · aggregate OHLC on the fly · apply ───────────
   function isIntra(){ return CSPEC[CSIZE] && CSPEC[CSIZE].kind==='intra'; }
