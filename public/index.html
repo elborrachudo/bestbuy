@@ -2436,10 +2436,10 @@
       else { setRangeDays(CS_WIN[size]); }
     });
   }
-  function applyInitialCandleSize(){ var s='1D'; try{ s=sessionStorage.getItem('wk_csize')||'1D'; }catch(e){} if(!CSPEC[s]) s='1D';
+  function applyInitialCandleSize(){ var s='1D';   // ENFORCED default on every page open (ignore persisted choice)
     var lab=document.getElementById('wk-csLabel'); if(lab) lab.textContent=s;
     Array.prototype.forEach.call(document.querySelectorAll('.wk-cs-item'),function(it){ it.classList.toggle('on', it.dataset.cs===s); });
-    if(s!=='1D') applyCandleSize(s); else refreshIndicatorAvailability(); }
+    refreshIndicatorAvailability(); }
 
   var PERIODS=[{d:1,k:'1D'},{d:7,k:'7D'},{d:15,k:'15D'},{d:30,k:'30D'},{d:60,k:'60D'},{d:90,k:'90D'},{d:182,k:'6M'},{d:365,k:'1A'},{d:1460,k:'4A'},{d:0,k:'ALL'}];
   function applyPeriod(d,label){
@@ -2450,8 +2450,8 @@
     try{ sessionStorage.setItem('wk_period', String(d)); }catch(e){}
   }
   function applyInitialPeriod(){
-    var pd=90; try{ var s=sessionStorage.getItem('wk_period'); if(s!==null && s!=='') pd=+s; }catch(e){}
-    var pe=PERIODS.filter(function(p){return p.d===pd;})[0]||PERIODS[5];
+    // ENFORCED default on every page open: ALL period (d:0), ignore any persisted choice.
+    var pe=PERIODS.filter(function(p){return p.d===0;})[0]||PERIODS[PERIODS.length-1];
     applyPeriod(pe.d, pe.k);
   }
 
