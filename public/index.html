@@ -542,6 +542,26 @@
   .wk-progress.indet .wk-pg-fill{width:38%!important;transition:none;animation:wkpgIndet 1.15s cubic-bezier(.65,0,.35,1) infinite;}
   @keyframes wkpgIndet{0%{transform:translateX(-130%)}100%{transform:translateX(360%)}}
   .wk-pg-txt{position:absolute;top:4px;right:10px;font-size:11px;line-height:1;color:#bff6ec;background:rgba(8,23,28,.9);border:1px solid rgba(45,212,191,.28);border-top:none;border-radius:0 0 9px 9px;padding:4px 10px;letter-spacing:.2px;box-shadow:0 4px 14px rgba(0,0,0,.4);white-space:nowrap;max-width:78vw;overflow:hidden;text-overflow:ellipsis;}
+  /* line-customization panel (double-click a line) */
+  .wk-stylepanel{position:absolute;z-index:30;display:none;opacity:0;transform:translateY(-6px) scale(.97);transform-origin:top center;transition:opacity .5s ease,transform .5s ease;width:210px;background:rgba(9,22,27,.97);border:1px solid #1f4a55;border-radius:12px;padding:9px 11px;box-shadow:0 16px 44px rgba(0,0,0,.6);color:#dbeee9;font-size:12px;}
+  .wk-stylepanel.on{opacity:1;transform:translateY(0) scale(1);}
+  .wk-sp-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+  .wk-sp-title{font-weight:700;color:#9ff3e4;font-size:11.5px;letter-spacing:.2px;}
+  .wk-sp-x{background:none;border:none;color:#7fa6ad;font-size:18px;line-height:1;cursor:pointer;padding:0 2px;}
+  .wk-sp-row{display:flex;align-items:center;gap:8px;margin:7px 0;}
+  .wk-sp-lbl{width:60px;flex:0 0 auto;color:#86b3ba;}
+  .wk-sp-sw{display:flex;flex-wrap:wrap;gap:4px;flex:1;}
+  .wk-sp-chip{width:18px;height:18px;border-radius:5px;border:1px solid rgba(255,255,255,.18);cursor:pointer;padding:0;}
+  .wk-sp-chip.on{outline:2px solid #fff;outline-offset:1px;}
+  .wk-sp-col{width:26px;height:24px;border:1px solid #1f4a55;border-radius:5px;background:none;padding:0;cursor:pointer;flex:0 0 auto;}
+  .wk-sp-w{flex:1;accent-color:#2dd4bf;min-width:0;}
+  .wk-sp-wv{width:12px;text-align:right;color:#9ff3e4;font-weight:700;}
+  .wk-sp-styles{display:flex;gap:5px;flex:1;}
+  .wk-sp-styles button{flex:1;height:26px;background:#0e2329;border:1px solid #1f4a55;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;}
+  .wk-sp-styles button.on{border-color:#2dd4bf;background:#12343b;}
+  .wk-sp-line{display:block;width:30px;height:0;border-top:2px solid #cfeee8;}
+  .wk-sp-line.dashed{border-top-style:dashed;}
+  .wk-sp-line.dotted{border-top-style:dotted;}
   .wk-modetog{position:absolute;left:8px;bottom:8px;z-index:6;display:flex;flex-direction:column;gap:2px;background:rgba(8,23,28,.85);border:1px solid #1a3a44;border-radius:999px;padding:3px;}
   .wk-mode-b{width:28px;height:24px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#4f7780;cursor:pointer;border-radius:999px;padding:0;}
   .wk-mode-b.on{background:rgba(45,212,191,.22);color:#5eead4;}
@@ -2464,6 +2484,21 @@
   // the drawings; this layer builds the 6-parent toolbar and adds the click-to-place-anchors creation
   // flow (the lib leaves creation to the host). If the CDN didn't load, the bar hides — nothing breaks.
   var drawMgr=null, drawReg=null, drawTool=null, drawPending=[], drawSelId=null, DRAW_OK=false;
+  // ── line customization (this phase: the 5 LINE tools only). Style is PER-TOOL: changing it updates
+  // every line of that tool (past + future) and becomes that tool's persisted default. ──────────────
+  var LINE_TOOLS=['horizontal-line','horizontal-ray','trend-line','ray','vertical-line'];
+  var DASH={solid:[], dashed:[7,5], dotted:[1.5,4]};
+  function dashName(arr){ if(!arr||!arr.length) return 'solid'; return (arr[0]<=2)?'dotted':'dashed'; }
+  function defLineStyle(){ return {lineColor:'#5eead4', lineWidth:2, lineDash:[]}; }
+  var lineStyles={};   // toolId -> {lineColor,lineWidth,lineDash}
+  function loadLineStyles(){ try{ var raw=localStorage.getItem(nsKey('wk_drawstyles')); lineStyles=raw?(JSON.parse(raw)||{}):{}; }catch(e){ lineStyles={}; } }
+  function saveLineStyles(){ try{ localStorage.setItem(nsKey('wk_drawstyles'), JSON.stringify(lineStyles)); }catch(e){} }
+  function toolStyle(toolId){ var s=lineStyles[toolId]; return s?{lineColor:s.lineColor,lineWidth:s.lineWidth,lineDash:(s.lineDash||[]).slice()}:defLineStyle(); }
+  // apply a tool's style to ALL its existing drawings (live) + persist as that tool's default
+  function applyToolStyle(toolId, style){ lineStyles[toolId]={lineColor:style.lineColor,lineWidth:style.lineWidth,lineDash:(style.lineDash||[]).slice()}; saveLineStyles();
+    if(!drawMgr) return; try{ drawMgr.getAllDrawings().forEach(function(d){ if(d.type===toolId){ try{ d.updateStyle({lineColor:style.lineColor,lineWidth:style.lineWidth,lineDash:(style.lineDash||[]).slice()}); }catch(e){} } }); }catch(e){} saveDrawings(); }
+  // on load / profile switch: re-apply each tool's stored style to its restored drawings (per-tool consistency)
+  function reapplyLineStyles(){ if(!drawMgr) return; try{ drawMgr.getAllDrawings().forEach(function(d){ if(LINE_TOOLS.indexOf(d.type)>=0 && lineStyles[d.type]){ var s=lineStyles[d.type]; try{ d.updateStyle({lineColor:s.lineColor,lineWidth:s.lineWidth,lineDash:(s.lineDash||[]).slice()}); }catch(e){} } }); }catch(e){} }
   function dsvg(inner){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">'+inner+'</svg>'; }
   var DI={
     cursor:'<path d="M5 3l14 8-5.6 1.4L16 19l-2.4 1-2.6-5.6L7 18z" fill="currentColor" stroke="none"/>',
@@ -2552,7 +2587,7 @@
       drawMgr.importDrawings(data, function(type,d){ return drawReg.createDrawing(d.type, d.id, d.anchors, d.style, d.options); }); }catch(e){} }
   // load another profile's drawings + manip-box layout (clearAll without persisting over the target key)
   function switchDrawProfile(id){ WK_USER=(id||'default'); if(!drawMgr){ return WK_USER; }
-    suspendDrawSave=true; try{ drawMgr.clearAll(); }catch(e){} drawSelId=null; loadDrawings(); suspendDrawSave=false;
+    suspendDrawSave=true; try{ drawMgr.clearAll(); }catch(e){} drawSelId=null; loadLineStyles(); loadDrawings(); reapplyLineStyles(); suspendDrawSave=false;
     try{ if(manipBox){ manipBox.style.left='auto'; manipBox.style.top=''; manipBox.style.right='72px'; placeManipBox(); } }catch(e){}
     return WK_USER; }
   // exposed so a future login/profile switch can swap the active user's drawings + layout at runtime
@@ -2606,6 +2641,55 @@
     // crosshair dot at the cursor (helps see where the next anchor lands)
     ctx.fillStyle='rgba(94,234,212,.55)'; ctx.beginPath(); ctx.arc(cur.x,cur.y,2.5,0,6.2832); ctx.fill();
     ctx.restore(); }
+
+  // ── line style panel (double-click a line → cor / espessura / estilo, applied per-tool) ───────────
+  function distToSeg(px,py,a,b){ var vx=b.x-a.x,vy=b.y-a.y,wx=px-a.x,wy=py-a.y; var L=vx*vx+vy*vy; var t=L?((wx*vx+wy*vy)/L):0; t=Math.max(0,Math.min(1,t)); var dx=px-(a.x+t*vx),dy=py-(a.y+t*vy); return Math.sqrt(dx*dx+dy*dy); }
+  function lineDrawingAt(px,py){ if(!drawMgr) return null; var best=null,bestD=16;
+    try{ drawMgr.getAllDrawings().forEach(function(d){ if(LINE_TOOLS.indexOf(d.type)<0) return;
+      var pts=(d.anchors||[]).map(function(a){ return anchorPx({time:a.time,price:a.price}); }).filter(Boolean); if(!pts.length) return;
+      var dist;
+      if(d.type==='horizontal-line'||d.type==='horizontal-ray') dist=Math.abs(py-pts[0].y);
+      else if(d.type==='vertical-line') dist=Math.abs(px-pts[0].x);
+      else dist=(pts.length>=2)?distToSeg(px,py,pts[0],pts[1]):Math.hypot(px-pts[0].x,py-pts[0].y);
+      if(dist<bestD){ bestD=dist; best=d; } }); }catch(e){}
+    return best; }
+  var stylePanel=null, styleTool=null;
+  var SWATCHES=['#5eead4','#2dd4bf','#60a5fa','#a78bfa','#f472b6','#f43f5e','#fb923c','#facc15','#22c55e','#e5e7eb'];
+  function buildStylePanel(){ if(stylePanel) return stylePanel; var host=document.getElementById('wk-chart'); if(!host) return null;
+    var p=document.createElement('div'); p.className='wk-stylepanel'; p.id='wk-stylepanel';
+    p.innerHTML='<div class="wk-sp-h"><span class="wk-sp-title">Estilo</span><button class="wk-sp-x" id="wk-sp-x" aria-label="Fechar">×</button></div>'
+      +'<div class="wk-sp-row"><span class="wk-sp-lbl">Cor</span><div class="wk-sp-sw" id="wk-sp-sw"></div><input type="color" class="wk-sp-col" id="wk-sp-col" aria-label="Cor livre"></div>'
+      +'<div class="wk-sp-row"><span class="wk-sp-lbl">Espessura</span><input type="range" min="1" max="6" step="1" class="wk-sp-w" id="wk-sp-w"><span class="wk-sp-wv" id="wk-sp-wv">2</span></div>'
+      +'<div class="wk-sp-row"><span class="wk-sp-lbl">Traço</span><div class="wk-sp-styles" id="wk-sp-styles">'
+        +'<button data-st="solid" title="Sólido"><span class="wk-sp-line solid"></span></button>'
+        +'<button data-st="dashed" title="Tracejado"><span class="wk-sp-line dashed"></span></button>'
+        +'<button data-st="dotted" title="Pontilhado"><span class="wk-sp-line dotted"></span></button></div></div>';
+    host.appendChild(p); stylePanel=p;
+    var sw=p.querySelector('#wk-sp-sw'); SWATCHES.forEach(function(c){ var b=document.createElement('button'); b.className='wk-sp-chip'; b.style.background=c; b.setAttribute('data-c',c);
+      b.onclick=function(){ setStyle({lineColor:c}); }; sw.appendChild(b); });
+    p.querySelector('#wk-sp-col').addEventListener('input', function(e){ setStyle({lineColor:e.target.value}); });
+    p.querySelector('#wk-sp-w').addEventListener('input', function(e){ setStyle({lineWidth:+e.target.value}); });
+    Array.prototype.forEach.call(p.querySelectorAll('#wk-sp-styles button'), function(b){ b.onclick=function(){ setStyle({lineDash:(DASH[b.getAttribute('data-st')]||[]).slice()}); }; });
+    p.querySelector('#wk-sp-x').onclick=function(){ closeStylePanel(); };
+    p.addEventListener('mousedown', function(e){ e.stopPropagation(); });   // clicks inside don't count as "outside"
+    p.addEventListener('touchstart', function(e){ e.stopPropagation(); }, {passive:true});
+    return p; }
+  function syncStylePanel(){ if(!stylePanel||!styleTool) return; var s=toolStyle(styleTool);
+    stylePanel.querySelector('.wk-sp-title').textContent='Estilo · '+(((drawReg&&drawReg.get(styleTool))||{}).name||styleTool);
+    stylePanel.querySelector('#wk-sp-col').value=(/^#[0-9a-f]{6}$/i.test(s.lineColor)?s.lineColor:'#5eead4');
+    stylePanel.querySelector('#wk-sp-w').value=s.lineWidth; stylePanel.querySelector('#wk-sp-wv').textContent=s.lineWidth;
+    Array.prototype.forEach.call(stylePanel.querySelectorAll('#wk-sp-sw .wk-sp-chip'), function(b){ b.classList.toggle('on', b.getAttribute('data-c').toLowerCase()===(s.lineColor||'').toLowerCase()); });
+    var nm=dashName(s.lineDash); Array.prototype.forEach.call(stylePanel.querySelectorAll('#wk-sp-styles button'), function(b){ b.classList.toggle('on', b.getAttribute('data-st')===nm); }); }
+  function setStyle(patch){ if(!styleTool) return; var s=toolStyle(styleTool); if(patch.lineColor!=null) s.lineColor=patch.lineColor; if(patch.lineWidth!=null) s.lineWidth=patch.lineWidth; if(patch.lineDash!=null) s.lineDash=patch.lineDash;
+    applyToolStyle(styleTool, s); syncStylePanel(); }
+  function openStylePanel(toolId, px, py){ if(LINE_TOOLS.indexOf(toolId)<0) return; buildStylePanel(); if(!stylePanel) return; styleTool=toolId;
+    syncStylePanel(); stylePanel.style.display='block'; var host=document.getElementById('wk-chart'), W=host.clientWidth, H=host.clientHeight;
+    var pw=210, ph=stylePanel.offsetHeight||168; var left=Math.max(6, Math.min(W-pw-6, px-pw/2)), tp=Math.max(6, Math.min(H-ph-6, py+14));
+    stylePanel.style.left=left+'px'; stylePanel.style.top=tp+'px'; requestAnimationFrame(function(){ stylePanel.classList.add('on'); }); }
+  function closeStylePanel(){ if(!stylePanel) return; stylePanel.classList.remove('on'); styleTool=null; setTimeout(function(){ if(!styleTool && stylePanel) stylePanel.style.display='none'; }, 520); }
+  function styleFromPoint(clientX, clientY){ var host=document.getElementById('wk-chart'); if(!host) return; var r=host.getBoundingClientRect(), px=clientX-r.left, py=clientY-r.top;
+    var d=lineDrawingAt(px,py); if(d){ openStylePanel(d.type, px, py); } }
+
   var drawWired=false;
   function wireDrawing(){
     if(drawWired) return; drawWired=true;   // guard: even if render() ran twice, the global listeners attach ONCE
@@ -2614,7 +2698,7 @@
     if(!D || !chart || !area){ if(bar) bar.style.display='none'; return; }   // CDN failed → hide bar, never break the chart
     try{ drawReg=D.getToolRegistry(); drawMgr=new D.DrawingManager(); drawMgr.attach(chart, area, document.getElementById('wk-chart')); DRAW_OK=true; }
     catch(e){ if(bar) bar.style.display='none'; return; }
-    buildDrawbar(); loadDrawings();
+    buildDrawbar(); loadLineStyles(); loadDrawings(); reapplyLineStyles();
     try{ drawMgr.on('drawing:selected', function(ev){ drawSelId=ev&&ev.drawingId; });
          drawMgr.on('drawing:deselected', function(){ drawSelId=null; });
          drawMgr.on('drawing:updated', function(){ saveDrawings(); });
@@ -2632,7 +2716,8 @@
       if(t==null || price==null) return;
       drawPending.push({time:t, price:price});
       var reg=drawReg.get(drawTool), need=(reg&&reg.requiredAnchors)||1;
-      if(drawPending.length>=need){ try{ var dr=drawReg.createDrawing(drawTool,'wkd_'+drawTool+'_'+(seq++)+'_'+c.px, drawPending.slice());
+      if(drawPending.length>=need){ try{ var nst=(LINE_TOOLS.indexOf(drawTool)>=0)?toolStyle(drawTool):undefined;   // new line inherits its tool's default style
+          var dr=drawReg.createDrawing(drawTool,'wkd_'+drawTool+'_'+(seq++)+'_'+c.px, drawPending.slice(), nst);
           if(dr){ drawMgr.addDrawing(dr);
             try{ if(drawMgr.selectDrawing){ drawMgr.selectDrawing(dr.id); drawSelId=dr.id; } }catch(e){}   // fixed → show its editable anchor handles
             saveDrawings(); } }catch(e){}
@@ -2652,14 +2737,24 @@
     chEl.addEventListener('touchmove', function(ev){ if(!drawTool||!tStart||ev.touches.length!==1) return; var p=ev.touches[0]; var c=toPx(p.clientX,p.clientY); drawPreview(c.px,c.py); ev.preventDefault(); }, {passive:false});
     chEl.addEventListener('touchend', function(ev){ if(!drawTool || !tStart) return; var p=ev.changedTouches[0];
       placeAnchorAt(p.clientX, p.clientY, ev.target); lastTouchPlace=Date.now(); tStart=null; ev.preventDefault(); }, {passive:false});
+    // double-click (desktop) on a line drawing → open its per-tool style panel (only when no tool is active)
+    chEl.addEventListener('dblclick', function(ev){ if(drawTool||onUI(ev.target)) return; styleFromPoint(ev.clientX, ev.clientY); });
+    // double-TAP (mobile) on a line drawing → same panel (cursor mode only)
+    var lastTap=0, lastTX=0, lastTY=0;
+    chEl.addEventListener('touchend', function(ev){ if(drawTool) return; var p=ev.changedTouches[0]; var now=Date.now();
+      if(now-lastTap<320 && Math.abs(p.clientX-lastTX)<24 && Math.abs(p.clientY-lastTY)<24){ styleFromPoint(p.clientX, p.clientY); lastTap=0; ev.preventDefault(); }
+      else { lastTap=now; lastTX=p.clientX; lastTY=p.clientY; } });
     document.addEventListener('keydown', function(e){
       if(!bodyEl.classList.contains('wk-b')) return;
+      if(e.key==='Escape' && stylePanel && stylePanel.classList.contains('on')){ closeStylePanel(); return; }   // ESC closes the style panel first
       if(e.key==='Escape' && drawTool){ if(drawPending.length){ drawPending=[]; clearPrev(); } else exitDraw(); return; }   // ESC cancels the in-progress creation, then exits the tool
       // Delete / Backspace removes the selected drawing (desktop). Trash button does the same on mobile.
       if((e.key==='Delete'||e.key==='Backspace') && drawSelId && drawMgr){ var tg=e.target; if(tg&&(tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.isContentEditable)) return;
         try{ drawMgr.removeDrawing(drawSelId); }catch(_){} drawSelId=null; saveDrawings(); e.preventDefault(); }
     });
     document.addEventListener('click', function(e){ if(!e.target.closest('.wk-dgroup')) closeFlyouts(); });
+    // close the style panel on any outside press (pointerdown covers mouse + touch; touch taps don't always emit 'click')
+    document.addEventListener('pointerdown', function(e){ if(stylePanel && stylePanel.classList.contains('on') && !e.target.closest('.wk-stylepanel')) closeStylePanel(); });
   }
   var _measCtx=null;   // shared canvas for shrink-to-fit text measurement
   function measureTagPx(s,size){ if(!_measCtx) _measCtx=document.createElement('canvas').getContext('2d'); _measCtx.font='700 '+size+'px -apple-system,system-ui,sans-serif'; return _measCtx.measureText(s).width; }
