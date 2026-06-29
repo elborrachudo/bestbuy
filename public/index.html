@@ -2343,11 +2343,11 @@
     function down(e){ ensureLT(); dragging=true; b.classList.add('drag'); var p=e.touches?e.touches[0]:e; sx=p.clientX; sy=p.clientY; sl=parseFloat(b.style.left)||0; st=parseFloat(b.style.top)||0; e.preventDefault(); }
     function move(e){ if(!dragging) return; var p=e.touches?e.touches[0]:e, pr=host.getBoundingClientRect(), bw=b.offsetWidth, bh=b.offsetHeight;
       b.style.left=Math.max(0,Math.min(pr.width-bw, sl+(p.clientX-sx)))+'px'; b.style.top=Math.max(0,Math.min(pr.height-bh, st+(p.clientY-sy)))+'px'; e.preventDefault(); }
-    function up(){ if(dragging){ try{ localStorage.setItem('wk_manipbox_pos', JSON.stringify({left:parseFloat(b.style.left),top:parseFloat(b.style.top)})); }catch(e){} } dragging=false; b.classList.remove('drag'); }
+    function up(){ if(dragging){ try{ localStorage.setItem(nsKey('wk_manipbox_pos'), JSON.stringify({left:parseFloat(b.style.left),top:parseFloat(b.style.top)})); }catch(e){} } dragging=false; b.classList.remove('drag'); }
     b.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
     b.addEventListener('touchstart',down,{passive:false}); window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
     return b; }
-  function placeManipBox(){ if(!manipBox) return; var saved=null; try{ saved=JSON.parse(localStorage.getItem('wk_manipbox_pos')); }catch(e){}
+  function placeManipBox(){ if(!manipBox) return; var saved=null; try{ saved=JSON.parse(localStorage.getItem(nsKey('wk_manipbox_pos'))||localStorage.getItem('wk_manipbox_pos')); }catch(e){}
     if(saved && typeof saved.left==='number' && typeof saved.top==='number'){ manipBox.style.left=saved.left+'px'; manipBox.style.top=saved.top+'px'; manipBox.style.right='auto'; return; }
     var M=ANCHOR.manip, y=null; try{ if(M&&M.refHigh) y=area.priceToCoordinate(livePrice!=null?livePrice:M.refHigh.price); }catch(e){}
     manipBox.style.right='72px'; manipBox.style.left='auto'; manipBox.style.top=((y!=null&&isFinite(y))?Math.max(8,y+10):60)+'px'; }
@@ -2462,9 +2462,11 @@
   function dtoast(m){ var t=document.getElementById('wk-toast'); if(!t) return; t.textContent=m; t.classList.add('show'); clearTimeout(t._dh); t._dh=setTimeout(function(){ t.classList.remove('show'); },1800); }
   function closeFlyouts(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-dgroup.open'),function(g){ g.classList.remove('open'); }); }
   function clearDrawActive(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-drawbar .wk-tool,#wk-drawbar .wk-dfly'),function(b){ b.classList.remove('on'); }); }
-  function exitDraw(){ drawTool=null; drawPending=[]; if(drawMgr){ try{ drawMgr.setActiveTool(null); }catch(e){} } clearDrawActive(); closeFlyouts();
+  function setChartNav(on){ if(!chart) return; try{ chart.applyOptions({handleScroll:on, handleScale:on}); }catch(e){} }
+  function exitDraw(){ drawTool=null; drawPending=[]; try{ clearPrev(); }catch(e){} setChartNav(true); if(drawMgr){ try{ drawMgr.setActiveTool(null); }catch(e){} } clearDrawActive(); closeFlyouts();
     var c=document.getElementById('wk-dCursor'); if(c) c.classList.add('on'); }
-  function activateTool(id, btn, parentBtn, parentHost){ if(!DRAW_OK) return; drawTool=id; drawPending=[]; try{ drawMgr.setActiveTool(id); }catch(e){}
+  function activateTool(id, btn, parentBtn, parentHost){ if(!DRAW_OK) return; drawTool=id; drawPending=[]; try{ clearPrev(); }catch(e){} setChartNav(false);   // while a tool is active, drag draws (not pans) so the live ghost tracks cleanly
+    try{ drawMgr.setActiveTool(id); }catch(e){}
     clearDrawActive(); if(btn) btn.classList.add('on'); if(parentBtn) parentBtn.classList.add('on');
     if(parentHost && btn){ var sv=btn.querySelector('svg'); if(sv) parentHost.innerHTML=sv.outerHTML; }   // parent remembers last-used icon
     closeFlyouts();
@@ -2488,9 +2490,72 @@
     tr.onclick=function(e){ e.stopPropagation(); if(!drawMgr) return; if(drawSelId){ try{ drawMgr.removeDrawing(drawSelId); }catch(_){} drawSelId=null; } else { try{ drawMgr.clearAll(); }catch(_){} } saveDrawings(); };
     bar.appendChild(tr);
   }
-  function saveDrawings(){ if(!drawMgr) return; try{ localStorage.setItem('wk_drawings', JSON.stringify(drawMgr.exportDrawings())); }catch(e){} }
-  function loadDrawings(){ if(!drawMgr||!drawReg) return; try{ var raw=localStorage.getItem('wk_drawings'); if(!raw) return; var data=JSON.parse(raw); if(!data||!data.length) return;
-    drawMgr.importDrawings(data, function(type,d){ return drawReg.createDrawing(d.type, d.id, d.anchors, d.style, d.options); }); }catch(e){} }
+  // ── per-user namespaced persistence (ready for multi-profile / login; a single 'default' user for now) ──
+  // Keys become wk_drawings::<userId> / wk_manipbox_pos::<userId>; switching userId loads that profile.
+  var WK_USER='default', suspendDrawSave=false;
+  function nsKey(base){ return base+'::'+WK_USER; }
+  function saveDrawings(){ if(!drawMgr||suspendDrawSave) return; try{ localStorage.setItem(nsKey('wk_drawings'), JSON.stringify(drawMgr.exportDrawings())); }catch(e){} }
+  function loadDrawings(){ if(!drawMgr||!drawReg) return; try{
+      var raw=localStorage.getItem(nsKey('wk_drawings'));
+      if(!raw && WK_USER==='default') raw=localStorage.getItem('wk_drawings');   // migrate the pre-namespaced key
+      if(!raw) return; var data=JSON.parse(raw); if(!data||!data.length) return;
+      drawMgr.importDrawings(data, function(type,d){ return drawReg.createDrawing(d.type, d.id, d.anchors, d.style, d.options); }); }catch(e){} }
+  // load another profile's drawings + manip-box layout (clearAll without persisting over the target key)
+  function switchDrawProfile(id){ WK_USER=(id||'default'); if(!drawMgr){ return WK_USER; }
+    suspendDrawSave=true; try{ drawMgr.clearAll(); }catch(e){} drawSelId=null; loadDrawings(); suspendDrawSave=false;
+    try{ if(manipBox){ manipBox.style.left='auto'; manipBox.style.top=''; manipBox.style.right='72px'; placeManipBox(); } }catch(e){}
+    return WK_USER; }
+  // exposed so a future login/profile switch can swap the active user's drawings + layout at runtime
+  window.wkDrawProfile={ get:function(){ return WK_USER; }, set:switchDrawProfile };
+
+  // ── live creation preview ("ghost") ─────────────────────────────────────────────────────────────
+  // The lib (v0.1.1) has no native interactive creation, so while anchors are being placed we draw a
+  // provisional dashed shape that follows the cursor/finger on a pointer-transparent overlay canvas.
+  // The real lib object is only created on the final click (in placeAnchorAt). LOG-aware: anchors are
+  // re-projected each frame via the series/time scales, so the ghost stays correct under pan/zoom.
+  var prevCanvas=null, prevCtx=null, prevW=0, prevH=0;
+  function ensurePrevCanvas(){ if(prevCanvas) return; var host=document.getElementById('wk-chart'); if(!host) return;
+    prevCanvas=document.createElement('canvas'); prevCanvas.id='wk-draw-preview';
+    prevCanvas.style.cssText='position:absolute;left:0;top:0;pointer-events:none;z-index:6;'; host.appendChild(prevCanvas);
+    prevCtx=prevCanvas.getContext('2d'); }
+  function sizePrev(){ var host=document.getElementById('wk-chart'); if(!host||!prevCanvas) return; var w=host.clientWidth,h=host.clientHeight,dpr=window.devicePixelRatio||1;
+    if(w!==prevW||h!==prevH){ prevCanvas.width=Math.round(w*dpr); prevCanvas.height=Math.round(h*dpr); prevCanvas.style.width=w+'px'; prevCanvas.style.height=h+'px'; prevW=w; prevH=h; }
+    prevCtx.setTransform(dpr,0,0,dpr,0,0); }
+  function clearPrev(){ if(prevCtx&&prevCanvas) prevCtx.clearRect(0,0,prevCanvas.width,prevCanvas.height); }
+  function anchorPx(a){ var x=null,y=null; try{ x=chart.timeScale().timeToCoordinate(a.time); }catch(e){} try{ y=area.priceToCoordinate(a.price); }catch(e){} return (x==null||y==null||!isFinite(x)||!isFinite(y))?null:{x:x,y:y}; }
+  function previewKind(id){
+    if(id==='rectangle'||id==='fib-retracement'||id==='long-position'||id==='short-position') return 'rect';
+    if(id==='horizontal-line') return 'hline';
+    if(id==='horizontal-ray') return 'hray';
+    if(id==='vertical-line') return 'vline';
+    if(id==='fib-extension'||id==='fib-channel'||id==='projection') return 'poly';
+    if(id==='text-annotation') return 'point';
+    return 'line';   // trend-line, ray, brush, forecast
+  }
+  var FIBLV=[0,0.236,0.382,0.5,0.618,0.786,1];
+  function drawPreview(px,py){ if(!DRAW_OK||!drawTool){ clearPrev(); return; }
+    var reg=drawReg&&drawReg.get(drawTool), need=(reg&&reg.requiredAnchors)||1;
+    ensurePrevCanvas(); if(!prevCtx) return; sizePrev(); clearPrev();
+    if(need>1 && !drawPending.length) return;   // 2-/3-point tools: ghost only after the first anchor is fixed
+    var ctx=prevCtx, W=prevW, H=prevH, kind=previewKind(drawTool);
+    var pts=drawPending.map(anchorPx).filter(Boolean), cur={x:px,y:py};
+    var a0=pts.length?pts[0]:cur, last=pts.length?pts[pts.length-1]:cur;
+    ctx.save(); ctx.lineWidth=1.4; ctx.setLineDash([5,4]); ctx.strokeStyle='rgba(94,234,212,.95)'; ctx.fillStyle='rgba(94,234,212,.10)';
+    if(kind==='hline'){ ctx.beginPath(); ctx.moveTo(0,cur.y); ctx.lineTo(W,cur.y); ctx.stroke(); }
+    else if(kind==='vline'){ ctx.beginPath(); ctx.moveTo(cur.x,0); ctx.lineTo(cur.x,H); ctx.stroke(); }
+    else if(kind==='hray'){ var hy=pts.length?a0.y:cur.y, hx=pts.length?a0.x:cur.x; ctx.beginPath(); ctx.moveTo(hx,hy); ctx.lineTo(W,hy); ctx.stroke(); }
+    else if(kind==='rect'){ var x=Math.min(a0.x,cur.x), y=Math.min(a0.y,cur.y), w=Math.abs(cur.x-a0.x), h=Math.abs(cur.y-a0.y);
+      ctx.fillRect(x,y,w,h); ctx.strokeRect(x,y,w,h);
+      if(drawTool==='fib-retracement'){ ctx.setLineDash([2,3]); FIBLV.forEach(function(f){ var yy=a0.y+(cur.y-a0.y)*f; ctx.beginPath(); ctx.moveTo(x,yy); ctx.lineTo(x+w,yy); ctx.stroke(); }); } }
+    else if(kind==='poly'){ ctx.beginPath(); ctx.moveTo(a0.x,a0.y); for(var i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y); ctx.lineTo(cur.x,cur.y); ctx.stroke(); }
+    else if(kind==='point'){ /* 1-point text marker: just the anchor dot below */ }
+    else { ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(cur.x,cur.y); ctx.stroke(); }   // line family
+    // placed-anchor dots
+    ctx.setLineDash([]); ctx.fillStyle='#5eead4';
+    pts.forEach(function(p){ ctx.beginPath(); ctx.arc(p.x,p.y,3.5,0,6.2832); ctx.fill(); });
+    // crosshair dot at the cursor (helps see where the next anchor lands)
+    ctx.fillStyle='rgba(94,234,212,.55)'; ctx.beginPath(); ctx.arc(cur.x,cur.y,2.5,0,6.2832); ctx.fill();
+    ctx.restore(); }
   var drawWired=false;
   function wireDrawing(){
     if(drawWired) return; drawWired=true;   // guard: even if render() ran twice, the global listeners attach ONCE
@@ -2509,30 +2574,37 @@
     // active tool's required-anchor count is reached, the drawing is created. Listening on the container's
     // 'click' (which the browser suppresses after a drag) means panning never accidentally places anchors.
     var chEl=document.getElementById('wk-chart'); var seq=0, lastTouchPlace=0;
-    function placeAnchorAt(clientX, clientY, targetEl){ if(!drawTool) return;
-      if(targetEl && targetEl.closest && targetEl.closest('.wk-drawbar,.wk-modetog,.wk-legend,.wk-livetag,.wk-titles')) return;
-      var rect=chEl.getBoundingClientRect(), px=clientX-rect.left, py=clientY-rect.top;
-      var t=null,price=null; try{ t=chart.timeScale().coordinateToTime(px); }catch(e){} try{ price=area.coordinateToPrice(py); }catch(e){}
+    function onUI(targetEl){ return targetEl && targetEl.closest && targetEl.closest('.wk-drawbar,.wk-modetog,.wk-legend,.wk-livetag,.wk-titles'); }
+    function toPx(clientX, clientY){ var rect=chEl.getBoundingClientRect(); return {px:clientX-rect.left, py:clientY-rect.top}; }
+    function placeAnchorAt(clientX, clientY, targetEl){ if(!drawTool) return; if(onUI(targetEl)) return;
+      var c=toPx(clientX,clientY);
+      var t=null,price=null; try{ t=chart.timeScale().coordinateToTime(c.px); }catch(e){} try{ price=area.coordinateToPrice(c.py); }catch(e){}
       if(t==null || price==null) return;
       drawPending.push({time:t, price:price});
       var reg=drawReg.get(drawTool), need=(reg&&reg.requiredAnchors)||1;
-      if(drawPending.length>=need){ try{ var dr=drawReg.createDrawing(drawTool,'wkd_'+drawTool+'_'+(seq++)+'_'+px, drawPending.slice());
-          if(dr){ drawMgr.addDrawing(dr); saveDrawings(); } }catch(e){}
-        drawPending=[]; }   // tool stays active for repeated drawing; Cursor or ESC exits draw mode
+      if(drawPending.length>=need){ try{ var dr=drawReg.createDrawing(drawTool,'wkd_'+drawTool+'_'+(seq++)+'_'+c.px, drawPending.slice());
+          if(dr){ drawMgr.addDrawing(dr);
+            try{ if(drawMgr.selectDrawing){ drawMgr.selectDrawing(dr.id); drawSelId=dr.id; } }catch(e){}   // fixed → show its editable anchor handles
+            saveDrawings(); } }catch(e){}
+        drawPending=[]; clearPrev(); }   // tool stays active for the next drawing; Cursor/ESC exits
+      else drawPreview(c.px, c.py);   // refresh the ghost from the just-placed anchor
     }
-    // desktop: 'click' (suppressed by the browser after a drag, so panning never places anchors)
+    // desktop: 'click' places an anchor; 'mousemove' updates the live ghost between clicks
     chEl.addEventListener('click', function(ev){ if(!drawTool) return; if(Date.now()-lastTouchPlace<700) return;   // a touch tap already placed this anchor
       placeAnchorAt(ev.clientX, ev.clientY, ev.target); });
-    // touch: the chart canvas swallows the synthetic click, so place on a clean tap (single finger,
-    // little movement, short press) — a pan/pinch moves more than the threshold and is ignored.
+    chEl.addEventListener('mousemove', function(ev){ if(!drawTool||onUI(ev.target)) return; var c=toPx(ev.clientX,ev.clientY); drawPreview(c.px,c.py); });
+    chEl.addEventListener('mouseleave', function(){ if(drawTool) clearPrev(); });
+    // touch: chart nav is disabled while a tool is active, so a single finger draws — press shows the
+    // ghost, drag updates it live, release fixes the anchor at the lift point (suppress the trailing click).
     var tStart=null;
-    chEl.addEventListener('touchstart', function(ev){ if(!drawTool) return; if(ev.touches.length!==1){ tStart=null; return; } var p=ev.touches[0]; tStart={x:p.clientX,y:p.clientY,time:Date.now()}; }, {passive:true});
+    chEl.addEventListener('touchstart', function(ev){ if(!drawTool||onUI(ev.target)) return; if(ev.touches.length!==1){ tStart=null; return; }
+      var p=ev.touches[0]; tStart={x:p.clientX,y:p.clientY,time:Date.now()}; var c=toPx(p.clientX,p.clientY); drawPreview(c.px,c.py); }, {passive:true});
+    chEl.addEventListener('touchmove', function(ev){ if(!drawTool||!tStart||ev.touches.length!==1) return; var p=ev.touches[0]; var c=toPx(p.clientX,p.clientY); drawPreview(c.px,c.py); ev.preventDefault(); }, {passive:false});
     chEl.addEventListener('touchend', function(ev){ if(!drawTool || !tStart) return; var p=ev.changedTouches[0];
-      if(Math.abs(p.clientX-tStart.x)>10 || Math.abs(p.clientY-tStart.y)>10 || Date.now()-tStart.time>600){ tStart=null; return; }
       placeAnchorAt(p.clientX, p.clientY, ev.target); lastTouchPlace=Date.now(); tStart=null; ev.preventDefault(); }, {passive:false});
     document.addEventListener('keydown', function(e){
       if(!bodyEl.classList.contains('wk-b')) return;
-      if(e.key==='Escape' && drawTool){ exitDraw(); return; }
+      if(e.key==='Escape' && drawTool){ if(drawPending.length){ drawPending=[]; clearPrev(); } else exitDraw(); return; }   // ESC cancels the in-progress creation, then exits the tool
       // Delete / Backspace removes the selected drawing (desktop). Trash button does the same on mobile.
       if((e.key==='Delete'||e.key==='Backspace') && drawSelId && drawMgr){ var tg=e.target; if(tg&&(tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.isContentEditable)) return;
         try{ drawMgr.removeDrawing(drawSelId); }catch(_){} drawSelId=null; saveDrawings(); e.preventDefault(); }
