@@ -39,6 +39,7 @@ export default async function handler(req, res) {
       sample_first: rows[0], sample_last: rows[rows.length - 1],
     });
   } catch (e) {
+    console.error('[backfill-dominance] failed:', e && e.stack ? e.stack : e);
     res.status(502).json({ ok: false, error: e.message });
   }
 }
