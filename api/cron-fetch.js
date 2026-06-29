@@ -14,6 +14,7 @@ import { detectLiveSignal } from '../lib/signals.js';
 import { getBtcDailySeries, classifyLatest } from '../lib/cycle.js';
 import { fetchGlobalM2Inputs, globalM2MetricsAsOf } from '../lib/globalm2.js';
 import { rollIntraday, closeDailyCandle } from '../lib/btcintraday.js';
+import { fetchMarketSnapshot, fetchFearGreed, computeDerivables } from '../lib/marketdaily.js';
 
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL;
@@ -74,6 +75,23 @@ export default async function handler(req, res) {
         cycle_date: cycleDay,
         btc_price: prices[prices.length - 1], phase, indicator_values: indicators, updated_at: fetchedAt,
       }], 'cycle_date');
+
+      // ── A1+A3: daily market-wide row (market_daily). Price-derived indicators from the loaded
+      // close series + live market totals (CoinGecko /global + /coins/markets) + Fear&Greed
+      // (alternative.me). Each external call is best-effort so a failure never blocks the run.
+      try {
+        const deriv = computeDerivables(prices);
+        let snap = {}; try { snap = await fetchMarketSnapshot(cgKey); } catch (e) { summary.push({ market_snapshot_error: e.message }); }
+        let fng = {}; try { fng = await fetchFearGreed(); } catch (e) { summary.push({ fng_error: e.message }); }
+        const row = {
+          date: cycleDay, ...deriv,
+          total_mcap: snap.total_mcap ?? null, mkt_vol_24h: snap.mkt_vol_24h ?? null, btc_vol_24h: snap.btc_vol_24h ?? null,
+          fear_greed: fng.value ?? null, fear_greed_label: fng.label ?? null,
+          cycle_phase: phase, source: 'cron',
+        };
+        await sbUpsert(base, serviceKey, 'market_daily', [row], 'date');
+        summary.push({ market_daily: { date: cycleDay, fng: fng.value ?? null, total_mcap: snap.total_mcap ?? null, mayer: deriv.mayer } });
+      } catch (e) { summary.push({ market_daily_error: e.message }); }
     }
   } catch (e) { summary.push({ cycle_error: e.message }); }
 
