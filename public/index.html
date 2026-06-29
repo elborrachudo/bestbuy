@@ -2144,7 +2144,7 @@
   // ── intraday (a)/(b) helpers — replace the old "warn + fallback 1D" ────────────────────────
   function toEpoch(t){ if(t==null) return null; if(typeof t==='number') return t; if(typeof t==='object'&&t.year) return Math.floor(Date.UTC(t.year,t.month-1,t.day)/1000); return Math.floor(Date.parse(t+'T00:00:00Z')/1000); }
   function visibleEpochRange(){ if(!chart) return null; try{ var r=chart.timeScale().getVisibleRange(); if(!r) return null; return {from:toEpoch(r.from), to:toEpoch(r.to)}; }catch(e){ return null; } }
-  function animateToFull(){ var ts=chart.timeScale(); var start; try{ start=ts.getVisibleLogicalRange(); }catch(e){ start=null; } if(!start){ try{ ts.fitContent(); }catch(e){} return; } var N=ACTIVE.length, tf=-1, tt=N+2;
+  function animateToFull(){ var ts=chart.timeScale(); var start; try{ start=ts.getVisibleLogicalRange(); }catch(e){ start=null; } if(!start){ fitRealContent(); return; } var N=ACTIVE.length, tf=-1, tt=N+2;
     animate('range', ANIM_MS, function(e){ try{ ts.setVisibleLogicalRange({from:start.from+(tf-start.from)*e, to:start.to+(tt-start.to)*e}); }catch(_){} }); }
 
   function showScreen(s){
@@ -2223,7 +2223,7 @@
               panes:{enableResize:true,separatorColor:'#16323b',separatorHoverColor:'#1f4a55'}},
       grid:{vertLines:{color:'rgba(94,234,212,.05)'},horzLines:{color:'rgba(94,234,212,.05)'}},
       rightPriceScale:{borderColor:'#16323b',mode:1,entireTextOnly:true},
-      timeScale:{borderColor:'#16323b',timeVisible:false,minBarSpacing:0.02,rightOffset:3,tickMarkFormatter:wkTick},
+      timeScale:{borderColor:'#16323b',timeVisible:false,minBarSpacing:0.02,rightOffset:3,fixRightEdge:false,fixLeftEdge:false,tickMarkFormatter:wkTick},   // fixRightEdge:false → free scroll into the future whitespace (draw beyond today)
       // crosshair: Normal mode (free, NO magnet/snap to candles — snap comes later) + faint 15% guides
       crosshair:{mode:0, vertLine:{color:'rgba(94,234,212,.15)', width:1, style:0, labelBackgroundColor:'#16323b'}, horzLine:{color:'rgba(94,234,212,.15)', width:1, style:0, labelBackgroundColor:'#16323b'}}, handleScroll:true, handleScale:true,
       localization:{priceFormatter:wkFmtPrice,locale:'pt-PT'},
@@ -2248,9 +2248,8 @@
 
     // PRICE pane (0): area (always present — carries the phase primitive + markers) + candles
     area=chart.addSeries(L.AreaSeries,{lineColor:'#a78bfa',topColor:'rgba(167,139,250,.18)',bottomColor:'rgba(167,139,250,0)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
-    area.setData(ACTIVE.map(function(d){ return {time:d.time,value:d.close}; }));
     candle=chart.addSeries(L.CandlestickSeries,{upColor:'#22c55e',downColor:'#f43f5e',wickUpColor:'#22c55e',wickDownColor:'#f43f5e',borderVisible:false,priceLineVisible:false,lastValueVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
-    candle.setData(ACTIVE.map(function(d){ return {time:d.time,open:d.open,high:d.high,low:d.low,close:d.close}; }));
+    setSeriesData();   // real candles + future whitespace (so drawings can land beyond today)
     // phase bands + halving lines as custom v5 primitives on pane 0 (init from persisted layers)
     ind.phases=layers.phases; ind.halving=layers.halvings;
     try{ phasePrim=makePhasePrimitive(buildRuns(ACTIVE)); if(layers.phases){ area.attachPrimitive(phasePrim); phasesAttached=true; } }catch(e){}
@@ -3053,10 +3052,34 @@
     DAILY_ONLY.forEach(function(k){ var it=document.querySelector('.wk-ind-item[data-ind="'+k+'"]'); if(it) it.classList.toggle('wk-cs-off', intra); if(intra && ind[k]){ ind[k]=false; if(it) it.classList.remove('on'); removeOsc(k); } });
     // weekly/daily cycle-MA toggle buttons — greyed at intraday (layer state kept; rebuilt on return)
     ['maw','mad'].forEach(function(k){ var b=document.querySelector('.wk-layer[data-layer="'+k+'"]'); if(b) b.classList.toggle('wk-cs-off', intra); }); }
-  function setRangeDays(days){ if(!chart||!ACTIVE.length) return; if(days===0){ chart.timeScale().fitContent(); return; } var last=ACTIVE[ACTIVE.length-1].time;
+  // ── Future drawing space ("desenhar para além de hoje") ──────────────────────────────────────
+  // The drawing lib projects anchors via timeToCoordinate, which returns null past the last candle —
+  // so a click in the empty space to the right of "today" never produced a valid time and the 2nd/3rd
+  // point wouldn't fix. We extend the price series with WHITESPACE points (time only, NO value — no
+  // invented price data, just drawing coordinates) for a generous future horizon. Then the time scale
+  // knows those slots: coordinateToTime resolves a click there (placing works), timeToCoordinate
+  // projects the anchor back (rendering works), and drawings in the future persist + reload in place.
+  // Horizon is resolution-aware and cheap (≤~1825 extra points). Real data is unchanged (ACTIVE), so
+  // every other primitive (phases/halvings/extremes/oscillators/live) is unaffected.
+  function futureBarsCount(){ var spec=CSPEC[CSIZE]||{}; if(spec.kind==='intra'){ return (spec.sec&&spec.sec<=60)?1440:1080; } return 1825; }   // ~1 day @1m · ~45 days @1h · ~5 years daily
+  function buildFuture(){ if(!ACTIVE.length) return []; var n=ACTIVE.length, last=ACTIVE[n-1].time, prev=ACTIVE[n>1?n-2:0].time, K=futureBarsCount(), out=[], i;
+    if(typeof last==='number'){ var step=(n>1?(last-prev):86400)||86400; for(i=1;i<=K;i++) out.push({time:last+i*step}); }   // intraday: epoch seconds
+    else { var lp=Date.parse(last+'T00:00:00Z'), pp=Date.parse(prev+'T00:00:00Z'); var sd=Math.max(1,Math.round((lp-pp)/86400000));   // daily family: 'YYYY-MM-DD', step = real bucket spacing
+      for(i=1;i<=K;i++) out.push({time:new Date(lp+i*sd*86400000).toISOString().slice(0,10)}); }
+    return out; }
+  // Single source of truth for pushing data into the price series: real candles + future whitespace.
+  function setSeriesData(){ if(!area||!candle) return; var fut=buildFuture();
+    var aD=ACTIVE.map(function(d){ return {time:d.time,value:d.close}; });
+    var cD=ACTIVE.map(function(d){ return {time:d.time,open:d.open,high:d.high,low:d.low,close:d.close}; });
+    if(fut.length){ aD=aD.concat(fut); cD=cD.concat(fut); }
+    try{ area.setData(aD); }catch(e){} try{ candle.setData(cD); }catch(e){} }
+  // Fit the visible range to REAL data only (the future whitespace must NOT leak into fitContent views).
+  function fitRealContent(){ if(!chart||!ACTIVE.length) return; try{ chart.timeScale().setVisibleRange({from:ACTIVE[0].time, to:ACTIVE[ACTIVE.length-1].time}); }catch(e){ try{ chart.timeScale().fitContent(); }catch(e2){} } }
+
+  function setRangeDays(days){ if(!chart||!ACTIVE.length) return; if(days===0){ fitRealContent(); return; } var last=ACTIVE[ACTIVE.length-1].time;
     try{ if(isIntra()){ chart.timeScale().setVisibleRange({from:last-days*86400, to:last}); }
       else { var dt=new Date(last+'T00:00:00Z'); dt.setUTCDate(dt.getUTCDate()-days); var from=dt.toISOString().slice(0,10); if(from<ACTIVE[0].time) from=ACTIVE[0].time; chart.timeScale().setVisibleRange({from:from,to:last}); }
-    }catch(e){ try{ chart.timeScale().fitContent(); }catch(e2){} } }
+    }catch(e){ fitRealContent(); } }
 
   function applyCandleSize(size, opt){ var spec=CSPEC[size]; if(!spec) return; opt=opt||{};
     var pre=visibleEpochRange();   // capture the current window (epoch) for the intraday (b) keep-in-place case
@@ -3069,8 +3092,7 @@
       ACTIVE=buildActive(size); CLOSE=ACTIVE.map(function(d){ return d.close; });
       var intra=spec.kind==='intra';
       try{ chart.applyOptions({timeScale:{timeVisible:intra, secondsVisible:false}}); }catch(e){}
-      area.setData(ACTIVE.map(function(d){ return {time:d.time,value:d.close}; }));
-      candle.setData(ACTIVE.map(function(d){ return {time:d.time,open:d.open,high:d.high,low:d.low,close:d.close}; }));
+      setSeriesData();   // real candles + future whitespace for the new resolution
       applyLive();   // re-develop the new last bar + reposition the live tag for this view
       updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators(); rebuildMaLayers();
       var lab=document.getElementById('wk-csLabel'); if(lab) lab.textContent=size;
@@ -3084,7 +3106,7 @@
         var winStart=(lastE!=null) ? lastE - INTRADAY_WINDOW_DAYS*86400 : null;
         if(pre && pre.from!=null && winStart!=null && pre.from >= winStart-3600){
           try{ chart.timeScale().setVisibleRange({from:Math.max(pre.from, ACTIVE[0].time), to:Math.min(pre.to||lastE, lastE)}); }   // (b) in place
-          catch(e){ try{ chart.timeScale().fitContent(); }catch(e2){} }
+          catch(e){ fitRealContent(); }
         } else { animateToFull(); }   // (a) wide/outside → animate to the window
       }
       else { setRangeDays(CS_WIN[size]); }
