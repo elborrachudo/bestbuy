@@ -539,6 +539,21 @@
   .wk-mode-b.on{background:rgba(45,212,191,.22);color:#5eead4;}
   /* live BTC price tag on the right axis (Fase L) — teal bg, black text, slightly larger, always green */
   .wk-livetag{position:absolute;right:0;z-index:7;background:#2dd4bf;color:#04201c;font-weight:700;line-height:1;padding:3px 0;border-radius:3px 0 0 3px;pointer-events:none;transform:translateY(-50%);white-space:nowrap;text-align:center;display:none;font-variant-numeric:tabular-nums;box-shadow:0 1px 4px rgba(0,0,0,.4);box-sizing:border-box;overflow:hidden;}
+  /* manipulation v2 comparison box — dark translucent, white text, 2px white left bar; draggable + persisted */
+  .wk-manipbox{position:absolute;z-index:8;display:none;opacity:0;transition:opacity .5s ease;background:rgba(10,22,20,.82);color:#eef5f3;border-left:2px solid #fff;border-radius:2px;padding:9px 12px 10px;width:184px;box-shadow:0 6px 24px rgba(0,0,0,.5);font-variant-numeric:tabular-nums;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;}
+  .wk-manipbox.on{opacity:1;}
+  .wk-manipbox.drag{cursor:grabbing;}
+  .wk-mb-dev{font-size:16px;font-weight:800;letter-spacing:.3px;color:#fff;}
+  .wk-mb-lbl{font-size:10px;font-weight:600;letter-spacing:.2px;color:#8fa6a1;margin-top:1px;}
+  .wk-mb-days{font-size:15px;font-weight:800;margin-top:8px;line-height:1.05;color:#fff;}
+  .wk-mb-days small{display:block;font-size:10px;font-weight:500;color:#8fa6a1;letter-spacing:0;margin-top:1px;}
+  .wk-mb-rule{height:1px;background:rgba(255,255,255,.14);margin:9px 0 7px;}
+  .wk-mb-head{font-size:9.5px;font-weight:500;letter-spacing:.2px;color:#8fa6a1;margin-bottom:5px;}
+  .wk-mb-row{display:grid;grid-template-columns:42px 1fr;gap:8px;align-items:baseline;margin-bottom:5px;}
+  .wk-mb-cyc{font-size:11px;font-weight:800;color:#cfe0dc;}
+  .wk-mb-met{font-size:11px;font-weight:600;color:#dfeae8;}
+  .wk-mb-met b{font-weight:800;color:#fff;}
+  .wk-mb-sub{display:block;font-size:9px;color:#7e9591;font-weight:500;letter-spacing:.2px;}
   .wk-legend{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;color:#a9c7cd;background:rgba(8,23,28,.78);border:1px solid #1a3a44;border-radius:7px;padding:5px 8px;pointer-events:none;line-height:1.5;display:none;}
   .wk-legend b{color:#fff;font-weight:600;}
   .wk-sub{font-size:11px;color:#7fa6ad;margin-top:8px;line-height:1.5;}
@@ -1827,9 +1842,9 @@
   function loadPhaseMode(){ try{ var m=sessionStorage.getItem('wk_phaseMode'); if(m==='structural'||m==='wyckoff') return m; }catch(e){} return 'structural'; }
   var PHASE_MODE=loadPhaseMode();
   function savePhaseMode(){ try{ sessionStorage.setItem('wk_phaseMode', PHASE_MODE); }catch(e){} }
-  var ANCHOR={runs:[], dayPhase:{}, extremes:[], curPhase:null, manipRuns:[], prevHighNow:null};
+  var ANCHOR={runs:[], dayPhase:{}, extremes:[], curPhase:null, manip:null};
   function computeAnchor(daily){
-    var empty={runs:[],dayPhase:{},extremes:[],curPhase:null,manipRuns:[],prevHighNow:null};
+    var empty={runs:[],dayPhase:{},extremes:[],curPhase:null,manip:null};
     if(!daily||!daily.length) return empty;
     var dates=daily.map(function(d){return d.t;}); var byd={}; daily.forEach(function(d){byd[d.t]=d;});
     var hd=HALVINGS.map(function(h){return h.date;}).filter(function(p){return p>dates[0] && p<dates[dates.length-1];});
@@ -1896,15 +1911,25 @@
     }
     var dayPhase={}; runs.forEach(function(r){ var i0=idxGE(r.from); for(var i=i0;i<dates.length && dates[i]<=r.to;i++) dayPhase[dates[i]]=r.phase; });
     var curPhase=dayPhase[dates[dates.length-1]]||null;
-    // manipulation: days where close < the PREVIOUS cycle's high. Uses the UNCAPPED highsAbs (window
-    // absolute max) so the manipulation layer (current −18.2% AND historical bands) stays exactly as
-    // it was before the extremes fix — only the phase bands / dots switched to the capped `highs`.
-    var ds={};
-    for(var mk=1;mk<pts.length-1;mk++){ var ma=pts[mk], mb=pts[mk+1], mcur=(mk===pts.length-2), mprev=highsAbs[mk-1]; if(!mprev) continue;
-      for(var mi=0;mi<daily.length;mi++){ var md=daily[mi]; if(md.t<ma) continue; if(!mcur && md.t>=mb) break; if(md.c<mprev.price) ds[md.t]=1; } }
-    var manipRuns=[], run=null; dates.forEach(function(dt){ if(ds[dt]){ if(!run) run={from:dt,to:dt}; else run.to=dt; } else if(run){ manipRuns.push(run); run=null; } }); if(run) manipRuns.push(run);
-    var prevHighNow=highOf.length>=2 ? highOf[highOf.length-2] : null;
-    return {runs:runs, dayPhase:dayPhase, extremes:ex, curPhase:curPhase, manipRuns:manipRuns, prevHighNow:prevHighNow};
+    // ── manipulation v2: everything references the LATEST cycle high (the current cycle's peak, ≈126k) ──
+    // (owner-confirmed reference). All figures are computed from the real daily series — never hardcoded.
+    var highsEx=ex.filter(function(e){return e.kind==='high';}), lowsEx=ex.filter(function(e){return e.kind==='low';});
+    var latestHigh=highsEx.length?highsEx[highsEx.length-1]:null;            // 126k / 2025
+    var PREV_LABELS=['2021','2018','2014'];
+    var prevCycles=[];
+    for(var pc=0;pc<3;pc++){ var hi=highsEx[highsEx.length-2-pc]; if(!hi) break;   // H2021, H2017, H2013 (most-recent first)
+      var lo=lowsEx.filter(function(l){return l.date>hi.date;})[0];          // the bear bottom that follows this high
+      var depth=lo?((lo.price-hi.price)/hi.price*100):null;                  // how deep the bear went (%)
+      var dur=null; for(var di=0;di<daily.length;di++){ var dd=daily[di]; if(dd.t<=hi.date) continue; if((dd.h!=null?dd.h:dd.c)>=hi.price){ dur=Math.round(dayDiff(hi.date,dd.t)); break; } }   // days below the top until price reclaims it
+      prevCycles.push({label:PREV_LABELS[pc], depth:depth, duration:dur, high:hi.price, low:lo?lo.price:null}); }
+    // deviation zones in the CURRENT cycle: contiguous runs (after the latest high) where close < latest high
+    var devZones=[], zr=null;
+    if(latestHigh){ for(var zi=0;zi<daily.length;zi++){ var zd=daily[zi]; if(zd.t<=latestHigh.date) continue; var zlo=(zd.l!=null?zd.l:zd.c);
+        if(zd.c<latestHigh.price){ if(!zr) zr={from:zd.t,to:zd.t,low:zlo}; else { zr.to=zd.t; if(zlo<zr.low) zr.low=zlo; } }
+        else if(zr){ devZones.push(zr); zr=null; } } if(zr) devZones.push(zr); }
+    var daysBelow=latestHigh?Math.round(dayDiff(latestHigh.date, dates[dates.length-1])):null;   // days since the peak (ongoing)
+    var manip={ latestHigh:latestHigh, prevCycles:prevCycles, devZones:devZones, daysBelow:daysBelow };
+    return {runs:runs, dayPhase:dayPhase, extremes:ex, curPhase:curPhase, manip:manip};
   }
 
   // ── phase background bands (custom v5 series primitive on pane 0, behind price) ─
@@ -2135,6 +2160,7 @@
     if(!liveTimer){ fetchLive(); liveTimer=setInterval(fetchLive, 5000); }
 
     wireDrawing();   // Fase VII: attach the drawing manager + build the toolbar (no-op if the CDN didn't load)
+    try{ buildManipBox(); if(layers.manip) showManipBox(true); }catch(e){}   // manipulation v2 comparison box
 
     // autoSize:true handles width from the container's ResizeObserver; relayout() snaps the
     // container to the available viewport height (dvh) and redistributes panes via stretch
@@ -2275,25 +2301,54 @@
   // Historical: white-10% vertical bands over every window where close < the previous cycle's high.
   // Current: white-10% horizontal band between today's price and that previous top + deviation %/USD.
   function makeManipPrimitive(){ var ch=null;
-    var r={ draw:function(target){ if(!ch || !layers.manip || isIntra() || layerAlpha.manip<=0.01) return; var ts=ch.timeScale();
-      target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save(); var al=0.10*layerAlpha.manip;
-        ctx.fillStyle='rgba(255,255,255,'+al+')';
-        ANCHOR.manipRuns.forEach(function(run){ var x0,x1; try{ x0=ts.timeToCoordinate(run.from); x1=ts.timeToCoordinate(run.to); }catch(e){ return; } if(x0==null&&x1==null) return; if(x0==null)x0=0; if(x1==null)x1=W; if(x1<0||x0>W) return; var a=Math.max(0,x0), b=Math.min(W,x1); if(b<=a) return; ctx.fillRect(a,0,b-a,H); });
-        var prev=ANCHOR.prevHighNow, today=ACTIVE.length?ACTIVE[ACTIVE.length-1].close:null;
-        if(prev && today!=null && today<prev.price){ var yT,yP; try{ yT=area.priceToCoordinate(prev.price); yP=area.priceToCoordinate(today); }catch(e){ yT=null; }
-          if(yT!=null&&yP!=null){ ctx.fillStyle='rgba(255,255,255,'+al+')'; ctx.fillRect(0,Math.min(yT,yP),W,Math.abs(yP-yT));
-            var pct=(today-prev.price)/prev.price*100, usd=today-prev.price, txt=pct.toFixed(1)+'% · -$'+wkFmtPrice(Math.abs(usd));
-            ctx.font='700 10px -apple-system,system-ui,sans-serif'; var w=ctx.measureText(txt).width+10; ctx.globalAlpha=Math.min(1,layerAlpha.manip);
-            ctx.fillStyle='rgba(13,16,22,.82)'; ctx.fillRect(W-w-4, yP+6, w, 17); ctx.fillStyle='#fff'; ctx.textBaseline='top'; ctx.fillText(txt, W-w, yP+9); ctx.globalAlpha=1;
-          } }
+    var r={ draw:function(target){ if(!ch || !layers.manip || isIntra() || layerAlpha.manip<=0.01) return; var ts=ch.timeScale(); var M=ANCHOR.manip; if(!M||!M.latestHigh) return;
+      target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save(); var a=layerAlpha.manip;
+        var yHigh; try{ yHigh=area.priceToCoordinate(M.latestHigh.price); }catch(e){ yHigh=null; }
+        // current-deviation horizontal band: current price → latest cycle high (white ~5%)
+        var today=(livePrice!=null?livePrice:(ACTIVE.length?ACTIVE[ACTIVE.length-1].close:null));
+        if(today!=null && yHigh!=null && today<M.latestHigh.price){ var yP; try{ yP=area.priceToCoordinate(today); }catch(e){ yP=null; }
+          if(yP!=null){ ctx.fillStyle='rgba(255,255,255,'+(0.05*a)+')'; ctx.fillRect(0,Math.min(yHigh,yP),W,Math.abs(yP-yHigh)); } }
+        // deviation zones — white 1px outline + faint fill (current cycle, price-bounded by [low, latest high])
+        (M.devZones||[]).forEach(function(z){ var x0,x1,yl; try{ x0=ts.timeToCoordinate(z.from); x1=ts.timeToCoordinate(z.to); yl=area.priceToCoordinate(z.low); }catch(e){ return; }
+          if(yHigh==null||yl==null) return; if(x0==null)x0=0; if(x1==null)x1=W; var bx=Math.max(0,x0), bw=Math.min(W,x1)-bx; if(bw<=1) return; var top=Math.min(yHigh,yl), hh=Math.abs(yl-yHigh); if(hh<1) return;
+          ctx.fillStyle='rgba(255,255,255,'+(0.06*a)+')'; ctx.fillRect(bx,top,bw,hh);
+          ctx.strokeStyle='rgba(255,255,255,'+(0.85*a)+')'; ctx.lineWidth=1; ctx.strokeRect(bx+0.5,top+0.5,Math.max(1,bw-1),Math.max(1,hh-1)); });
         ctx.restore();
       }); } };
     return { attached:function(p){ ch=p.chart; if(p.requestUpdate) primReqs.push(p.requestUpdate); }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'bottom'; }, renderer:function(){ return r; } } ]; } };
   }
   function setManip(on){ layers.manip=on; saveLayers();
-    if(on){ if(!manipAttached){ try{ area.attachPrimitive(manipPrim); manipAttached=true; }catch(e){} } layerAlpha.manip=0; fadeLayer('manip',1); }
-    else { fadeLayer('manip',0, function(){ try{ area.detachPrimitive(manipPrim); manipAttached=false; }catch(e){} }); }
+    if(on){ if(!manipAttached){ try{ area.attachPrimitive(manipPrim); manipAttached=true; }catch(e){} } layerAlpha.manip=0; fadeLayer('manip',1); showManipBox(true); }
+    else { fadeLayer('manip',0, function(){ try{ area.detachPrimitive(manipPrim); manipAttached=false; }catch(e){} }); showManipBox(false); }
     syncLayerUI(); }
+  // ── manipulation v2 comparison box (draggable HTML overlay, position persisted) ───────────────
+  var manipBox=null;
+  function buildManipBox(){ if(manipBox) return manipBox; var host=document.getElementById('wk-chart'); if(!host) return null;
+    var b=document.createElement('div'); b.className='wk-manipbox'; b.id='wk-manipbox'; host.appendChild(b); manipBox=b;
+    var dragging=false, sx=0, sy=0, sl=0, st=0;
+    function ensureLT(){ if(b.style.left && b.style.left!=='auto') return; var r=b.getBoundingClientRect(), pr=host.getBoundingClientRect(); b.style.left=(r.left-pr.left)+'px'; b.style.top=(r.top-pr.top)+'px'; b.style.right='auto'; }
+    function down(e){ ensureLT(); dragging=true; b.classList.add('drag'); var p=e.touches?e.touches[0]:e; sx=p.clientX; sy=p.clientY; sl=parseFloat(b.style.left)||0; st=parseFloat(b.style.top)||0; e.preventDefault(); }
+    function move(e){ if(!dragging) return; var p=e.touches?e.touches[0]:e, pr=host.getBoundingClientRect(), bw=b.offsetWidth, bh=b.offsetHeight;
+      b.style.left=Math.max(0,Math.min(pr.width-bw, sl+(p.clientX-sx)))+'px'; b.style.top=Math.max(0,Math.min(pr.height-bh, st+(p.clientY-sy)))+'px'; e.preventDefault(); }
+    function up(){ if(dragging){ try{ localStorage.setItem('wk_manipbox_pos', JSON.stringify({left:parseFloat(b.style.left),top:parseFloat(b.style.top)})); }catch(e){} } dragging=false; b.classList.remove('drag'); }
+    b.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+    b.addEventListener('touchstart',down,{passive:false}); window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+    return b; }
+  function placeManipBox(){ if(!manipBox) return; var saved=null; try{ saved=JSON.parse(localStorage.getItem('wk_manipbox_pos')); }catch(e){}
+    if(saved && typeof saved.left==='number' && typeof saved.top==='number'){ manipBox.style.left=saved.left+'px'; manipBox.style.top=saved.top+'px'; manipBox.style.right='auto'; return; }
+    var M=ANCHOR.manip, y=null; try{ if(M&&M.latestHigh) y=area.priceToCoordinate(livePrice!=null?livePrice:M.latestHigh.price); }catch(e){}
+    manipBox.style.right='72px'; manipBox.style.left='auto'; manipBox.style.top=((y!=null&&isFinite(y))?Math.max(8,y+10):60)+'px'; }
+  function updateManipBox(){ if(!manipBox) return; var M=ANCHOR.manip, today=(livePrice!=null?livePrice:(ACTIVE.length?ACTIVE[ACTIVE.length-1].close:null));
+    if(!M||!M.latestHigh||today==null){ manipBox.innerHTML=''; return; }
+    var H=M.latestHigh.price, devPct=(today-H)/H*100, devUsd=today-H;
+    var dev=(devUsd<0?'-':'+')+Math.abs(devPct).toFixed(1)+'% · '+(devUsd<0?'-':'+')+'$'+wkFmtPrice(Math.abs(devUsd));
+    var rows=(M.prevCycles||[]).map(function(c){ var d=(c.depth!=null)?Math.round(c.depth)+'%':'—', du=(c.duration!=null)?c.duration+'d':'—';
+      return '<div class="wk-mb-row"><span class="wk-mb-cyc">'+c.label+'</span><span class="wk-mb-met"><b>'+d+'</b> · <b>'+du+'</b><span class="wk-mb-sub">depth · duration</span></span></div>'; }).join('');
+    manipBox.innerHTML='<div class="wk-mb-dev">'+dev+'</div><div class="wk-mb-lbl">current deviation</div>'
+      +'<div class="wk-mb-days">'+(M.daysBelow!=null?M.daysBelow:'—')+'<small>days below previous high</small></div>'
+      +'<div class="wk-mb-rule"></div><div class="wk-mb-head">VS prev. cycles · depth · duration</div>'+rows; }
+  function showManipBox(on){ buildManipBox(); if(!manipBox) return; if(on){ updateManipBox(); placeManipBox(); manipBox.style.display='block'; requestAnimationFrame(function(){ manipBox.classList.add('on'); }); }
+    else { manipBox.classList.remove('on'); setTimeout(function(){ if(!layers.manip && manipBox) manipBox.style.display='none'; }, 520); } }
   function updateHalvings(){ applyHalvLayer(); }   // primitive redraws itself; this just manages attach state
   var phasesAttached=false;
   function setPhases(on){ layers.phases=on; saveLayers();
@@ -2335,7 +2390,7 @@
     if(lb.high==null||livePrice>lb.high) lb.high=livePrice; if(lb.low==null||livePrice<lb.low) lb.low=livePrice; lb.close=livePrice; lb.value=livePrice;
     try{ area.update({time:lb.time,value:livePrice}); }catch(e){}
     try{ candle.update({time:lb.time,open:lb.open,high:lb.high,low:lb.low,close:livePrice}); }catch(e){}
-    positionLiveTag(); updateQuote(); }
+    positionLiveTag(); updateQuote(); if(layers.manip) updateManipBox(); }
   // Fase T: big headline price + 24h change in the top bar (green/red on the %)
   function updateQuote(){ var bp=document.getElementById('wk-bigprice'), ch=document.getElementById('wk-chg24'); if(!bp) return;
     if(livePrice!=null) bp.textContent=Math.round(livePrice).toLocaleString('en-US');
