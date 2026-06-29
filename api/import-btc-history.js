@@ -8,7 +8,6 @@
 // Idempotent upsert by date. CRON_SECRET. Returns coverage + milestone closes for ±5% check.
 
 import { sbUpsert } from '../lib/tokens.js';
-import { importMarketHistory } from '../lib/markethistory.js';
 
 const UA = { 'User-Agent': 'Mozilla/5.0 (compatible; bestbuy/1.0)', 'Accept': 'application/json' };
 const dstr = (sec) => new Date(sec * 1000).toISOString().slice(0, 10);
@@ -71,14 +70,6 @@ export default async function handler(req, res) {
   if (secret) {
     const q = (req.query && req.query.secret) || '';
     if (q !== secret && (req.headers['authorization'] || '') !== `Bearer ${secret}`) { res.status(401).json({ ok: false, error: 'unauthorized' }); return; }
-  }
-
-  // Alternate dataset: one-shot import of the cleaned Kaggle multi-coin history into market_history
-  // (kept here, not a new route, because Hobby caps a deployment at 12 Serverless Functions).
-  if (req.query && req.query.dataset === 'market-history') {
-    try { const r = await importMarketHistory(base, serviceKey); res.status(200).json(r); }
-    catch (e) { console.error('[import market-history] failed:', e && e.stack ? e.stack : e); res.status(502).json({ ok: false, error: e.message }); }
-    return;
   }
 
   const sources = {};
