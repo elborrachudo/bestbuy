@@ -534,6 +534,14 @@
   /* discreet guard toast */
   .wk-toast{position:absolute;left:50%;bottom:40px;transform:translateX(-50%);z-index:8;background:rgba(10,24,29,.96);border:1px solid #1a3a44;border-radius:9px;padding:8px 13px;font-size:12px;color:#e6f1f2;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .25s;pointer-events:none;max-width:80%;text-align:center;}
   .wk-toast.show{opacity:1;}
+  /* Fase P: global loading bar (top of Screen B). Determinate (real %) or indeterminate (honest loop). */
+  .wk-progress{position:fixed;top:0;left:0;right:0;z-index:60;display:none;opacity:0;transition:opacity .35s ease;pointer-events:none;}
+  .wk-progress.on{opacity:1;}
+  .wk-pg-bar{height:3px;width:100%;background:rgba(45,212,191,.10);overflow:hidden;}
+  .wk-pg-fill{height:100%;width:0;background:linear-gradient(90deg,#14b8a6,#5eead4);box-shadow:0 0 9px rgba(45,212,191,.75);border-radius:0 2px 2px 0;transition:width .22s ease;will-change:width,transform;}
+  .wk-progress.indet .wk-pg-fill{width:38%!important;transition:none;animation:wkpgIndet 1.15s cubic-bezier(.65,0,.35,1) infinite;}
+  @keyframes wkpgIndet{0%{transform:translateX(-130%)}100%{transform:translateX(360%)}}
+  .wk-pg-txt{position:absolute;top:4px;right:10px;font-size:11px;line-height:1;color:#bff6ec;background:rgba(8,23,28,.9);border:1px solid rgba(45,212,191,.28);border-top:none;border-radius:0 0 9px 9px;padding:4px 10px;letter-spacing:.2px;box-shadow:0 4px 14px rgba(0,0,0,.4);white-space:nowrap;max-width:78vw;overflow:hidden;text-overflow:ellipsis;}
   .wk-modetog{position:absolute;left:8px;bottom:8px;z-index:6;display:flex;flex-direction:column;gap:2px;background:rgba(8,23,28,.85);border:1px solid #1a3a44;border-radius:999px;padding:3px;}
   .wk-mode-b{width:28px;height:24px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#4f7780;cursor:pointer;border-radius:999px;padding:0;}
   .wk-mode-b.on{background:rgba(45,212,191,.22);color:#5eead4;}
@@ -562,6 +570,7 @@
   .wk-loading{display:flex;align-items:center;justify-content:center;height:72dvh;color:#4f7780;font-size:13px;}
 </style>
 <div id="screenB">
+  <div class="wk-progress" id="wk-progress" role="progressbar" aria-label="A carregar"><div class="wk-pg-bar"><div class="wk-pg-fill"></div></div><div class="wk-pg-txt"></div></div>
   <div class="wk-wrap">
     <div class="wk-card">
       <div class="wk-topbar">
@@ -2095,12 +2104,53 @@
     var tag=document.getElementById('wk-phasetag'); tag.style.background='rgba('+hexRgb(col)+',.16)'; tag.style.color=col;
   }
 
+  // ── Fase P: global loading bar API. Honest two modes: determinate (a real total is known →
+  // 0→100% with the true number) or indeterminate (no measurable end → animated loop, no fake %).
+  // Concurrency-safe: each start() returns an id; the bar shows the most recent task's label
+  // (+N when several overlap) and only fades out once every task is done — even if one fails.
+  var wkLoading=(function(){
+    var bar,fill,txt,order=[],tasks={},seq=0,hideT=null;
+    function grab(){ if(bar) return bar; bar=document.getElementById('wk-progress'); if(bar){ fill=bar.querySelector('.wk-pg-fill'); txt=bar.querySelector('.wk-pg-txt'); } return bar; }
+    function top(){ return order.length?tasks[order[order.length-1]]:null; }
+    function paint(){ if(!grab()) return; var t=top(); if(!t) return; var label=t.label; if(order.length>1) label+=' (+'+(order.length-1)+')';
+      if(t.total!=null && t.total>0){ var pct=Math.max(0,Math.min(100,Math.round(t.loaded/t.total*100)));
+        bar.classList.remove('indet'); fill.style.transform='none'; fill.style.width=pct+'%'; txt.textContent=label+' · '+pct+'%'; }
+      else { bar.classList.add('indet'); fill.style.width=''; txt.textContent=label; } }
+    function show(){ if(!grab()) return; clearTimeout(hideT); bar.style.display='block'; requestAnimationFrame(function(){ if(order.length) bar.classList.add('on'); }); paint(); }
+    function fade(){ if(!grab()) return; bar.classList.remove('on'); hideT=setTimeout(function(){ if(!order.length){ bar.style.display='none'; bar.classList.remove('indet'); if(fill){ fill.style.width='0'; fill.style.transform='none'; } } },440); }
+    return {
+      start:function(label,opt){ opt=opt||{}; var id='ld'+(seq++); tasks[id]={label:label||'A carregar…',total:(opt.total!=null?opt.total:null),loaded:0}; order.push(id); show(); return id; },
+      update:function(id,loaded,total){ var t=tasks[id]; if(!t) return; if(total!=null) t.total=total; if(loaded!=null) t.loaded=loaded; paint(); },
+      done:function(id){ if(!tasks[id]) return; var t=tasks[id]; delete tasks[id]; var i=order.indexOf(id); if(i>=0) order.splice(i,1);
+        if(order.length){ paint(); } else { if(t.total!=null && grab()&&fill){ fill.style.transform='none'; fill.style.width='100%'; } fade(); } }
+    };
+  })();
+  // stream a JSON fetch with Content-Length so the bar can show a REAL percentage; if the length is
+  // unknown (no header / no stream), fall back to a plain json() and the bar stays indeterminate.
+  function fetchJSONProgress(url, loadId){
+    return fetch(url).then(function(resp){
+      var total=parseInt((resp.headers&&resp.headers.get&&resp.headers.get('content-length'))||'0',10);
+      if(!resp.body||!resp.body.getReader||!total){ return resp.json(); }
+      wkLoading.update(loadId,0,total);
+      var reader=resp.body.getReader(),received=0,chunks=[];
+      function pump(){ return reader.read().then(function(r){
+        if(r.done){ var all=new Uint8Array(received),pos=0; chunks.forEach(function(c){ all.set(c,pos); pos+=c.length; });
+          return JSON.parse(new TextDecoder('utf-8').decode(all)); }
+        chunks.push(r.value); received+=r.value.length; wkLoading.update(loadId,received,total); return pump(); }); }
+      return pump();
+    });
+  }
   function initChart(){
     if(inited) return; inited=true;
-    fetch('/api/cycle-series').then(function(r){return r.json();}).then(function(j){
+    var dl=wkLoading.start('A carregar histórico BTC…');   // determinate once Content-Length is read
+    fetchJSONProgress('/api/cycle-series', dl).then(function(j){
+      wkLoading.done(dl);
       if(!j||!j.ok||!j.series||!j.series.length){ document.getElementById('wk-loading').textContent='sem dados (corre /api/backfill-cycle).'; return; }
-      DATA=j; render(j);
-    }).catch(function(e){ var l=document.getElementById('wk-loading'); if(l) l.textContent='erro a carregar: '+e.message; });
+      DATA=j;
+      var rid=wkLoading.start('A renderizar gráfico…');   // indeterminate: the render time isn't countable
+      // yield a frame so the bar paints before the synchronous (frame-blocking) render runs
+      setTimeout(function(){ try{ render(j); } finally{ wkLoading.done(rid); } }, 90);
+    }).catch(function(e){ wkLoading.done(dl); var l=document.getElementById('wk-loading'); if(l) l.textContent='erro a carregar: '+e.message; });
   }
 
   function render(j){
@@ -2643,9 +2693,11 @@
 
   function applyCandleSize(size, opt){ var spec=CSPEC[size]; if(!spec) return; opt=opt||{};
     var pre=visibleEpochRange();   // capture the current window (epoch) for the intraday (b) keep-in-place case
+    // Fase P: show the bar only when the tier must actually be fetched (a cached switch is instant → no bar)
+    var pid=(!tierCache[spec.tier]) ? wkLoading.start('A mudar para '+size+'…') : null;
     loadTier(spec.tier, function(cands){
       // intraday tier unavailable (network) → silent fallback to 1D (no toast); never an empty chart
-      if(spec.kind==='intra' && (!cands || !cands.length)){ if(size!=='1D') applyCandleSize('1D', {keepRange:true}); return; }
+      if(spec.kind==='intra' && (!cands || !cands.length)){ if(pid) wkLoading.done(pid); if(size!=='1D') applyCandleSize('1D', {keepRange:true}); return; }
       CSIZE=size; try{ sessionStorage.setItem('wk_csize', size); }catch(e){}
       ACTIVE=buildActive(size); CLOSE=ACTIVE.map(function(d){ return d.close; });
       var intra=spec.kind==='intra';
@@ -2669,6 +2721,7 @@
         } else { animateToFull(); }   // (a) wide/outside → animate to the window
       }
       else { setRangeDays(CS_WIN[size]); }
+      if(pid) wkLoading.done(pid);   // Fase P: switch complete
     });
   }
   function applyInitialCandleSize(){ var s='1D';   // ENFORCED default on every page open (ignore persisted choice)
