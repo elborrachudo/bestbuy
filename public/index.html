@@ -427,7 +427,30 @@
   .wk-pairwrap{display:flex;align-items:center;gap:7px;flex:0 0 auto;}
   .wk-nav{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border:1px solid #1a3a44;border-radius:9px;background:rgba(45,212,191,.06);color:#5eead4;cursor:pointer;padding:0;flex:0 0 auto;}
   .wk-nav svg{width:16px;height:16px;}
-  .wk-pair{font-size:18px;font-weight:800;letter-spacing:.02em;color:#e6f1f2;cursor:pointer;white-space:nowrap;}
+  .wk-pair{font-size:18px;font-weight:800;letter-spacing:.02em;color:#e6f1f2;cursor:pointer;white-space:nowrap;background:none;border:0;padding:0;display:inline-flex;align-items:center;gap:4px;}
+  /* asset selector + overlay ("+") menus */
+  .wk-asset-wrap{position:relative;display:inline-flex;align-items:center;gap:6px;}
+  .wk-plus{width:24px;height:24px;border-radius:8px;border:1px solid #1f4a55;background:#0e242c;color:#9fe9da;font-size:17px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+  .wk-plus:hover{background:rgba(45,212,191,.16);}
+  .wk-plus.on{background:rgba(45,212,191,.22);color:#5eead4;border-color:#2f8b7d;}
+  .wk-asset-menu,.wk-ov-menu{position:absolute;top:34px;left:0;right:auto;z-index:33;width:210px;max-height:60vh;overflow:auto;background:#0e242c;border:1px solid #1a3a44;border-radius:12px;padding:6px;box-shadow:0 16px 44px rgba(0,0,0,.6);display:none;opacity:0;transform:translateY(-6px);transition:opacity .22s ease,transform .22s ease;}
+  .wk-asset-menu.open,.wk-ov-menu.open{display:block;opacity:1;transform:translateY(0);}
+  .wk-srch{display:flex;align-items:center;gap:6px;padding:5px 8px;margin-bottom:5px;background:#08161b;border:1px solid #1a3a44;border-radius:9px;}
+  .wk-srch svg{width:14px;height:14px;color:#6f9aa2;flex:0 0 auto;}
+  .wk-srch input{flex:1;background:none;border:0;outline:none;color:#dbeee9;font-size:12px;min-width:0;}
+  .wk-asset-item{font-size:13px;color:#cfe7ec;padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .wk-asset-item:hover{background:rgba(45,212,191,.12);}
+  .wk-asset-item.on{background:rgba(45,212,191,.20);color:#5eead4;font-weight:600;}
+  .wk-asset-item .wk-ai-sym{font-weight:700;}
+  .wk-asset-item .wk-ai-dep{margin-left:auto;font-size:10px;color:#6f9aa2;font-weight:400;}
+  .wk-ov-item{font-size:12px;color:#cfe7ec;padding:7px 9px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .wk-ov-item:hover{background:rgba(45,212,191,.10);}
+  .wk-ov-item.on{background:rgba(45,212,191,.16);}
+  .wk-ov-chk{width:15px;height:15px;border-radius:4px;border:1px solid #2f6d63;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#0a1b21;}
+  .wk-ov-item.on .wk-ov-chk{background:#5eead4;border-color:#5eead4;}
+  .wk-ov-col{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.2);padding:0;flex:0 0 auto;cursor:pointer;background:none;margin-left:auto;}
+  .wk-ov-head{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6f9aa2;padding:6px 9px 2px;}
+  .wk-ov-nm{flex:1;}
   .wk-quote{margin-left:auto;display:flex;align-items:baseline;gap:7px;flex:0 0 auto;}
   .wk-bigprice{font-size:21px;font-weight:800;letter-spacing:-.01em;color:#e6f1f2;font-variant-numeric:tabular-nums;line-height:1;white-space:nowrap;}
   .wk-chg24{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:#7fa6ad;white-space:nowrap;}
@@ -627,7 +650,18 @@
         <div class="wk-tb1">
           <div class="wk-pairwrap">
             <button class="wk-nav" id="wk-navA" title="Trocar de ecrã" aria-label="Trocar de ecrã"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg></button>
-            <span class="wk-pair" id="wk-pair" title="BTC — mais tokens em breve">BTC</span>
+            <div class="wk-asset-wrap" id="wk-assetWrap">
+              <button class="wk-pair" id="wk-assetBtn" title="Ativo principal"><span id="wk-assetLabel">BTC</span> <span class="wk-per-caret">▾</span></button>
+              <div class="wk-per-menu wk-asset-menu" id="wk-assetMenu">
+                <div class="wk-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="text" id="wk-assetSrch" placeholder="Pesquisar ativo…" autocomplete="off"></div>
+                <div class="wk-asset-list" id="wk-assetList"></div>
+              </div>
+              <button class="wk-plus" id="wk-ovBtn" title="Sobrepor ativos / séries" aria-label="Sobreposições">+</button>
+              <div class="wk-per-menu wk-ov-menu" id="wk-ovMenu">
+                <div class="wk-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="text" id="wk-ovSrch" placeholder="Pesquisar sobreposição…" autocomplete="off"></div>
+                <div class="wk-ov-list" id="wk-ovList"></div>
+              </div>
+            </div>
           </div>
           <span class="wk-phasetag" id="wk-phasetag"><span class="wk-sw" id="wk-phasesw"></span><span id="wk-phasetxt">—</span></span>
           <div class="wk-quote"><span class="wk-bigprice" id="wk-bigprice">—</span><span class="wk-chg24" id="wk-chg24"></span></div>
@@ -1824,6 +1858,7 @@
   var DATA=null, byTime={}, isLog=true, mode='line';
   var livePrice=null, live24h=null, liveTimer=null, liveTag=null, livePrim=null;   // Fase L/T: live BTC price + 24h change (5s, display-only)
   var CLOSE=[], oscReg={};   // CLOSE: active close series · oscReg: id -> {series:[…],pane,priceLines:[…],kind}
+  var ASSET='BTC', assetDaily={}, overlays={};   // multi-asset: base asset (BTC default), per-coin daily cache, overlay-series registry
   // ── candle-size tiers (price granularity) ─────────────────────────────────────
   // The price candles can be served at 12 resolutions from 3 stored tiers (daily=btc_history,
   // 1h=btc_1h, 1m=btc_1m). ACTIVE is whatever series is currently shown — aggregated on the fly
@@ -2302,6 +2337,9 @@
     try{ el.addEventListener('pointerdown', panDown); el.addEventListener('pointermove', panMove, {passive:true}); el.addEventListener('pointerup', panUp); el.addEventListener('pointercancel', function(){ _pan.tracking=false; }); }catch(e){}
     wireTitles(); wireConfigurator(); updateMenuLabels();
     relayout(); wireToolbar(); wireLayers(); initCycMode(); initDom(); applyInitialPeriod(); applyInitialCandleSize();
+    initAssetSelector();
+    // restore a persisted non-BTC asset (data + layers ready by now)
+    try{ var sa=sessionStorage.getItem('wk_asset'); if(sa && sa!=='BTC' && ASSET_LIST.some(function(a){return a.sym===sa;})) applyAsset(sa); }catch(e){}
     rebuildMaLayers();   // build any MA layers persisted on (applyInitialCandleSize only builds them for non-1D)
   }
 
@@ -2431,7 +2469,7 @@
   // ── live-price line: a 1px teal dotted horizontal at the live level, from the right-axis tag across
   //   to the forming candle. Redrawn every tick (LOG-aware via priceToCoordinate); above the grid. ──
   function makeLivePrimitive(){ var ch=null;
-    var r={ draw:function(target){ if(!ch || livePrice==null || !area) return; var y; try{ y=area.priceToCoordinate(livePrice); }catch(e){ return; } if(y==null||!isFinite(y)) return;
+    var r={ draw:function(target){ if(!ch || livePrice==null || !area || ASSET!=='BTC') return; var y; try{ y=area.priceToCoordinate(livePrice); }catch(e){ return; } if(y==null||!isFinite(y)) return;
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width; ctx.save(); ctx.setLineDash([1.5,3]); ctx.lineWidth=1; ctx.strokeStyle='rgba(45,212,191,.85)';
         var yy=Math.round(y)+0.5; ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(W,yy); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); }); } };
     return { attached:function(p){ ch=p.chart; if(p.requestUpdate) primReqs.push(p.requestUpdate); }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'top'; }, renderer:function(){ return r; } } ]; } };
@@ -2717,8 +2755,129 @@
   function aggDay(cands, grp){ var out=[],cur=null,key=null,i; for(i=0;i<cands.length;i++){ var c=cands[i]; var k=dayKey(c.t,grp);
     if(k!==key){ if(cur)out.push(cur); cur={time:k,open:c.o,high:c.h,low:c.l,close:c.c,value:c.c,p:c.p,mayer:c.mayer,pct:c.pct,ma50w:c.ma50w,ma200w:c.ma200w,ma50d:c.ma50d,ma200d:c.ma200d}; key=k; }
     else { if(c.h>cur.high)cur.high=c.h; if(c.l<cur.low)cur.low=c.l; cur.close=c.c; cur.value=c.c; cur.p=c.p; cur.mayer=c.mayer; cur.pct=c.pct; cur.ma50w=c.ma50w; cur.ma200w=c.ma200w; cur.ma50d=c.ma50d; cur.ma200d=c.ma200d; } } if(cur)out.push(cur); return out; }
-  function buildActive(size){ var spec=CSPEC[size]||CSPEC['1D']; var cands=tierCache[spec.tier]||[]; return spec.kind==='intra' ? aggIntra(cands, spec.sec) : aggDay(cands, spec.grp); }
+  function buildActive(size){ var spec=CSPEC[size]||CSPEC['1D'];
+    if(ASSET!=='BTC'){ var base=assetDaily[ASSET]||[]; return aggDay(base, spec.kind==='intra'?'D':spec.grp); }   // non-BTC: daily-family only, from market_history
+    var cands=tierCache[spec.tier]||[]; return spec.kind==='intra' ? aggIntra(cands, spec.sec) : aggDay(cands, spec.grp); }
   function loadTier(tier, cb){ if(tierCache[tier]){ cb(tierCache[tier]); return; } fetch('/api/btc-candles?tier='+tier).then(function(r){return r.json();}).then(function(j){ tierCache[tier]=(j&&j.ok&&j.candles)?j.candles:[]; cb(tierCache[tier]); }).catch(function(){ tierCache[tier]=[]; cb([]); }); }
+
+  // ── Multi-asset selector + overlays (Screen B) ────────────────────────────────────────────────
+  // Asset list (depth = first date that exists; honest start, no invention before it). BTC keeps its
+  // deeper btc_history series; the other 9 come from market_history (1D only).
+  var ASSET_LIST=[
+    {sym:'BTC',dep:'2011'},{sym:'ETH',dep:'2017'},{sym:'ADA',dep:'2017'},{sym:'BNB',dep:'2017'},
+    {sym:'DOGE',dep:'2017'},{sym:'XRP',dep:'2017'},{sym:'LTC',dep:'2017'},{sym:'SOL',dep:'2020'},
+    {sym:'DOT',dep:'2020'},{sym:'AVAX',dep:'2020'}];
+  var ASSET_COLORS={BTC:'#f7931a',ETH:'#627eea',ADA:'#3468d1',AVAX:'#e84142',BNB:'#f3ba2f',DOGE:'#c2a633',DOT:'#e6007a',LTC:'#5c6bc0',SOL:'#14f195',XRP:'#7fbbe0'};
+  // overlay catalogue: 10 assets (price, own hidden scale) + 9 own-axis series.
+  var OV_SERIES=[
+    {id:'btcd',label:'BTC.D — dominância',color:'#f7931a'},
+    {id:'ethd',label:'ETH.D — dominância',color:'#627eea'},
+    {id:'stabled',label:'STABLE.D — presente',color:'#26a17b'},
+    {id:'othersd',label:'OTHERS.D — presente',color:'#a78bfa'},
+    {id:'fng',label:'Fear & Greed (0–100)',color:'#facc15'},
+    {id:'dxy',label:'DXY — dólar',color:'#e5e7eb'},
+    {id:'us10y',label:'US10Y — juro 10 anos',color:'#fb923c'},
+    {id:'mayer',label:'Mayer Multiple',color:'#22d3ee'},
+    {id:'mcap',label:'Total market cap',color:'#34d399'}];
+  function ovLabel(id){ var s=OV_SERIES.filter(function(x){return x.id===id;})[0]; if(s) return s.label; return id; }
+  function ovDefColor(id){ if(id.indexOf('asset:')===0){ return ASSET_COLORS[id.slice(6)]||'#5eead4'; } var s=OV_SERIES.filter(function(x){return x.id===id;})[0]; return s?s.color:'#5eead4'; }
+
+  // fetch a {time,value} line for an overlay id (asset:<COIN> price, or a series id), cached.
+  var ovDataCache={};
+  function fetchOverlayData(id, cb){ if(ovDataCache[id]){ cb(ovDataCache[id]); return; }
+    var url = (id.indexOf('asset:')===0) ? ('/api/btc-candles?tier=daily&coin='+id.slice(6)) : ('/api/btc-candles?series='+id);
+    fetch(url).then(function(r){return r.json();}).then(function(j){
+      var pts=[];
+      if(j&&j.ok){ if(j.candles) pts=j.candles.map(function(d){ return {time:d.t,value:d.c}; });
+        else if(j.points) pts=j.points.map(function(d){ return {time:d.t,value:d.v}; }); }
+      pts=pts.filter(function(p){ return p.value!=null&&isFinite(p.value); });
+      ovDataCache[id]=pts; cb(pts);
+    }).catch(function(){ ovDataCache[id]=[]; cb([]); }); }
+
+  // overlay state persistence: { id: {color} } for the ones turned on
+  function loadOvState(){ try{ return JSON.parse(sessionStorage.getItem('wk_overlays')||'{}')||{}; }catch(e){ return {}; } }
+  function saveOvState(){ var st={}; Object.keys(overlays).forEach(function(id){ st[id]={color:overlays[id].color}; }); try{ sessionStorage.setItem('wk_overlays', JSON.stringify(st)); }catch(e){} }
+
+  function addOverlay(id, color){ if(!chart||overlays[id]) return; color=color||ovDefColor(id);
+    var scaleId='wkov_'+id.replace(/[^a-z0-9]/gi,'_');
+    var s; try{ s=chart.addSeries(L.LineSeries,{color:color,lineWidth:1.5,priceScaleId:scaleId,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false},0); }catch(e){ return; }
+    try{ chart.priceScale(scaleId).applyOptions({visible:false,scaleMargins:{top:0.08,bottom:0.08}}); }catch(e){}   // own INVISIBLE scale → doesn't distort the base price axis ("new price scale")
+    overlays[id]={series:s,color:color,scaleId:scaleId};
+    fetchOverlayData(id, function(pts){ try{ s.setData(pts); }catch(e){} });
+    saveOvState(); refreshOvUI(); }
+  function removeOverlay(id){ var o=overlays[id]; if(!o) return; try{ chart.removeSeries(o.series); }catch(e){} delete overlays[id]; saveOvState(); refreshOvUI(); }
+  function setOverlayColor(id, color){ var o=overlays[id]; if(!o) return; o.color=color; try{ o.series.applyOptions({color:color}); }catch(e){} saveOvState(); refreshOvUI(); }
+  function toggleOverlay(id){ if(overlays[id]) removeOverlay(id); else addOverlay(id); }
+
+  // load a coin's daily series (market_history), compute MAs over it, join BTC's mayer/pct/phase by
+  // date (the cycle indicators + phases stay BTC-relative — the thesis), cache it.
+  function loadAssetDaily(coin, cb){ if(coin==='BTC'||assetDaily[coin]){ cb(); return; }
+    fetch('/api/btc-candles?tier=daily&coin='+coin).then(function(r){return r.json();}).then(function(j){
+      var dc=(j&&j.ok&&j.candles)?j.candles:[];
+      var closes=dc.map(function(d){return d.c;});
+      var m50=smaArr(closes,50),m200=smaArr(closes,200),m350=smaArr(closes,350),m1400=smaArr(closes,1400);
+      assetDaily[coin]=dc.map(function(d,i){ var b=byTime[d.t]||{};
+        return {t:d.t,o:(d.o!=null?d.o:d.c),h:(d.h!=null?d.h:d.c),l:(d.l!=null?d.l:d.c),c:d.c,v:d.v,
+          ma50d:m50[i],ma200d:m200[i],ma50w:m350[i],ma200w:m1400[i], p:b.p,mayer:b.mayer,pct:b.pct}; });
+      cb();
+    }).catch(function(){ assetDaily[coin]=[]; cb(); }); }
+
+  function applyAsset(coin){ if(!chart) return; var menu=document.getElementById('wk-assetMenu'); if(menu) menu.classList.remove('open');
+    if(coin===ASSET){ return; }
+    loadAssetDaily(coin, function(){
+      ASSET=coin; try{ sessionStorage.setItem('wk_asset', coin); }catch(e){}
+      var lab=document.getElementById('wk-assetLabel'); if(lab) lab.textContent=coin;
+      var area2=document.getElementById('wk-assetBtn'); if(area2) area2.title=coin;
+      if(coin!=='BTC'){ CSIZE='1D'; var cl=document.getElementById('wk-csLabel'); if(cl) cl.textContent='1D';
+        Array.prototype.forEach.call(document.querySelectorAll('.wk-cs-item'),function(it){ it.classList.toggle('on', it.dataset.cs==='1D'); }); }
+      // grey the candle-size button for non-BTC (only 1D exists), restore for BTC
+      var csBtn=document.getElementById('wk-csBtn'); if(csBtn) csBtn.classList.toggle('wk-cs-off', coin!=='BTC');
+      ACTIVE=buildActive(CSIZE); CLOSE=ACTIVE.map(function(d){return d.close;});
+      setSeriesData(); applyLive();
+      updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators(); rebuildMaLayers();
+      setRangeDays(coin==='BTC'?90:0);   // coin → fit its full history; BTC → 90D default
+      refreshAssetUI(); positionLiveTag();
+    }); }
+
+  // ── menu rendering + search ───────────────────────────────────────────────────────────────────
+  function refreshAssetUI(){ var lab=document.getElementById('wk-assetLabel'); if(lab) lab.textContent=ASSET;
+    Array.prototype.forEach.call(document.querySelectorAll('#wk-assetList .wk-asset-item'),function(it){ it.classList.toggle('on', it.dataset.sym===ASSET); }); }
+  function buildAssetList(filter){ var host=document.getElementById('wk-assetList'); if(!host) return; host.innerHTML=''; filter=(filter||'').trim().toUpperCase();
+    ASSET_LIST.filter(function(a){ return !filter || a.sym.indexOf(filter)>=0; }).forEach(function(a){
+      var it=document.createElement('div'); it.className='wk-asset-item'+(a.sym===ASSET?' on':''); it.dataset.sym=a.sym;
+      it.innerHTML='<span class="wk-ai-sym" style="color:'+(ASSET_COLORS[a.sym]||'#cfe7ec')+'">'+a.sym+'</span><span class="wk-ai-dep">desde '+a.dep+'</span>';
+      it.onclick=function(){ applyAsset(a.sym); }; host.appendChild(it); }); }
+  function refreshOvUI(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-ovList .wk-ov-item'),function(it){ var id=it.dataset.id; var on=!!overlays[id];
+      it.classList.toggle('on', on); var chk=it.querySelector('.wk-ov-chk'); if(chk) chk.textContent=on?'✓':''; var col=it.querySelector('.wk-ov-col'); if(col){ col.style.background=(overlays[id]?overlays[id].color:ovDefColor(id)); } });
+    var b=document.getElementById('wk-ovBtn'); if(b) b.classList.toggle('on', Object.keys(overlays).length>0); }
+  function ovRow(id,label,color){ var on=!!overlays[id];
+    var it=document.createElement('div'); it.className='wk-ov-item'+(on?' on':''); it.dataset.id=id;
+    it.innerHTML='<span class="wk-ov-chk">'+(on?'✓':'')+'</span><span class="wk-ov-nm">'+label+'</span><input type="color" class="wk-ov-col" value="'+(on?overlays[id].color:color)+'" title="Cor">';
+    it.querySelector('.wk-ov-nm').onclick=function(){ toggleOverlay(id); };
+    it.querySelector('.wk-ov-chk').onclick=function(){ toggleOverlay(id); };
+    var ci=it.querySelector('.wk-ov-col'); ci.onclick=function(e){ e.stopPropagation(); }; ci.oninput=function(e){ if(!overlays[id]) addOverlay(id, e.target.value); else setOverlayColor(id, e.target.value); };
+    return it; }
+  function buildOvList(filter){ var host=document.getElementById('wk-ovList'); if(!host) return; host.innerHTML=''; filter=(filter||'').trim().toLowerCase();
+    var hA=document.createElement('div'); hA.className='wk-ov-head'; hA.textContent='Ativos (escala própria)'; host.appendChild(hA);
+    ASSET_LIST.forEach(function(a){ var id='asset:'+a.sym, label=a.sym; if(filter && label.toLowerCase().indexOf(filter)<0) return; host.appendChild(ovRow(id,label,ovDefColor(id))); });
+    var hB=document.createElement('div'); hB.className='wk-ov-head'; hB.textContent='Séries (eixo próprio)'; host.appendChild(hB);
+    OV_SERIES.forEach(function(s){ if(filter && s.label.toLowerCase().indexOf(filter)<0) return; host.appendChild(ovRow(s.id,s.label,s.color)); }); }
+
+  function initAssetSelector(){
+    var aBtn=document.getElementById('wk-assetBtn'), aMenu=document.getElementById('wk-assetMenu'), aSrch=document.getElementById('wk-assetSrch');
+    var oBtn=document.getElementById('wk-ovBtn'), oMenu=document.getElementById('wk-ovMenu'), oSrch=document.getElementById('wk-ovSrch');
+    if(!aBtn) return;
+    buildAssetList(''); buildOvList('');
+    aBtn.onclick=function(e){ e.stopPropagation(); if(oMenu) oMenu.classList.remove('open'); var open=aMenu.classList.toggle('open'); if(open){ buildAssetList(aSrch?aSrch.value:''); if(aSrch){ aSrch.focus(); } } };
+    oBtn.onclick=function(e){ e.stopPropagation(); if(aMenu) aMenu.classList.remove('open'); var open=oMenu.classList.toggle('open'); if(open){ buildOvList(oSrch?oSrch.value:''); if(oSrch){ oSrch.focus(); } } };
+    if(aSrch) aSrch.addEventListener('input', function(){ buildAssetList(aSrch.value); });
+    if(oSrch) oSrch.addEventListener('input', function(){ buildOvList(oSrch.value); });
+    [aMenu,oMenu].forEach(function(m){ if(m) m.addEventListener('click', function(e){ e.stopPropagation(); }); });
+    document.addEventListener('click', function(){ if(aMenu) aMenu.classList.remove('open'); if(oMenu) oMenu.classList.remove('open'); });
+    // restore persisted overlays (asset restore happens in render once data is ready)
+    var ov=loadOvState(); Object.keys(ov).forEach(function(id){ addOverlay(id, ov[id].color); });
+    refreshOvUI();
+  }
 
   // ── Fase L: live BTC price (CoinGecko, client-side, 5s, fault-tolerant, display-only) ──────────
   function fetchLive(){ if(!bodyEl.classList.contains('wk-b')) return;   // only poll while Screen B is showing
@@ -2727,7 +2886,11 @@
       .then(function(j){ var b=j&&j.bitcoin, p=b&&b.usd; if(b&&b.usd_24h_change!=null&&isFinite(b.usd_24h_change)) live24h=b.usd_24h_change;
         if(p&&isFinite(p)&&p>0){ livePrice=p; applyLive(); } else updateQuote(); })
       .catch(function(){ /* network blip → keep last value, never break the chart */ }); }
-  function applyLive(){ if(livePrice==null||!area||!ACTIVE.length){ updateQuote(); return; } var lb=ACTIVE[ACTIVE.length-1];
+  function applyLive(){
+    // Live feed is BTC-only. While a non-BTC asset is shown, keep the top-bar BTC ticker but don't
+    // merge BTC's live price into the (other-asset) candle or draw the live line/tag at BTC's level.
+    if(ASSET!=='BTC'){ updateQuote(); try{ if(liveTag) liveTag.style.display='none'; }catch(e){} return; }
+    if(livePrice==null||!area||!ACTIVE.length){ updateQuote(); return; } var lb=ACTIVE[ACTIVE.length-1];
     // develop the latest candle: close follows live; high/low expand if exceeded (the bar "breathes")
     if(lb.high==null||livePrice>lb.high) lb.high=livePrice; if(lb.low==null||livePrice<lb.low) lb.low=livePrice; lb.close=livePrice; lb.value=livePrice;
     try{ area.update({time:lb.time,value:livePrice}); }catch(e){}
@@ -2735,6 +2898,7 @@
     positionLiveTag(); updateQuote(); if(layers.manip) updateManipBox(); tickPrims(); }   // tickPrims → live-price line follows the new tick
   // Fase T: big headline price + 24h change in the top bar (green/red on the %)
   function updateQuote(){ var bp=document.getElementById('wk-bigprice'), ch=document.getElementById('wk-chg24'); if(!bp) return;
+    if(ASSET!=='BTC'){ bp.textContent='—'; if(ch){ ch.textContent=''; ch.className='wk-chg24'; } return; }   // live quote is BTC-only
     if(livePrice!=null) bp.textContent=Math.round(livePrice).toLocaleString('en-US');
     if(ch){ if(live24h==null){ ch.textContent=''; ch.className='wk-chg24'; }
       else { var up=live24h>=0; ch.textContent=(up?'+':'')+live24h.toFixed(2)+'%'; ch.className='wk-chg24 '+(up?'up':'down'); } } }
@@ -3063,6 +3227,7 @@
   var _measCtx=null;   // shared canvas for shrink-to-fit text measurement
   function measureTagPx(s,size){ if(!_measCtx) _measCtx=document.createElement('canvas').getContext('2d'); _measCtx.font='700 '+size+'px -apple-system,system-ui,sans-serif'; return _measCtx.measureText(s).width; }
   function positionLiveTag(){ if(!liveTag) liveTag=document.getElementById('wk-livetag'); if(!liveTag) return;
+    if(ASSET!=='BTC'){ liveTag.style.display='none'; return; }   // live tag is BTC-only
     if(livePrice==null||!area){ liveTag.style.display='none'; return; }
     var y=null; try{ y=area.priceToCoordinate(livePrice); }catch(e){}
     if(y==null||!isFinite(y)){ liveTag.style.display='none'; return; }
@@ -3115,6 +3280,7 @@
     }catch(e){ fitRealContent(); } }
 
   function applyCandleSize(size, opt){ var spec=CSPEC[size]; if(!spec) return; opt=opt||{};
+    if(ASSET!=='BTC' && size!=='1D'){ notify(ASSET+': só velas diárias (1D)'); var m=document.getElementById('wk-csMenu'); if(m) m.classList.remove('open'); return; }   // non-BTC = daily only
     var pre=visibleEpochRange();   // capture the current window (epoch) for the intraday (b) keep-in-place case
     // Fase P: show the bar only when the tier must actually be fetched (a cached switch is instant → no bar)
     var pid=(!tierCache[spec.tier]) ? wkLoading.start('A mudar para '+size+'…') : null;
