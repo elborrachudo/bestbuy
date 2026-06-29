@@ -1911,10 +1911,12 @@
     }
     var dayPhase={}; runs.forEach(function(r){ var i0=idxGE(r.from); for(var i=i0;i<dates.length && dates[i]<=r.to;i++) dayPhase[dates[i]]=r.phase; });
     var curPhase=dayPhase[dates[dates.length-1]]||null;
-    // ── manipulation v2: everything references the LATEST cycle high (the current cycle's peak, ≈126k) ──
-    // (owner-confirmed reference). All figures are computed from the real daily series — never hardcoded.
+    // ── manipulation v2: reference = the PREVIOUS cycle high (the peak of the cycle BEFORE the current
+    // one — e.g. the 2020→2024 cycle's top ≈69k/2021), NOT the current cycle's 126k. "Manipulation" = the
+    // price trading below the prior cycle's peak. All figures computed from the real daily series.
     var highsEx=ex.filter(function(e){return e.kind==='high';}), lowsEx=ex.filter(function(e){return e.kind==='low';});
-    var latestHigh=highsEx.length?highsEx[highsEx.length-1]:null;            // 126k / 2025
+    var latestHigh=highsEx.length?highsEx[highsEx.length-1]:null;            // current cycle top (126k) — context only
+    var refHigh=highsEx.length>=2?highsEx[highsEx.length-2]:null;            // PREVIOUS cycle top (≈69k) = manipulation reference
     var PREV_LABELS=['2021','2018','2014'];
     var prevCycles=[];
     for(var pc=0;pc<3;pc++){ var hi=highsEx[highsEx.length-2-pc]; if(!hi) break;   // H2021, H2017, H2013 (most-recent first)
@@ -1922,13 +1924,24 @@
       var depth=lo?((lo.price-hi.price)/hi.price*100):null;                  // how deep the bear went (%)
       var dur=null; for(var di=0;di<daily.length;di++){ var dd=daily[di]; if(dd.t<=hi.date) continue; if((dd.h!=null?dd.h:dd.c)>=hi.price){ dur=Math.round(dayDiff(hi.date,dd.t)); break; } }   // days below the top until price reclaims it
       prevCycles.push({label:PREV_LABELS[pc], depth:depth, duration:dur, high:hi.price, low:lo?lo.price:null}); }
-    // deviation zones in the CURRENT cycle: contiguous runs (after the latest high) where close < latest high
+    // current cycle window = from the latest halving (its left edge) to today
+    var cycStart=hd.length?hd[hd.length-1]:dates[0];
+    // deviation zones = discrete windows in the CURRENT cycle where close < the previous cycle high (≈69k)
     var devZones=[], zr=null;
-    if(latestHigh){ for(var zi=0;zi<daily.length;zi++){ var zd=daily[zi]; if(zd.t<=latestHigh.date) continue; var zlo=(zd.l!=null?zd.l:zd.c);
-        if(zd.c<latestHigh.price){ if(!zr) zr={from:zd.t,to:zd.t,low:zlo}; else { zr.to=zd.t; if(zlo<zr.low) zr.low=zlo; } }
+    if(refHigh){ for(var zi=0;zi<daily.length;zi++){ var zd=daily[zi]; if(zd.t<cycStart) continue; var zlo=(zd.l!=null?zd.l:zd.c);
+        if(zd.c<refHigh.price){ if(!zr) zr={from:zd.t,to:zd.t,low:zlo}; else { zr.to=zd.t; if(zlo<zr.low) zr.low=zlo; } }
         else if(zr){ devZones.push(zr); zr=null; } } if(zr) devZones.push(zr); }
-    var daysBelow=latestHigh?Math.round(dayDiff(latestHigh.date, dates[dates.length-1])):null;   // days since the peak (ongoing)
-    var manip={ latestHigh:latestHigh, prevCycles:prevCycles, devZones:devZones, daysBelow:daysBelow };
+    // merge runs separated by a brief reclaim (≤30 days) so the chop around the reference high
+    // collapses into a few discrete deviation windows (not one per single-day cross of 69k)
+    if(devZones.length>1){ var merged=[devZones[0]];
+      for(var mi=1;mi<devZones.length;mi++){ var curZ=devZones[mi], prevZ=merged[merged.length-1];
+        if(dayDiff(prevZ.to, curZ.from)<=30){ prevZ.to=curZ.to; if(curZ.low<prevZ.low) prevZ.low=curZ.low; }
+        else merged.push(curZ); }
+      devZones=merged; }
+    // days below the previous high = days since the price last closed at/above it (the most recent cross-below)
+    var daysBelow=null; if(refHigh){ var lastAbove=null; for(var ai=0;ai<daily.length;ai++){ if(daily[ai].c>=refHigh.price) lastAbove=daily[ai].t; }
+      daysBelow=Math.round(dayDiff(lastAbove||dates[0], dates[dates.length-1])); }
+    var manip={ refHigh:refHigh, latestHigh:latestHigh, prevCycles:prevCycles, devZones:devZones, daysBelow:daysBelow };
     return {runs:runs, dayPhase:dayPhase, extremes:ex, curPhase:curPhase, manip:manip};
   }
 
@@ -2301,12 +2314,12 @@
   // Historical: white-10% vertical bands over every window where close < the previous cycle's high.
   // Current: white-10% horizontal band between today's price and that previous top + deviation %/USD.
   function makeManipPrimitive(){ var ch=null;
-    var r={ draw:function(target){ if(!ch || !layers.manip || isIntra() || layerAlpha.manip<=0.01) return; var ts=ch.timeScale(); var M=ANCHOR.manip; if(!M||!M.latestHigh) return;
+    var r={ draw:function(target){ if(!ch || !layers.manip || isIntra() || layerAlpha.manip<=0.01) return; var ts=ch.timeScale(); var M=ANCHOR.manip; if(!M||!M.refHigh) return;
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save(); var a=layerAlpha.manip;
-        var yHigh; try{ yHigh=area.priceToCoordinate(M.latestHigh.price); }catch(e){ yHigh=null; }
-        // current-deviation horizontal band: current price → latest cycle high (white ~5%)
+        var yHigh; try{ yHigh=area.priceToCoordinate(M.refHigh.price); }catch(e){ yHigh=null; }
+        // current-deviation horizontal band: current price → previous cycle high (white ~5%)
         var today=(livePrice!=null?livePrice:(ACTIVE.length?ACTIVE[ACTIVE.length-1].close:null));
-        if(today!=null && yHigh!=null && today<M.latestHigh.price){ var yP; try{ yP=area.priceToCoordinate(today); }catch(e){ yP=null; }
+        if(today!=null && yHigh!=null && today<M.refHigh.price){ var yP; try{ yP=area.priceToCoordinate(today); }catch(e){ yP=null; }
           if(yP!=null){ ctx.fillStyle='rgba(255,255,255,'+(0.05*a)+')'; ctx.fillRect(0,Math.min(yHigh,yP),W,Math.abs(yP-yHigh)); } }
         // deviation zones — white 1px outline + faint fill (current cycle, price-bounded by [low, latest high])
         (M.devZones||[]).forEach(function(z){ var x0,x1,yl; try{ x0=ts.timeToCoordinate(z.from); x1=ts.timeToCoordinate(z.to); yl=area.priceToCoordinate(z.low); }catch(e){ return; }
@@ -2336,11 +2349,11 @@
     return b; }
   function placeManipBox(){ if(!manipBox) return; var saved=null; try{ saved=JSON.parse(localStorage.getItem('wk_manipbox_pos')); }catch(e){}
     if(saved && typeof saved.left==='number' && typeof saved.top==='number'){ manipBox.style.left=saved.left+'px'; manipBox.style.top=saved.top+'px'; manipBox.style.right='auto'; return; }
-    var M=ANCHOR.manip, y=null; try{ if(M&&M.latestHigh) y=area.priceToCoordinate(livePrice!=null?livePrice:M.latestHigh.price); }catch(e){}
+    var M=ANCHOR.manip, y=null; try{ if(M&&M.refHigh) y=area.priceToCoordinate(livePrice!=null?livePrice:M.refHigh.price); }catch(e){}
     manipBox.style.right='72px'; manipBox.style.left='auto'; manipBox.style.top=((y!=null&&isFinite(y))?Math.max(8,y+10):60)+'px'; }
   function updateManipBox(){ if(!manipBox) return; var M=ANCHOR.manip, today=(livePrice!=null?livePrice:(ACTIVE.length?ACTIVE[ACTIVE.length-1].close:null));
-    if(!M||!M.latestHigh||today==null){ manipBox.innerHTML=''; return; }
-    var H=M.latestHigh.price, devPct=(today-H)/H*100, devUsd=today-H;
+    if(!M||!M.refHigh||today==null){ manipBox.innerHTML=''; return; }
+    var H=M.refHigh.price, devPct=(today-H)/H*100, devUsd=today-H;
     var dev=(devUsd<0?'-':'+')+Math.abs(devPct).toFixed(1)+'% · '+(devUsd<0?'-':'+')+'$'+wkFmtPrice(Math.abs(devUsd));
     var rows=(M.prevCycles||[]).map(function(c){ var d=(c.depth!=null)?Math.round(c.depth)+'%':'—', du=(c.duration!=null)?c.duration+'d':'—';
       return '<div class="wk-mb-row"><span class="wk-mb-cyc">'+c.label+'</span><span class="wk-mb-met"><b>'+d+'</b> · <b>'+du+'</b><span class="wk-mb-sub">depth · duration</span></span></div>'; }).join('');
@@ -2478,7 +2491,9 @@
   function saveDrawings(){ if(!drawMgr) return; try{ localStorage.setItem('wk_drawings', JSON.stringify(drawMgr.exportDrawings())); }catch(e){} }
   function loadDrawings(){ if(!drawMgr||!drawReg) return; try{ var raw=localStorage.getItem('wk_drawings'); if(!raw) return; var data=JSON.parse(raw); if(!data||!data.length) return;
     drawMgr.importDrawings(data, function(type,d){ return drawReg.createDrawing(d.type, d.id, d.anchors, d.style, d.options); }); }catch(e){} }
+  var drawWired=false;
   function wireDrawing(){
+    if(drawWired) return; drawWired=true;   // guard: even if render() ran twice, the global listeners attach ONCE
     var D=window.LightweightChartsDrawing;
     var bar=document.getElementById('wk-drawbar');
     if(!D || !chart || !area){ if(bar) bar.style.display='none'; return; }   // CDN failed → hide bar, never break the chart
@@ -2493,9 +2508,10 @@
     // creation: each tap places one anchor (coords converted via the chart's scales — LOG aware). When the
     // active tool's required-anchor count is reached, the drawing is created. Listening on the container's
     // 'click' (which the browser suppresses after a drag) means panning never accidentally places anchors.
-    var chEl=document.getElementById('wk-chart'); var seq=0;
-    chEl.addEventListener('click', function(ev){ if(!drawTool) return; if(ev.target.closest('.wk-drawbar,.wk-modetog,.wk-legend,.wk-livetag,.wk-titles')) return;
-      var rect=chEl.getBoundingClientRect(), px=ev.clientX-rect.left, py=ev.clientY-rect.top;
+    var chEl=document.getElementById('wk-chart'); var seq=0, lastTouchPlace=0;
+    function placeAnchorAt(clientX, clientY, targetEl){ if(!drawTool) return;
+      if(targetEl && targetEl.closest && targetEl.closest('.wk-drawbar,.wk-modetog,.wk-legend,.wk-livetag,.wk-titles')) return;
+      var rect=chEl.getBoundingClientRect(), px=clientX-rect.left, py=clientY-rect.top;
       var t=null,price=null; try{ t=chart.timeScale().coordinateToTime(px); }catch(e){} try{ price=area.coordinateToPrice(py); }catch(e){}
       if(t==null || price==null) return;
       drawPending.push({time:t, price:price});
@@ -2503,8 +2519,24 @@
       if(drawPending.length>=need){ try{ var dr=drawReg.createDrawing(drawTool,'wkd_'+drawTool+'_'+(seq++)+'_'+px, drawPending.slice());
           if(dr){ drawMgr.addDrawing(dr); saveDrawings(); } }catch(e){}
         drawPending=[]; }   // tool stays active for repeated drawing; Cursor or ESC exits draw mode
+    }
+    // desktop: 'click' (suppressed by the browser after a drag, so panning never places anchors)
+    chEl.addEventListener('click', function(ev){ if(!drawTool) return; if(Date.now()-lastTouchPlace<700) return;   // a touch tap already placed this anchor
+      placeAnchorAt(ev.clientX, ev.clientY, ev.target); });
+    // touch: the chart canvas swallows the synthetic click, so place on a clean tap (single finger,
+    // little movement, short press) — a pan/pinch moves more than the threshold and is ignored.
+    var tStart=null;
+    chEl.addEventListener('touchstart', function(ev){ if(!drawTool) return; if(ev.touches.length!==1){ tStart=null; return; } var p=ev.touches[0]; tStart={x:p.clientX,y:p.clientY,time:Date.now()}; }, {passive:true});
+    chEl.addEventListener('touchend', function(ev){ if(!drawTool || !tStart) return; var p=ev.changedTouches[0];
+      if(Math.abs(p.clientX-tStart.x)>10 || Math.abs(p.clientY-tStart.y)>10 || Date.now()-tStart.time>600){ tStart=null; return; }
+      placeAnchorAt(p.clientX, p.clientY, ev.target); lastTouchPlace=Date.now(); tStart=null; ev.preventDefault(); }, {passive:false});
+    document.addEventListener('keydown', function(e){
+      if(!bodyEl.classList.contains('wk-b')) return;
+      if(e.key==='Escape' && drawTool){ exitDraw(); return; }
+      // Delete / Backspace removes the selected drawing (desktop). Trash button does the same on mobile.
+      if((e.key==='Delete'||e.key==='Backspace') && drawSelId && drawMgr){ var tg=e.target; if(tg&&(tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.isContentEditable)) return;
+        try{ drawMgr.removeDrawing(drawSelId); }catch(_){} drawSelId=null; saveDrawings(); e.preventDefault(); }
     });
-    document.addEventListener('keydown', function(e){ if(e.key==='Escape' && drawTool) exitDraw(); });
     document.addEventListener('click', function(e){ if(!e.target.closest('.wk-dgroup')) closeFlyouts(); });
   }
   var _measCtx=null;   // shared canvas for shrink-to-fit text measurement
