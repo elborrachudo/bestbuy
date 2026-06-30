@@ -451,6 +451,19 @@
   .wk-ov-col{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.2);padding:0;flex:0 0 auto;cursor:pointer;background:none;margin-left:auto;}
   .wk-ov-head{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6f9aa2;padding:6px 9px 2px;}
   .wk-ov-nm{flex:1;}
+  /* Accumulation / Distribution toggles */
+  .wk-ad-wrap{position:relative;display:inline-flex;}
+  .wk-ad-menu{width:184px;right:auto;left:0;}
+  .wk-ad-btn{font-size:11px;font-weight:600;color:#7fa6ad;border:1px solid #1a3a44;background:rgba(45,212,191,.04);border-radius:999px;padding:5px 11px;cursor:pointer;line-height:1;}
+  .wk-ad-btn.on{background:rgba(34,197,94,.18);border-color:#2f8b5e;color:#86efac;}
+  #wk-distBtn.wk-ad-btn.on{background:rgba(244,63,94,.18);border-color:#9f3a48;color:#fda4af;}
+  .wk-ad-item{font-size:12px;color:#cfe7ec;padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .wk-ad-item:hover{background:rgba(94,234,212,.10);}
+  .wk-ad-chk{width:14px;height:14px;border-radius:4px;border:1px solid #2f6d63;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#0a1b21;}
+  .wk-ad-item.on .wk-ad-chk{background:#5eead4;border-color:#5eead4;}
+  .wk-ad-item.on .wk-ad-chk::after{content:'✓';}
+  .wk-ad-nm{flex:1;}
+  .wk-ad-exp{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#fbbf24;border:1px solid rgba(251,191,36,.4);border-radius:999px;padding:1px 5px;}
   /* scenarios (rocket) */
   .wk-rocket{width:26px;height:24px;border-radius:8px;border:1px solid #1f4a55;background:#0e242c;font-size:14px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
   .wk-rocket:hover{background:rgba(45,212,191,.16);}
@@ -784,6 +797,20 @@
             </div>
             <button class="wk-layer" data-layer="halvings" title="Halvings"><span class="wk-hbtc">H₿</span></button>
             <button class="wk-layer" data-layer="manip">Manip</button>
+            <div class="wk-ad-wrap" id="wk-accWrap">
+              <button class="wk-ad-btn" id="wk-accBtn" title="Accumulation (fundo)">Accumulation <span class="wk-per-caret">▾</span></button>
+              <div class="wk-cyc-menu wk-ad-menu" id="wk-accMenu">
+                <div class="wk-ad-item" data-ad="accStruct"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Structural</span></div>
+                <div class="wk-ad-item" data-ad="accWyck"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Wyckoff events</span><span class="wk-ad-exp">exp.</span></div>
+              </div>
+            </div>
+            <div class="wk-ad-wrap" id="wk-distWrap">
+              <button class="wk-ad-btn" id="wk-distBtn" title="Distribution (topo)">Distribution <span class="wk-per-caret">▾</span></button>
+              <div class="wk-cyc-menu wk-ad-menu" id="wk-distMenu">
+                <div class="wk-ad-item" data-ad="distStruct"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Structural</span></div>
+                <div class="wk-ad-item" data-ad="distWyck"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Wyckoff events</span><span class="wk-ad-exp">exp.</span></div>
+              </div>
+            </div>
             <button class="wk-layer" data-layer="maw">50/200W</button>
             <button class="wk-layer" data-layer="mad">50/200D</button>
           </div>
@@ -2329,6 +2356,7 @@
     try{ phasePrim=makePhasePrimitive(buildRuns(ACTIVE)); if(layers.phases){ area.attachPrimitive(phasePrim); phasesAttached=true; } }catch(e){}
     try{ halvPrim=makeHalvingPrimitive(); if(layers.halvings){ area.attachPrimitive(halvPrim); halvAttached=true; } }catch(e){}
     try{ manipPrim=makeManipPrimitive(); if(layers.manip){ area.attachPrimitive(manipPrim); manipAttached=true; } }catch(e){}
+    try{ computeAccDist(); accDistPrim=makeAccDistPrimitive(); area.attachPrimitive(accDistPrim); }catch(e){}   // Fase D pt2: Acc/Dist (draw() no-ops until a toggle is on)
     try{ domPrim=makeDomPrimitive(); area.attachPrimitive(domPrim); domAttached=true; }catch(e){}   // Fase D: dominance markers (draw() no-ops until a metric is enabled)
     try{ livePrim=makeLivePrimitive(); area.attachPrimitive(livePrim); }catch(e){}   // live-price dotted line (draws at the live level each tick)
     try{ crossPrim=makeCrossPrimitive(); area.attachPrimitive(crossPrim); }catch(e){}   // MA crossover circles + glow
@@ -2374,7 +2402,7 @@
     try{ el.addEventListener('pointerdown', panDown); el.addEventListener('pointermove', panMove, {passive:true}); el.addEventListener('pointerup', panUp); el.addEventListener('pointercancel', function(){ _pan.tracking=false; }); }catch(e){}
     wireTitles(); wireConfigurator(); updateMenuLabels();
     relayout(); wireToolbar(); wireLayers(); initCycMode(); initDom(); applyInitialPeriod(); applyInitialCandleSize();
-    initAssetSelector(); initRocket();
+    initAssetSelector(); initRocket(); initAccDist();
     // restore a persisted non-BTC asset (data + layers ready by now)
     try{ var sa=sessionStorage.getItem('wk_asset'); if(sa && sa!=='BTC' && ASSET_LIST.some(function(a){return a.sym===sa;})) applyAsset(sa); }catch(e){}
     rebuildMaLayers();   // build any MA layers persisted on (applyInitialCandleSize only builds them for non-1D)
@@ -2532,6 +2560,67 @@
       }); } };
     return { attached:function(p){ ch=p.chart; }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'normal'; }, renderer:function(){ return r; } } ]; } };
   }
+
+  // ── Accumulation / Distribution (Fase D pt2) ──────────────────────────────────────────────────
+  // Semantic colours: green=Acc/bottom/strength, red=Dist/top/weakness. Two independent toggles,
+  // each with (a) Structural — shade the detected Acc/Dist phase runs, graded by signal convergence
+  // (Mayer / historical percentile / drawdown), and (b) Wyckoff events (EXPERIMENTAL) — a price-action
+  // heuristic marking SC/Spring (Acc) and BC/UTAD (Dist). Follows the visible asset (uses ACTIVE).
+  var accDist={accStruct:false, accWyck:false, distStruct:false, distWyck:false};
+  var accConv=[], distConv=[], wyckAcc=[], wyckDist=[], adTimeIdx={}, accDistPrim=null, accDistReq=null;
+  function loadAccDist(){ try{ var s=JSON.parse(sessionStorage.getItem('wk_accdist')||'{}'); Object.keys(accDist).forEach(function(k){ if(typeof s[k]==='boolean') accDist[k]=s[k]; }); }catch(e){} }
+  function saveAccDist(){ try{ sessionStorage.setItem('wk_accdist', JSON.stringify(accDist)); }catch(e){} }
+  function thinEvents(list){ list.sort(function(a,b){return a.i-b.i;}); var out=[], last=-99; list.forEach(function(e){ if(e.i-last>=8){ out.push(e); last=e.i; } }); return out; }
+  function computeAccDist(){ accConv=[]; distConv=[]; wyckAcc=[]; wyckDist=[]; adTimeIdx={}; var n=ACTIVE.length; if(!n) return;
+    var ath=-Infinity, dd=new Array(n), i;
+    for(i=0;i<n;i++){ adTimeIdx[ACTIVE[i].time]=i; var c=ACTIVE[i].close; if(c>ath) ath=c; dd[i]=(ath>0)?(c/ath-1):0; }
+    for(i=0;i<n;i++){ var m=ACTIVE[i].mayer, pc=ACTIVE[i].pct, a=0, d=0;   // convergence (0..3 → 0..1)
+      if(m!=null&&m<1.0) a++; if(pc!=null&&pc<35) a++; if(dd[i]<-0.45) a++;
+      if(m!=null&&m>2.0) d++; if(pc!=null&&pc>80) d++; if(dd[i]>-0.08) d++;
+      accConv[i]=a/3; distConv[i]=d/3; }
+    var L=20;   // Wyckoff: false breaks of the trailing L-bar range + climax bars (heuristic)
+    for(i=L;i<n;i++){ var lo=ACTIVE[i].low, hi=ACTIVE[i].high, cc=ACTIVE[i].close, oo=ACTIVE[i].open, supp=Infinity, res=-Infinity, j;
+      for(j=i-L;j<i;j++){ if(ACTIVE[j].low<supp) supp=ACTIVE[j].low; if(ACTIVE[j].high>res) res=ACTIVE[j].high; }
+      var rng=(hi-lo)/(cc||1), body=(hi-lo)||1e-9;
+      if(lo<supp*0.985 && cc>supp) wyckAcc.push({i:i,type:'Spring',value:lo});               // sweep below support, recover
+      else if(rng>0.13 && cc<oo && (cc-lo)/body<0.32) wyckAcc.push({i:i,type:'SC',value:lo});  // selling climax
+      if(hi>res*1.015 && cc<res) wyckDist.push({i:i,type:'UTAD',value:hi});                    // sweep above resistance, reject
+      else if(rng>0.13 && cc>oo && (hi-cc)/body<0.32) wyckDist.push({i:i,type:'BC',value:hi}); // buying climax
+    }
+    wyckAcc=thinEvents(wyckAcc); wyckDist=thinEvents(wyckDist); }
+  function makeAccDistPrimitive(){ var ch=null;
+    var shade={ draw:function(target){ if(!ch||!(accDist.accStruct||accDist.distStruct)) return; var ts=ch.timeScale();
+      target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save();
+        buildRuns(ACTIVE).forEach(function(run){ var isAcc=run.p==='accumulation', isDist=run.p==='distribution';
+          if(!((isAcc&&accDist.accStruct)||(isDist&&accDist.distStruct))) return;
+          var x0,x1; try{ x0=ts.timeToCoordinate(run.from); }catch(e){x0=null;} try{ x1=ts.timeToCoordinate(run.to); }catch(e){x1=null;}
+          if(x0==null)x0=0; if(x1==null)x1=W; if(x1<=x0) return;
+          var i0=adTimeIdx[run.from]==null?0:adTimeIdx[run.from], i1=adTimeIdx[run.to]==null?ACTIVE.length-1:adTimeIdx[run.to], sum=0,cnt=0,k;
+          for(k=i0;k<=i1&&k<ACTIVE.length;k++){ var cv=isAcc?accConv[k]:distConv[k]; if(cv!=null){ sum+=cv; cnt++; } }
+          var a=0.07+(cnt?sum/cnt:0)*0.18;
+          ctx.fillStyle=isAcc?('rgba(34,197,94,'+a+')'):('rgba(244,63,94,'+a+')'); ctx.fillRect(x0,0,x1-x0,H);
+          if(x1-x0>30){ ctx.fillStyle=isAcc?'rgba(134,239,172,.92)':'rgba(253,164,175,.92)'; ctx.font='700 10px -apple-system,system-ui,sans-serif'; ctx.textAlign='center'; ctx.fillText(isAcc?'Acc':'Dist',(x0+x1)/2,13); }
+        }); ctx.restore(); }); } };
+    var marks={ draw:function(target){ if(!ch||!(accDist.accWyck||accDist.distWyck)) return; var ts=ch.timeScale();
+      target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width; ctx.save(); ctx.font='700 9px -apple-system,system-ui,sans-serif'; ctx.textAlign='center';
+        function drawEv(list,color,below){ list.forEach(function(ev){ var x; try{ x=ts.timeToCoordinate(ACTIVE[ev.i].time); }catch(e){ x=null; } if(x==null||x<-24||x>W+24) return; var y; try{ y=area.priceToCoordinate(ev.value); }catch(e){ y=null; } if(y==null) return;
+          ctx.beginPath(); ctx.arc(x,y,3,0,6.283); ctx.fillStyle=color; ctx.fill(); ctx.fillText(ev.type, x, below?y+15:y-9); }); }
+        if(accDist.accWyck) drawEv(wyckAcc,'#22c55e',true); if(accDist.distWyck) drawEv(wyckDist,'#f43f5e',false);
+        ctx.restore(); }); } };
+    return { attached:function(p){ ch=p.chart; accDistReq=p.requestUpdate; if(p.requestUpdate) primReqs.push(p.requestUpdate); }, updateAllViews:function(){},
+      paneViews:function(){ return [ {zOrder:function(){return 'bottom';},renderer:function(){return shade;}}, {zOrder:function(){return 'top';},renderer:function(){return marks;}} ]; } }; }
+  function refreshAccDistUI(){ var ab=document.getElementById('wk-accBtn'), db=document.getElementById('wk-distBtn');
+    if(ab) ab.classList.toggle('on', accDist.accStruct||accDist.accWyck); if(db) db.classList.toggle('on', accDist.distStruct||accDist.distWyck);
+    Array.prototype.forEach.call(document.querySelectorAll('.wk-ad-item'),function(it){ it.classList.toggle('on', !!accDist[it.dataset.ad]); }); }
+  function redrawAccDist(){ try{ if(accDistReq) accDistReq(); }catch(e){} }
+  function initAccDist(){ loadAccDist();
+    function wire(btnId, menuId){ var btn=document.getElementById(btnId), menu=document.getElementById(menuId); if(!btn||!menu) return;
+      btn.addEventListener('click',function(e){ e.stopPropagation(); var open=menu.classList.contains('open');
+        Array.prototype.forEach.call(document.querySelectorAll('.wk-ad-menu.open'),function(m){ m.classList.remove('open'); }); if(!open) menu.classList.add('open'); });
+      menu.addEventListener('click',function(e){ e.stopPropagation(); var it=e.target.closest('.wk-ad-item'); if(!it) return; var k=it.dataset.ad; accDist[k]=!accDist[k]; saveAccDist(); refreshAccDistUI(); redrawAccDist(); }); }
+    wire('wk-accBtn','wk-accMenu'); wire('wk-distBtn','wk-distMenu');
+    document.addEventListener('click',function(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-ad-menu.open'),function(m){ m.classList.remove('open'); }); });
+    refreshAccDistUI(); }
 
   // ── manipulation layer (Fase IV) — toggle "Manip." ────────────────────────────
   // Historical: white-10% vertical bands over every window where close < the previous cycle's high.
@@ -2904,6 +2993,7 @@
       // grey the candle-size button for non-BTC (only 1D exists), restore for BTC
       var csBtn=document.getElementById('wk-csBtn'); if(csBtn) csBtn.classList.toggle('wk-cs-off', coin!=='BTC');
       ACTIVE=buildActive(CSIZE); CLOSE=ACTIVE.map(function(d){return d.close;});
+      computeAccDist();
       setSeriesData(); applyLive();
       updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators(); rebuildMaLayers();
       setRangeDays(coin==='BTC'?90:0);   // coin → fit its full history; BTC → 90D default
@@ -3512,6 +3602,7 @@
       CSIZE=size; try{ sessionStorage.setItem('wk_csize', size); }catch(e){}
       try{ clearScenario(); }catch(e){}   // projection is 1D-specific — drop it on timeframe change
       ACTIVE=buildActive(size); CLOSE=ACTIVE.map(function(d){ return d.close; });
+      try{ computeAccDist(); }catch(e){}
       var intra=spec.kind==='intra';
       try{ chart.applyOptions({timeScale:{timeVisible:intra, secondsVisible:false}}); }catch(e){}
       setSeriesData();   // real candles + future whitespace for the new resolution
