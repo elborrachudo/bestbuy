@@ -2427,7 +2427,7 @@
   function positionTitles(){ var host=document.getElementById('wk-titles'); if(!host||!chart) return; var panes; try{ panes=chart.panes(); }catch(e){ return; }
     var idByPane={}; Object.keys(oscReg).forEach(function(id){ try{ idByPane[oscReg[id].pane.paneIndex()]=id; }catch(e){} });
     host.innerHTML=''; var y=0;
-    for(var i=0;i<panes.length;i++){ var ph=0; try{ ph=panes[i].getHeight(); }catch(e){} var id=i===0?'':(idByPane[i]||''); var txt=i===0?'BTC':(id&&OSC[id]?OSC[id].title:'');
+    for(var i=0;i<panes.length;i++){ var ph=0; try{ ph=panes[i].getHeight(); }catch(e){} var id=i===0?'':(idByPane[i]||''); var txt=i===0?ASSET:(id&&OSC[id]?OSC[id].title:'');   // price-pane title follows the active asset
       if(txt){ var div=document.createElement('div'); div.className='wk-ptitle'+(id?' wk-ptitle-osc':''); div.textContent=txt; div.style.top=(y+2)+'px'; div.dataset.osc=id; host.appendChild(div); }
       y+=ph+1; }
     // pin the Line/Candles toggle to the BOTTOM-LEFT OF THE PRICE PANE (pane 0), never over an
@@ -2874,7 +2874,7 @@
       setSeriesData(); applyLive();
       updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators(); rebuildMaLayers();
       setRangeDays(coin==='BTC'?90:0);   // coin → fit its full history; BTC → 90D default
-      refreshAssetUI(); positionLiveTag();
+      refreshAssetUI(); positionLiveTag(); positionTitles();
     }); }
 
   // ── menu rendering + search ───────────────────────────────────────────────────────────────────
