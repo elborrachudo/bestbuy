@@ -451,6 +451,41 @@
   .wk-ov-col{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.2);padding:0;flex:0 0 auto;cursor:pointer;background:none;margin-left:auto;}
   .wk-ov-head{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6f9aa2;padding:6px 9px 2px;}
   .wk-ov-nm{flex:1;}
+  /* scenarios (rocket) */
+  .wk-rocket{width:26px;height:24px;border-radius:8px;border:1px solid #1f4a55;background:#0e242c;font-size:14px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
+  .wk-rocket:hover{background:rgba(45,212,191,.16);}
+  .wk-rocket.on{background:rgba(94,234,212,.22);border-color:#2f8b7d;}
+  .wk-rocket-menu{width:236px;left:0;}
+  .wk-rk-item{font-size:12px;color:#cfe7ec;padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .wk-rk-item:hover{background:rgba(94,234,212,.12);}
+  .wk-rk-item.on{background:rgba(94,234,212,.18);color:#5eead4;}
+  .wk-rk-item.soon{opacity:.5;cursor:not-allowed;}
+  .wk-rk-num{width:18px;height:18px;border-radius:50%;background:#08161b;border:1px solid #2f6d63;font-size:10px;display:inline-flex;align-items:center;justify-content:center;color:#7fd9c9;flex:0 0 auto;}
+  .wk-rk-soon{margin-left:auto;font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#6f9aa2;border:1px solid #2a4a52;border-radius:999px;padding:1px 6px;}
+  /* rocket PIN modal (chart-scoped, pjdc266 style) */
+  .wk-rkpin{position:absolute;inset:0;z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:radial-gradient(ellipse at center,rgba(4,10,7,.82),rgba(2,5,4,.94));font-family:'Courier New',monospace;}
+  .wk-rkpin.on{display:flex;}
+  .wk-rkpin .wk-rkpin-crest{width:54px;height:54px;border-radius:50%;border:2px solid rgba(94,234,212,.6);display:flex;align-items:center;justify-content:center;font-size:24px;box-shadow:0 0 22px rgba(94,234,212,.35);}
+  .wk-rkpin .wk-rkpin-t{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#cfe7ec;}
+  .wk-rkpin-pins{display:flex;gap:10px;}
+  .wk-rkpin-pin{width:44px;height:54px;border-radius:8px;background:rgba(8,18,12,.85);border:1px solid rgba(94,234,212,.35);color:#5eead4;font-size:24px;text-align:center;line-height:54px;outline:none;font-family:'Courier New',monospace;}
+  .wk-rkpin-pin:focus{border-color:#5eead4;box-shadow:0 0 14px rgba(94,234,212,.45);}
+  .wk-rkpin-pin.err{border-color:#ff4d4d;box-shadow:0 0 14px rgba(255,77,77,.6);animation:pjdc266-shake .4s;}
+  .wk-rkpin-x{position:absolute;top:12px;right:14px;background:none;border:0;color:#9fb3a8;font-size:20px;cursor:pointer;}
+  /* scenario explainer panel (draggable) */
+  .wk-scen{position:absolute;z-index:32;width:228px;background:rgba(7,22,27,.97);border:1px solid #1f4a55;border-radius:12px;box-shadow:0 16px 44px rgba(0,0,0,.6);color:#dbeee9;font-size:12px;display:none;left:auto;right:14px;top:64px;}
+  .wk-scen.show{display:block;}
+  .wk-scen-h{display:flex;align-items:center;gap:8px;padding:9px 11px;cursor:move;border-bottom:1px solid rgba(31,74,85,.6);}
+  .wk-scen-dot{width:9px;height:9px;border-radius:50%;background:#5eead4;box-shadow:0 0 8px #5eead4;flex:0 0 auto;}
+  .wk-scen-name{font-weight:700;font-size:12px;color:#e6f1f2;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .wk-scen-cl{background:none;border:0;color:#9fb3a8;cursor:pointer;font-size:13px;padding:0 2px;}
+  .wk-scen-body{padding:9px 11px;}
+  .wk-scen.collapsed .wk-scen-body{display:none;}
+  .wk-scen.collapsed .wk-scen-h{border-bottom:0;}
+  .wk-scen-lbl{color:#9fe9da;margin-bottom:8px;}
+  .wk-scen-sim{font-size:10px;color:#6f9aa2;margin-bottom:9px;line-height:1.5;}
+  .wk-scen-dl{width:100%;padding:7px;border-radius:8px;border:1px solid #2f8b7d;background:rgba(45,212,191,.14);color:#9fe9da;font-size:12px;cursor:pointer;}
+  .wk-scen-dl:hover{background:rgba(45,212,191,.24);}
   .wk-quote{margin-left:auto;display:flex;align-items:baseline;gap:7px;flex:0 0 auto;}
   .wk-bigprice{font-size:21px;font-weight:800;letter-spacing:-.01em;color:#e6f1f2;font-variant-numeric:tabular-nums;line-height:1;white-space:nowrap;}
   .wk-chg24{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;color:#7fa6ad;white-space:nowrap;}
@@ -661,6 +696,8 @@
                 <div class="wk-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="text" id="wk-ovSrch" placeholder="Pesquisar sobreposição…" autocomplete="off"></div>
                 <div class="wk-ov-list" id="wk-ovList"></div>
               </div>
+              <button class="wk-rocket" id="wk-rocketBtn" title="Scenarios" aria-label="Scenarios">🚀</button>
+              <div class="wk-per-menu wk-rocket-menu" id="wk-rocketMenu"><div class="wk-ov-head">Scenarios — future projection</div><div class="wk-rk-list" id="wk-rkList"></div></div>
             </div>
           </div>
           <span class="wk-phasetag" id="wk-phasetag"><span class="wk-sw" id="wk-phasesw"></span><span id="wk-phasetxt">—</span></span>
@@ -2337,7 +2374,7 @@
     try{ el.addEventListener('pointerdown', panDown); el.addEventListener('pointermove', panMove, {passive:true}); el.addEventListener('pointerup', panUp); el.addEventListener('pointercancel', function(){ _pan.tracking=false; }); }catch(e){}
     wireTitles(); wireConfigurator(); updateMenuLabels();
     relayout(); wireToolbar(); wireLayers(); initCycMode(); initDom(); applyInitialPeriod(); applyInitialCandleSize();
-    initAssetSelector();
+    initAssetSelector(); initRocket();
     // restore a persisted non-BTC asset (data + layers ready by now)
     try{ var sa=sessionStorage.getItem('wk_asset'); if(sa && sa!=='BTC' && ASSET_LIST.some(function(a){return a.sym===sa;})) applyAsset(sa); }catch(e){}
     rebuildMaLayers();   // build any MA layers persisted on (applyInitialCandleSize only builds them for non-1D)
@@ -2825,6 +2862,7 @@
   function applyAsset(coin){ if(!chart) return; var menu=document.getElementById('wk-assetMenu'); if(menu) menu.classList.remove('open');
     if(coin===ASSET){ return; }
     loadAssetDaily(coin, function(){
+      try{ clearScenario(); }catch(e){}   // a projection is BTC/1D-specific — drop it on asset change
       ASSET=coin; try{ sessionStorage.setItem('wk_asset', coin); }catch(e){}
       var lab=document.getElementById('wk-assetLabel'); if(lab) lab.textContent=coin;
       var area2=document.getElementById('wk-assetBtn'); if(area2) area2.title=coin;
@@ -2878,6 +2916,157 @@
     var ov=loadOvState(); Object.keys(ov).forEach(function(id){ addOverlay(id, ov[id].color); });
     refreshOvUI();
   }
+
+  // ── Scenarios engine (rocket → PIN 0223 → dropdown → animated future projection) ──────────────
+  // Honest, client-side (no ML). Horizon-aware config so future intraday horizons can be added.
+  var SCENARIOS=[
+    {id:'dual-horizon', n:1, name:'Dual-Horizon Heuristic', label:'Trend + vol bootstrap', soon:false},
+    {id:'knn', n:2, name:'Cycle-State k-NN', soon:true},
+    {id:'stretch', n:3, name:'Cycle Stretch-Fit', soon:true},
+    {id:'meanrev', n:4, name:'Mean-Reversion (200W/Mayer)', soon:true},
+    {id:'quantile', n:5, name:'Quantile Scenario Bands', soon:true}];
+  var HORIZON={ tf:'1D', endDate:'2036-07-01' };   // 1D → summer 2036 (only active horizon for now)
+  var scenSeries=null, activeScenario=null, scenAnim=null, scenData=null;
+  function rocketUnlocked(){ try{ return sessionStorage.getItem('wk_rocket_ok')==='1'; }catch(e){ return false; } }
+  function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+  function daysBetween(a,b){ return Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000); }
+  function addDaysStr(d,k){ return new Date(Date.parse(d+'T00:00:00Z')+k*86400000).toISOString().slice(0,10); }
+
+  // Hypothesis 1 — Dual-Horizon Heuristic: smooth macro trend (damped/capped drift + 200W-MA pull)
+  // + micro deviations (bootstrapped recent daily returns → full OHLC). Teal candles, opacity decays
+  // with distance. Deterministic per session (seeded PRNG). Always projects BTC (deepest series).
+  function buildDualHorizon(){
+    var src=(tierCache.daily||[]).filter(function(d){ return d.c>0; });
+    if(src.length<400) return null;
+    var closes=src.map(function(d){return d.c;});
+    var lastDate=src[src.length-1].t, last=closes[closes.length-1];
+    var ma200w=src[src.length-1].ma200w||last;
+    var N=daysBetween(lastDate, HORIZON.endDate); if(N<10) return null;
+    var win=Math.min(1460, closes.length-1), sumlr=0;
+    for(var i=closes.length-win;i<closes.length;i++){ sumlr+=Math.log(closes[i]/closes[i-1]); }
+    var mu=sumlr/win; mu=Math.max(-0.0005, Math.min(0.0016, mu));   // capped daily drift
+    var rwin=Math.min(365, closes.length-1), rets=[];
+    for(var j=closes.length-rwin;j<closes.length;j++){ rets.push(Math.log(closes[j]/closes[j-1])); }
+    var rngRatios=[]; for(var k=src.length-rwin;k<src.length;k++){ var s=src[k]; if(s.h>0&&s.l>0&&s.c>0) rngRatios.push((s.h-s.l)/s.c); }
+    var avgRange=rngRatios.length?(rngRatios.reduce(function(a,b){return a+b;},0)/rngRatios.length):0.04;
+    var rnd=mulberry32(0x5EED ^ (last|0));
+    var HALF=N*0.6, out=[], prevClose=last, macro=last;
+    for(var t=1;t<=N;t++){
+      var date=addDaysStr(lastDate, t);
+      var driftT=mu*Math.exp(-t/HALF);                 // drift decays → far future flattens
+      var anchor=ma200w*Math.exp(mu*0.5*t);            // slow 200W-MA-style anchor
+      macro=macro*Math.exp(driftT); macro=macro*0.996 + anchor*0.004;   // gentle pull toward anchor
+      var r=rets[(rnd()*rets.length)|0]||0;
+      var close=prevClose*Math.exp(driftT + r);
+      close=close*0.85 + macro*0.15;                   // tether the random walk to the macro path
+      if(close<=0) close=prevClose*0.95;
+      var open=prevClose, rng=close*avgRange*(0.5+rnd());
+      var hi=Math.max(open,close)+rng*0.6, lo=Math.min(open,close)-rng*0.6; if(lo<=0) lo=Math.min(open,close)*0.9;
+      var alpha=Math.max(0.1, 0.9-0.78*(t/N));         // opacity decay (near solid → far faded)
+      var col='rgba(45,212,191,'+alpha.toFixed(3)+')';
+      out.push({time:date, open:open, high:hi, low:lo, close:close, color:col, wickColor:col, borderColor:col});
+      prevClose=close;
+    }
+    return out;
+  }
+  var SCEN_BUILDERS={ 'dual-horizon': buildDualHorizon };
+
+  function clearScenario(){ if(scenAnim){ cancelAnimationFrame(scenAnim); scenAnim=null; } if(scenSeries){ try{ chart.removeSeries(scenSeries); }catch(e){} scenSeries=null; } scenData=null; activeScenario=null;
+    var p=document.getElementById('wk-scen'); if(p) p.classList.remove('show'); var rb=document.getElementById('wk-rocketBtn'); if(rb) rb.classList.remove('on'); refreshRkUI(); }
+
+  function runScenario(id){ var sc=SCENARIOS.filter(function(s){return s.id===id;})[0]; if(!sc||sc.soon) return;
+    var build=SCEN_BUILDERS[id]; if(!build){ notify('Scenario coming soon'); return; }
+    var needSwitch=(ASSET!=='BTC'); if(needSwitch) applyAsset('BTC');
+    setTimeout(function(){
+      clearScenario();
+      var data=build(); if(!data||!data.length){ notify('Not enough history to project'); return; }
+      activeScenario=id; scenData=data;
+      scenSeries=chart.addSeries(L.CandlestickSeries,{priceScaleId:'right',borderVisible:true,priceLineVisible:false,lastValueVisible:false,upColor:'rgba(45,212,191,.7)',downColor:'rgba(45,212,191,.7)'},0);
+      try{ var from=ACTIVE.length?ACTIVE[Math.max(0,ACTIVE.length-200)].time:data[0].time; chart.timeScale().setVisibleRange({from:from, to:data[data.length-1].time}); }catch(e){}
+      var T0=null, DUR=3000, nfull=data.length;        // animate in ~3s, left→right, single batched series
+      function frame(ts){ if(T0==null) T0=ts; var pr=Math.min(1,(ts-T0)/DUR); var e=1-Math.pow(1-pr,3); var kk=Math.max(1,Math.floor(e*nfull));
+        try{ scenSeries.setData(data.slice(0,kk)); }catch(_){}
+        if(pr<1) scenAnim=requestAnimationFrame(frame); else scenAnim=null; }
+      scenAnim=requestAnimationFrame(frame);
+      showScenPanel(sc);
+      var rb=document.getElementById('wk-rocketBtn'); if(rb) rb.classList.add('on');
+      var menu=document.getElementById('wk-rocketMenu'); if(menu) menu.classList.remove('open');
+      refreshRkUI();
+    }, needSwitch?440:0);
+  }
+
+  // ── draggable explainer panel (collapsible, position persisted) ──────────────────────────────
+  function buildScenPanel(){ var p=document.getElementById('wk-scen'); if(p) return p; var host=document.getElementById('wk-chart'); if(!host) return null;
+    p=document.createElement('div'); p.className='wk-scen'; p.id='wk-scen';
+    p.innerHTML='<div class="wk-scen-h" id="wk-scen-h"><span class="wk-scen-dot"></span><span class="wk-scen-name" id="wk-scen-name">Scenario</span><button class="wk-scen-cl" id="wk-scen-cl" title="Collapse">▾</button></div>'
+      +'<div class="wk-scen-body"><div class="wk-scen-lbl" id="wk-scen-lbl"></div><div class="wk-scen-sim">Scenario / simulation — not a prediction. Uncertainty grows with distance (candles fade toward 2036).</div><button class="wk-scen-dl" id="wk-scen-dl">⤓ Download .md report</button></div>';
+    host.appendChild(p);
+    p.querySelector('#wk-scen-cl').onclick=function(e){ e.stopPropagation(); p.classList.toggle('collapsed'); this.textContent=p.classList.contains('collapsed')?'▸':'▾'; };
+    p.querySelector('#wk-scen-dl').onclick=function(e){ e.stopPropagation(); downloadScenReport(activeScenario); };
+    var h=p.querySelector('#wk-scen-h'); var dragging=false,sx=0,sy=0,sl=0,st=0;
+    function ensureLT(){ if(p.style.left && p.style.left!=='auto') return; var r=p.getBoundingClientRect(), pr=host.getBoundingClientRect(); p.style.left=(r.left-pr.left)+'px'; p.style.top=(r.top-pr.top)+'px'; p.style.right='auto'; }
+    function down(e){ if(e.target.closest('button')) return; ensureLT(); dragging=true; var q=e.touches?e.touches[0]:e; sx=q.clientX; sy=q.clientY; sl=parseFloat(p.style.left)||0; st=parseFloat(p.style.top)||0; e.preventDefault(); }
+    function move(e){ if(!dragging) return; var q=e.touches?e.touches[0]:e, pr=host.getBoundingClientRect(), bw=p.offsetWidth, bh=p.offsetHeight; p.style.left=Math.max(0,Math.min(pr.width-bw, sl+(q.clientX-sx)))+'px'; p.style.top=Math.max(0,Math.min(pr.height-bh, st+(q.clientY-sy)))+'px'; e.preventDefault(); }
+    function up(){ if(dragging){ try{ localStorage.setItem('wk_scenpanel_pos', JSON.stringify({left:parseFloat(p.style.left),top:parseFloat(p.style.top)})); }catch(e){} } dragging=false; }
+    h.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+    h.addEventListener('touchstart',down,{passive:false}); window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+    return p; }
+  function showScenPanel(sc){ var p=buildScenPanel(); if(!p) return; p.querySelector('#wk-scen-name').textContent=sc.name; p.querySelector('#wk-scen-lbl').textContent=sc.label||'';
+    try{ var s=JSON.parse(localStorage.getItem('wk_scenpanel_pos')||'null'); if(s&&typeof s.left==='number'){ p.style.left=s.left+'px'; p.style.top=s.top+'px'; p.style.right='auto'; } }catch(e){}
+    p.classList.remove('collapsed'); var cl=p.querySelector('#wk-scen-cl'); if(cl) cl.textContent='▾'; p.classList.add('show'); }
+
+  function scenReportMd(id){ var sc=SCENARIOS.filter(function(s){return s.id===id;})[0]||{name:id};
+    if(id==='dual-horizon'){ return ''
+      +'# WAKAWAKA Scenario — Dual-Horizon Heuristic\n\n'
+      +'**Type:** scenario / simulation — NOT a prediction.\n\n'
+      +'**Timeframe / horizon:** 1D candles, projected from the current price to **'+HORIZON.endDate+'** (~'+(scenData?scenData.length:3650)+' daily candles).\n\n'
+      +'## Algorithm (client-side, no ML / no training)\n'
+      +'A lightweight in-browser emulation of a dual-horizon idea (macro trend + micro deviations):\n\n'
+      +'- **Macro layer (trend):** drift = damped, capped mean of recent daily log-returns (~4y), decayed over the horizon (half-life ≈ 60% of it) so the far future flattens; each step is pulled gently (~0.4%/day) toward a slow **200-week-MA** anchor so it cannot run away.\n'
+      +'- **Micro layer (deviations):** volatility is **bootstrapped** from the last ~365 daily log-returns; candle ranges/wicks use the recent average (high−low)/close → full OHLC candles tethered to the macro path.\n'
+      +'- **Uncertainty decay:** candle opacity fades from ~0.9 (near term) to ~0.12 (toward 2036). Not solid identical candles to 2036.\n\n'
+      +'## System data consumed\n'
+      +'- `btc_history` daily closes (deepest BTC series, ≥2011) — trend + bootstrap source.\n'
+      +'- The **200-week MA** (1400d) carried on the daily series — macro anchor.\n'
+      +'- Recent **daily volatility** (~1y log-returns + average daily range) — micro layer.\n\n'
+      +'## How it was simplified from the original blueprint\n'
+      +'The original hybrid blueprint paired a **BiLSTM** (sequence model for the macro trajectory) with **XGBoost** (gradient-boosted residuals for short-horizon deviations), trained offline — needing training data, a model server and heavy runtime, none of which run in a buildless static page. This heuristic keeps the *shape* of that idea (smooth macro + calibrated micro) but replaces the trained models with a damped/capped drift + 200W-MA pull (macro) and a historical-return bootstrap (micro). Deterministic per session (seeded PRNG); runs instantly on a phone.\n\n'
+      +'## Honest caveats\n'
+      +'- A **scenario, not a forecast** — one plausible path under simple assumptions.\n'
+      +'- History is only ~3 BTC cycles; projecting ~10 years to 2036 extrapolates far beyond the data.\n'
+      +'- No exogenous inputs (macro/liquidity/news); volatility is stationary-bootstrapped while real regimes shift.\n'
+      +'- The true distribution is far wider than any single drawn path; opacity decay only hints at this.\n';
+    }
+    return '# WAKAWAKA Scenario — '+sc.name+'\n\nNot yet implemented (coming soon).\n'; }
+  function downloadScenReport(id){ if(!id) return; var md=scenReportMd(id); var blob=new Blob([md],{type:'text/markdown'}); var url=URL.createObjectURL(blob);
+    var a=document.createElement('a'); a.href=url; a.download='wakawaka-scenario-'+id+'.md'; document.body.appendChild(a); a.click(); setTimeout(function(){ try{ document.body.removeChild(a); }catch(e){} URL.revokeObjectURL(url); },120); }
+
+  // ── rocket button + PIN 0223 + dropdown ───────────────────────────────────────────────────────
+  function refreshRkUI(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-rkList .wk-rk-item'),function(it){ it.classList.toggle('on', it.dataset.id===activeScenario); }); }
+  function buildRkList(){ var host=document.getElementById('wk-rkList'); if(!host) return; host.innerHTML='';
+    SCENARIOS.forEach(function(s){ var it=document.createElement('div'); it.className='wk-rk-item'+(s.soon?' soon':'')+(s.id===activeScenario?' on':''); it.dataset.id=s.id;
+      it.innerHTML='<span class="wk-rk-num">'+s.n+'</span><span class="wk-rk-nm">'+s.name+'</span>'+(s.soon?'<span class="wk-rk-soon">soon</span>':'');
+      if(!s.soon) it.onclick=function(){ runScenario(s.id); };
+      host.appendChild(it); }); }
+  function openRocketMenu(){ buildRkList(); var menu=document.getElementById('wk-rocketMenu'); if(!menu) return;
+    var am=document.getElementById('wk-assetMenu'); if(am) am.classList.remove('open'); var om=document.getElementById('wk-ovMenu'); if(om) om.classList.remove('open'); menu.classList.toggle('open'); }
+  function buildRkPin(){ var host=document.getElementById('wk-chart'); if(!host || document.getElementById('wk-rkpin')) return;
+    var m=document.createElement('div'); m.className='wk-rkpin'; m.id='wk-rkpin';
+    m.innerHTML='<button class="wk-rkpin-x" id="wk-rkpin-x" aria-label="Close">×</button><div class="wk-rkpin-crest">🚀</div><div class="wk-rkpin-t">Scenarios — enter access PIN</div>'
+      +'<div class="wk-rkpin-pins" id="wk-rkpin-pins"><input class="wk-rkpin-pin" maxlength="1" inputmode="numeric"><input class="wk-rkpin-pin" maxlength="1" inputmode="numeric"><input class="wk-rkpin-pin" maxlength="1" inputmode="numeric"><input class="wk-rkpin-pin" maxlength="1" inputmode="numeric"></div>';
+    host.appendChild(m);
+    var pins=[].slice.call(m.querySelectorAll('.wk-rkpin-pin'));
+    function check(){ var code=pins.map(function(p){return p.value;}).join('');
+      if(code.length===4){ if(code==='0223'){ try{ sessionStorage.setItem('wk_rocket_ok','1'); }catch(e){} m.classList.remove('on'); openRocketMenu(); }
+        else { pins.forEach(function(p){ p.classList.add('err'); }); setTimeout(function(){ pins.forEach(function(p){ p.classList.remove('err'); p.value=''; }); if(pins[0]) pins[0].focus(); },450); } } }
+    pins.forEach(function(p,i){ p.addEventListener('input',function(){ p.value=p.value.replace(/[^0-9]/g,''); if(p.value&&i<3) pins[i+1].focus(); check(); });
+      p.addEventListener('keydown',function(e){ if(e.key==='Backspace'&&!p.value&&i>0) pins[i-1].focus(); }); });
+    m.querySelector('#wk-rkpin-x').onclick=function(){ m.classList.remove('on'); }; }
+  function openRkPin(){ buildRkPin(); var m=document.getElementById('wk-rkpin'); if(!m) return; var pins=[].slice.call(m.querySelectorAll('.wk-rkpin-pin')); pins.forEach(function(p){ p.value=''; }); m.classList.add('on'); setTimeout(function(){ if(pins[0]) pins[0].focus(); },60); }
+  function initRocket(){ var rb=document.getElementById('wk-rocketBtn'); if(!rb) return;
+    rb.onclick=function(e){ e.stopPropagation(); if(rocketUnlocked()) openRocketMenu(); else openRkPin(); };
+    var menu=document.getElementById('wk-rocketMenu'); if(menu) menu.addEventListener('click',function(e){ e.stopPropagation(); });
+    document.addEventListener('click',function(){ var mm=document.getElementById('wk-rocketMenu'); if(mm) mm.classList.remove('open'); }); }
 
   // ── Fase L: live BTC price (CoinGecko, client-side, 5s, fault-tolerant, display-only) ──────────
   function fetchLive(){ if(!bodyEl.classList.contains('wk-b')) return;   // only poll while Screen B is showing
@@ -3259,7 +3448,7 @@
   // projects the anchor back (rendering works), and drawings in the future persist + reload in place.
   // Horizon is resolution-aware and cheap (≤~1825 extra points). Real data is unchanged (ACTIVE), so
   // every other primitive (phases/halvings/extremes/oscillators/live) is unaffected.
-  function futureBarsCount(){ var spec=CSPEC[CSIZE]||{}; if(spec.kind==='intra'){ return (spec.sec&&spec.sec<=60)?1440:1080; } return 1825; }   // ~1 day @1m · ~45 days @1h · ~5 years daily
+  function futureBarsCount(){ var spec=CSPEC[CSIZE]||{}; if(spec.kind==='intra'){ return (spec.sec&&spec.sec<=60)?1440:1080; } return 3700; }   // ~1 day @1m · ~45 days @1h · daily reaches summer 2036 (scenarios horizon + draw space)
   function buildFuture(){ if(!ACTIVE.length) return []; var n=ACTIVE.length, last=ACTIVE[n-1].time, prev=ACTIVE[n>1?n-2:0].time, K=futureBarsCount(), out=[], i;
     if(typeof last==='number'){ var step=(n>1?(last-prev):86400)||86400; for(i=1;i<=K;i++) out.push({time:last+i*step}); }   // intraday: epoch seconds
     else { var lp=Date.parse(last+'T00:00:00Z'), pp=Date.parse(prev+'T00:00:00Z'); var sd=Math.max(1,Math.round((lp-pp)/86400000));   // daily family: 'YYYY-MM-DD', step = real bucket spacing
@@ -3288,6 +3477,7 @@
       // intraday tier unavailable (network) → silent fallback to 1D (no toast); never an empty chart
       if(spec.kind==='intra' && (!cands || !cands.length)){ if(pid) wkLoading.done(pid); if(size!=='1D') applyCandleSize('1D', {keepRange:true}); return; }
       CSIZE=size; try{ sessionStorage.setItem('wk_csize', size); }catch(e){}
+      try{ clearScenario(); }catch(e){}   // projection is 1D-specific — drop it on timeframe change
       ACTIVE=buildActive(size); CLOSE=ACTIVE.map(function(d){ return d.close; });
       var intra=spec.kind==='intra';
       try{ chart.applyOptions({timeScale:{timeVisible:intra, secondsVisible:false}}); }catch(e){}
