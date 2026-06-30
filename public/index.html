@@ -1942,7 +1942,7 @@
   // MACD are standard and tiny) rather than pulling the deepentropy lightweight-charts-indicators
   // lib: it has no clean v5-standalone buildless CDN build, and inline keeps this page buildless.
   var OSC_DEFAULTS={
-    rsi:   {length:14, ob:70, os:30, color:'#5b8cff', width:1},
+    rsi:   {length:14, ob:70, os:30, color:'#cbd5e1', width:1, maLen:14, maColor:'#fb923c'},
     stoch: {length:14, k:3, d:3, ob:80, os:20, kColor:'#22d3ee', dColor:'#f59e0b', width:1},
     macd:  {fast:12, slow:26, signal:9, macdColor:'#5b8cff', signalColor:'#f59e0b', width:1},
     mayer: {ref1:1, ref2:2.4, color:'#a78bfa', width:1},
@@ -2410,8 +2410,12 @@
   // Each oscillator: tiny pane TITLE, the configurator FIELDS, and a parameterized BUILD that
   // computes from CLOSE per its config and returns {series, priceLines}.
   var OSC={
-    rsi:{ title:'RSI', fields:[{key:'length',label:'Período'},{key:'os',label:'Sobrevenda (OS)'},{key:'ob',label:'Sobrecompra (OB)'},{key:'color',label:'Cor',type:'color'},{key:'width',label:'Espessura',max:4}],
-      build:function(p,c){ var s=mkLine(c.color,p,{lineWidth:c.width,autoscaleInfoProvider:fix(0,100)}); s.setData(arrData(rsiArr(CLOSE,c.length))); return {series:[s], priceLines:refLines(s,[{price:c.ob},{price:c.os}])}; } },
+    rsi:{ title:'RSI', fields:[{key:'length',label:'Período'},{key:'maLen',label:'Média (laranja)'},{key:'os',label:'Sobrevenda (OS)'},{key:'ob',label:'Sobrecompra (OB)'},{key:'color',label:'Cor RSI',type:'color'},{key:'maColor',label:'Cor média',type:'color'},{key:'width',label:'Espessura',max:4}],
+      build:function(p,c){ var rsi=rsiArr(CLOSE,c.length); var ma=smaArr(rsi, Math.max(2,(c.maLen||14)));
+        var s=mkLine(c.color,p,{lineWidth:c.width,autoscaleInfoProvider:fix(0,100)}); s.setData(arrData(rsi));
+        var mas=mkLine(c.maColor||'#fb923c',p,{lineWidth:1,autoscaleInfoProvider:fix(0,100)}); mas.setData(arrData(ma));   // the orange RSI-MA
+        try{ s.attachPrimitive(makeRsiPrimitive(s, rsi, ma, c)); }catch(e){}   // OB/OS shading + RSI×MA crossover markers
+        return {series:[s, mas], priceLines:refLines(s,[{price:c.ob},{price:50,style:1},{price:c.os}])}; } },
     // StochRSI is the fastest oscillator — softened opacity + 1px keeps it from going solid in ALL.
     stoch:{ title:'STOCH RSI', fields:[{key:'length',label:'Período RSI'},{key:'k',label:'Suavização %K'},{key:'d',label:'Suavização %D'},{key:'os',label:'Sobrevenda (OS)'},{key:'ob',label:'Sobrecompra (OB)'},{key:'kColor',label:'Cor %K',type:'color'},{key:'dColor',label:'Cor %D',type:'color'},{key:'width',label:'Espessura',max:4}],
       build:function(p,c){ var sr=stochRsiArr(CLOSE,c.length,c.k,c.d); var k=mkLine(c.kColor,p,{lineWidth:c.width,autoscaleInfoProvider:fix(0,100)}); k.setData(arrData(sr.k)); var d=mkLine(c.dColor,p,{lineWidth:c.width}); d.setData(arrData(sr.d)); return {series:[k,d], priceLines:refLines(k,[{price:c.ob},{price:c.os}])}; } },
@@ -2498,6 +2502,35 @@
         ctx.restore();
       }); } };
     return { attached:function(p){ ch=p.chart; crossReq=p.requestUpdate; if(p.requestUpdate) primReqs.push(p.requestUpdate); }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'top'; }, renderer:function(){ return r; } } ]; } };
+  }
+
+  // ── RSI pane decoration: OB/OS shading + RSI×MA crossover markers ─────────────────────────────
+  // Crossovers in OVERSOLD (RSI<OS) that turn UP = strength (green ▲); in OVERBOUGHT (RSI>OB) that
+  // turn DOWN = weakness (red ▼). Mid-range crossovers are kept faint (small grey dot). Markers are
+  // computed once from the RSI + its MA over the visible asset's close; the primitive draws on the
+  // RSI pane via the RSI series' own price scale (0–100), so it tracks pan/zoom.
+  function makeRsiPrimitive(series, rsi, ma, cfg){ var ch=null;
+    var marks=[]; for(var i=1;i<rsi.length;i++){ var a0=rsi[i-1],a1=rsi[i],b0=ma[i-1],b1=ma[i]; if(a0==null||a1==null||b0==null||b1==null) continue;
+      var up=(a0<=b0 && a1>b1), dn=(a0>=b0 && a1<b1); if(!up&&!dn) continue; var t=ACTIVE[i]&&ACTIVE[i].time; if(t==null) continue;
+      var strong=(up && a1<cfg.os)||(dn && a1>cfg.ob); marks.push({time:t, value:a1, up:up, strong:strong}); }
+    var r={ draw:function(target){ if(!ch) return; var ts=ch.timeScale();
+      target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width; ctx.save();
+        function yv(v){ try{ var y=series.priceToCoordinate(v); return (y==null||!isFinite(y))?null:y; }catch(e){ return null; } }
+        var y100=yv(100),yOb=yv(cfg.ob),yOs=yv(cfg.os),y0=yv(0);
+        if(y100!=null&&yOb!=null){ ctx.fillStyle='rgba(244,63,94,.07)'; ctx.fillRect(0,Math.min(y100,yOb),W,Math.abs(yOb-y100)); }   // overbought band
+        if(yOs!=null&&y0!=null){ ctx.fillStyle='rgba(34,197,94,.07)'; ctx.fillRect(0,Math.min(yOs,y0),W,Math.abs(y0-yOs)); }          // oversold band
+        marks.forEach(function(m){ var x; try{ x=ts.timeToCoordinate(m.time); }catch(e){ x=null; } if(x==null||x<-6||x>W+6) return; var y=yv(m.value); if(y==null) return;
+          if(m.strong){ var col=m.up?'#22c55e':'#f43f5e', s=5;
+            ctx.beginPath();
+            if(m.up){ ctx.moveTo(x,y+4); ctx.lineTo(x-s,y+4+s); ctx.lineTo(x+s,y+4+s); }        // green ▲ below (bullish)
+            else { ctx.moveTo(x,y-4); ctx.lineTo(x-s,y-4-s); ctx.lineTo(x+s,y-4-s); }            // red ▼ above (bearish)
+            ctx.closePath(); ctx.fillStyle=col; ctx.fill();
+            ctx.beginPath(); ctx.arc(x,y,2.3,0,6.283); ctx.fillStyle=col; ctx.fill();
+          } else { ctx.beginPath(); ctx.arc(x,y,1.8,0,6.283); ctx.fillStyle='rgba(180,192,205,.5)'; ctx.fill(); }   // mid-range crossover: faint
+        });
+        ctx.restore();
+      }); } };
+    return { attached:function(p){ ch=p.chart; }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'normal'; }, renderer:function(){ return r; } } ]; } };
   }
 
   // ── manipulation layer (Fase IV) — toggle "Manip." ────────────────────────────
