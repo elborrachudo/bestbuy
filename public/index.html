@@ -712,6 +712,22 @@
   .wk-manipbox{position:absolute;z-index:8;display:none;opacity:0;transition:opacity .5s ease;background:rgba(10,22,20,.82);color:#eef5f3;border-left:2px solid #fff;border-radius:2px;padding:9px 12px 10px;width:184px;box-shadow:0 6px 24px rgba(0,0,0,.5);font-variant-numeric:tabular-nums;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;}
   .wk-manipbox.on{opacity:1;}
   .wk-manipbox.drag{cursor:grabbing;}
+  /* Phase VI(b+): draggable Score summary panel — read-only, tied to the Score overlay (scoreOn) */
+  .wk-scorepanel{position:absolute;z-index:9;display:none;opacity:0;transition:opacity .3s ease;background:rgba(10,22,26,.9);color:#eef5f3;border:1px solid #1f4a55;border-radius:8px;padding:8px 10px 9px;min-width:186px;max-width:236px;box-shadow:0 8px 28px rgba(0,0,0,.55);font-variant-numeric:tabular-nums;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;font-size:12px;}
+  .wk-scorepanel.on{opacity:1;}
+  .wk-scorepanel.drag{cursor:grabbing;}
+  .wk-scp-h{display:flex;align-items:center;justify-content:space-between;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:#7fa6ad;margin-bottom:6px;}
+  .wk-scp-h small{font-size:9px;color:#4f7780;text-transform:none;letter-spacing:0;}
+  .wk-scp-row{display:flex;align-items:center;gap:6px;margin-top:5px;}
+  .wk-scp-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+  .wk-scp-sym{font-weight:700;color:#e6f1f2;width:40px;}
+  .wk-scp-score{flex:1;color:#cfe7ec;}
+  .wk-scp-score small{font-size:8px;color:#6f9aa2;}
+  .wk-scp-score b{color:#5eead4;}
+  .wk-scp-delta{font-size:11px;font-weight:600;min-width:40px;text-align:right;}
+  .wk-scp-delta.g{color:#34d399;} .wk-scp-delta.r{color:#f87171;} .wk-scp-delta.n{color:#7fa6ad;}
+  .wk-scp-pills{display:flex;gap:9px;padding:1px 0 3px 14px;font-size:11px;font-weight:600;}
+  .wk-scp-empty{font-size:11px;color:#6f9aa2;padding:3px 0 1px;}
   .wk-mb-dev{font-size:16px;font-weight:800;letter-spacing:.3px;color:#fff;}
   .wk-mb-lbl{font-size:10px;font-weight:600;letter-spacing:.2px;color:#8fa6a1;margin-top:1px;}
   .wk-mb-days{font-size:15px;font-weight:800;margin-top:8px;line-height:1.05;color:#fff;}
@@ -3140,13 +3156,16 @@
     // honest-empty vs engine-not-loaded-yet: retry a few times while data is still fetching
     var e2=scoreEngine();
     if(present===0){ if(e2&&e2.state&&e2.state.tokens&&e2.state.tokens.length){ scoreHint(true); } else if(_scoreRetry<6){ _scoreRetry++; setTimeout(function(){ if(scoreOn) refreshScoreLines(false); }, 700); } }
-    else { scoreHint(false); _scoreRetry=0; } }
+    else { scoreHint(false); _scoreRetry=0; }
+    if(scoreOn) updateScorePanel();   // keep the summary panel in sync with the lines (assets/pillars)
+  }
   function setScore(on){ scoreOn=on; saveScoreOn(on); _scoreRetry=0;
     if(on){ refreshScoreLines(true); }
     else { var keys=Object.keys(scoreSeries);
       if(keys.length){ animate('scoreFade', ANIM_MS, function(e){ keys.forEach(function(sym){ if(scoreSeries[sym]){ try{ scoreSeries[sym].series.applyOptions({color:scoreAlpha(scoreSeries[sym].color,1-e)}); }catch(_){}} }); },
         function(){ keys.forEach(function(sym){ if(scoreSeries[sym]){ try{ chart.removeSeries(scoreSeries[sym].series); }catch(_){}} delete scoreSeries[sym]; }); }); }
       scoreHint(false); }
+    showScorePanel(on);   // summary panel is tied to the Score overlay
     refreshOvUI(); rebuildOvIfOpen(); }
   function onPillarToggle(key){ var e=scoreEngine(); if(!e||!e.state||!e.state.pillars) return;
     e.state.pillars[key]=!e.state.pillars[key];                       // SHARED state (not a fork)
@@ -3155,8 +3174,47 @@
     rebuildOvIfOpen(); }
   function rebuildOvIfOpen(){ var m=document.getElementById('wk-ovMenu'); var s=document.getElementById('wk-ovSrch');
     if(m&&m.classList.contains('open')) buildOvList(s?s.value:''); }
-  function restoreScore(){ scoreOn=loadScoreOn(); if(scoreOn) refreshScoreLines(true); }
+  function restoreScore(){ scoreOn=loadScoreOn(); if(scoreOn){ refreshScoreLines(true); showScorePanel(true); } }
   try{ window.__scoreState=function(){ return { on:scoreOn, syms:Object.keys(scoreSeries) }; }; }catch(e){}   // read-only test/debug snapshot
+
+  // ── Draggable Score SUMMARY panel — read-only; tied to the Score overlay (visible iff scoreOn).
+  //   One row per charted scored asset: blended score (0–10) + percentile, the 3 pillar sub-scores,
+  //   and the blended delta vs the PREVIOUS reading. Reuses blendRow/percentile (== chart == dashboard)
+  //   and the exact drag/persist pattern of .wk-manipbox (localStorage nsKey('wk_scorepanel_pos')). ──
+  var scorePanel=null, PILL_COL={fundamentals:'#6399ed',technicals:'#a78bfa',activity:'#34d399'};
+  function buildScorePanel(){ if(scorePanel) return scorePanel; var host=document.getElementById('wk-chart'); if(!host) return null;
+    var b=document.createElement('div'); b.className='wk-scorepanel'; b.id='wk-scorepanel'; host.appendChild(b); scorePanel=b;
+    var dragging=false, sx=0, sy=0, sl=0, st=0;
+    function ensureLT(){ if(b.style.left && b.style.left!=='auto') return; var r=b.getBoundingClientRect(), pr=host.getBoundingClientRect(); b.style.left=(r.left-pr.left)+'px'; b.style.top=(r.top-pr.top)+'px'; b.style.right='auto'; }
+    function down(e){ ensureLT(); dragging=true; b.classList.add('drag'); var p=e.touches?e.touches[0]:e; sx=p.clientX; sy=p.clientY; sl=parseFloat(b.style.left)||0; st=parseFloat(b.style.top)||0; e.preventDefault(); }
+    function move(e){ if(!dragging) return; var p=e.touches?e.touches[0]:e, pr=host.getBoundingClientRect(), bw=b.offsetWidth, bh=b.offsetHeight;
+      b.style.left=Math.max(0,Math.min(pr.width-bw, sl+(p.clientX-sx)))+'px'; b.style.top=Math.max(0,Math.min(pr.height-bh, st+(p.clientY-sy)))+'px'; e.preventDefault(); }
+    function up(){ if(dragging){ try{ localStorage.setItem(nsKey('wk_scorepanel_pos'), JSON.stringify({left:parseFloat(b.style.left),top:parseFloat(b.style.top)})); }catch(e){} } dragging=false; b.classList.remove('drag'); }
+    b.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+    b.addEventListener('touchstart',down,{passive:false}); window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
+    return b; }
+  function placeScorePanel(){ if(!scorePanel) return; var saved=null; try{ saved=JSON.parse(localStorage.getItem(nsKey('wk_scorepanel_pos'))||localStorage.getItem('wk_scorepanel_pos')||'null'); }catch(e){}
+    if(saved && typeof saved.left==='number' && typeof saved.top==='number'){ scorePanel.style.left=saved.left+'px'; scorePanel.style.top=saved.top+'px'; scorePanel.style.right='auto'; return; }
+    scorePanel.style.right='16px'; scorePanel.style.left='auto'; scorePanel.style.top='64px'; }   // default: top-right, clear of the chart body
+  function updateScorePanel(){ if(!scorePanel) return; var e=scoreEngine(); if(!e){ scorePanel.innerHTML='<div class="wk-scp-h"><span>Score summary</span></div><div class="wk-scp-empty">no score for current assets</div>'; return; }
+    var syms=chartedAssetSyms(), rowsHtml='', present=0;
+    syms.forEach(function(sym){ var tk=tokenForSym(sym); if(!tk) return; var rows=(e.state.readingsByToken||{})[tk.id]||[]; if(!rows.length) return;
+      var latest=rows[rows.length-1], prev=rows.length>1?rows[rows.length-2]:null;
+      var blend=e.blendRow(latest); if(blend==null) return; present++;
+      var pct=e.percentileOf(e.tokenSortedScores(tk.id), blend);
+      var dcls='n', darr='–', dtxt='';
+      if(prev){ var pb=e.blendRow(prev); if(pb!=null){ var dd=blend-pb; dcls=dd>0.05?'g':(dd<-0.05?'r':'n'); darr=dd>0.05?'▲':(dd<-0.05?'▼':'–'); dtxt=(dd>=0?'+':'')+dd.toFixed(1); } }
+      var col=ASSET_COLORS[sym]||'#5eead4';
+      function pill(k){ var v=latest['score_'+k]; return '<span style="color:'+PILL_COL[k]+'">'+(v==null?'—':Number(v).toFixed(1))+'</span>'; }
+      rowsHtml+='<div class="wk-scp-row"><span class="wk-scp-dot" style="background:'+col+'"></span><span class="wk-scp-sym">'+sym+'</span>'
+        +'<span class="wk-scp-score"><b>'+blend.toFixed(1)+'</b><small>/10</small> · '+(pct==null?'—':Math.round(pct))+'<small>pct</small></span>'
+        +'<span class="wk-scp-delta '+dcls+'">'+darr+' '+dtxt+'</span></div>'
+        +'<div class="wk-scp-pills">'+pill('fundamentals')+pill('technicals')+pill('activity')+'</div>'; });
+    var head='<div class="wk-scp-h"><span>Score summary</span><small>F·T·A · Δ vs prev</small></div>';
+    scorePanel.innerHTML = present===0 ? head+'<div class="wk-scp-empty">no score for current assets</div>' : head+rowsHtml; }
+  function showScorePanel(on){ buildScorePanel(); if(!scorePanel) return;
+    if(on){ updateScorePanel(); placeScorePanel(); scorePanel.style.display='block'; requestAnimationFrame(function(){ scorePanel.classList.add('on'); }); }
+    else { scorePanel.classList.remove('on'); setTimeout(function(){ if(!scoreOn && scorePanel) scorePanel.style.display='none'; }, 320); } }
 
   // load a coin's daily series (market_history), compute MAs over it, join BTC's mayer/pct/phase by
   // date (the cycle indicators + phases stay BTC-relative — the thesis), cache it.
