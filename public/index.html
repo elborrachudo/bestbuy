@@ -451,6 +451,16 @@
   .wk-ov-col{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.2);padding:0;flex:0 0 auto;cursor:pointer;background:none;margin-left:auto;}
   .wk-ov-head{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6f9aa2;padding:6px 9px 2px;}
   .wk-ov-nm{flex:1;}
+  /* Fase VI-b: "+" overlay dropdown — one line per item (no wrap / no truncation) + collapsible groups.
+     Layout/CSS + collapse only; overlay data/scales/colours/order untouched. */
+  #wk-ovMenu.wk-ov-menu{width:266px;max-width:calc(100vw - 16px);}   /* ID selector beats the shared .wk-per-menu(92px); wider so long labels fit on one line; clamped on mobile */
+  .wk-ov-item{font-size:11.5px;}                            /* slightly smaller so everything fits legibly */
+  .wk-ov-nm{white-space:nowrap;}                            /* never wrap or cut mid-word */
+  .wk-ov-head{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;-webkit-user-select:none;white-space:nowrap;}
+  .wk-ov-head:hover{color:#9fc4cb;}
+  .wk-ov-chev{font-size:9px;line-height:1;flex:0 0 auto;transition:transform .15s ease;}
+  .wk-ov-group.collapsed .wk-ov-chev{transform:rotate(-90deg);}   /* ▾ open → ▸ collapsed */
+  .wk-ov-group.collapsed .wk-ov-body{display:none;}
   /* Accumulation / Distribution toggles */
   .wk-ad-wrap{position:relative;display:inline-flex;}
   .wk-ad-menu{width:184px;right:auto;left:0;}
@@ -3121,11 +3131,31 @@
     it.querySelector('.wk-ov-chk').onclick=function(){ toggleOverlay(id); };
     var ci=it.querySelector('.wk-ov-col'); ci.onclick=function(e){ e.stopPropagation(); }; ci.oninput=function(e){ if(!overlays[id]) addOverlay(id, e.target.value); else setOverlayColor(id, e.target.value); };
     return it; }
-  function buildOvList(filter){ var host=document.getElementById('wk-ovList'); if(!host) return; host.innerHTML=''; filter=(filter||'').trim().toLowerCase();
-    var hA=document.createElement('div'); hA.className='wk-ov-head'; hA.textContent='Assets (own scale)'; host.appendChild(hA);
-    ASSET_LIST.forEach(function(a){ var id='asset:'+a.sym, label=a.sym; if(filter && label.toLowerCase().indexOf(filter)<0) return; host.appendChild(ovRow(id,label,ovDefColor(id))); });
-    var hB=document.createElement('div'); hB.className='wk-ov-head'; hB.textContent='Series (own axis)'; host.appendChild(hB);
-    OV_SERIES.forEach(function(s){ if(filter && s.label.toLowerCase().indexOf(filter)<0) return; host.appendChild(ovRow(s.id,s.label,s.color)); }); }
+  // Collapse state for the two overlay groups, persisted across dropdown re-open AND refresh.
+  var OV_GRP_KEY='wk_overlay_groups';
+  function loadOvGroups(){ try{ return JSON.parse(localStorage.getItem(OV_GRP_KEY)||'{}')||{}; }catch(e){ return {}; } }
+  function saveOvGroups(st){ try{ localStorage.setItem(OV_GRP_KEY, JSON.stringify(st)); }catch(e){} }
+  // Build the "+" overlay list as two collapsible groups. ORDER PRESERVED (ASSET_LIST / OV_SERIES
+  // forEach untouched — alphabetising is a separate task). While searching, groups force-expand and
+  // empty groups hide so filtered results are always visible regardless of persisted collapse state.
+  function buildOvList(filter){ var host=document.getElementById('wk-ovList'); if(!host) return; host.innerHTML='';
+    filter=(filter||'').trim().toLowerCase(); var searching=!!filter; var grpState=loadOvGroups();
+    function group(key, title, rows){
+      if(searching && rows.length===0) return;   // hide a group with no matches while searching
+      var g=document.createElement('div'); g.className='wk-ov-group'; g.dataset.grp=key;
+      if(!searching && grpState[key]===true) g.classList.add('collapsed');   // search always expands
+      var h=document.createElement('div'); h.className='wk-ov-head';
+      h.innerHTML='<span class="wk-ov-chev">▾</span><span>'+title+'</span>';
+      h.onclick=function(){ if(searching) return;   // no collapse toggling mid-search (kept expanded)
+        g.classList.toggle('collapsed'); var st=loadOvGroups(); st[key]=g.classList.contains('collapsed'); saveOvGroups(st); };
+      var body=document.createElement('div'); body.className='wk-ov-body';
+      rows.forEach(function(r){ body.appendChild(r); });
+      g.appendChild(h); g.appendChild(body); host.appendChild(g);
+    }
+    var aRows=[]; ASSET_LIST.forEach(function(a){ var id='asset:'+a.sym, label=a.sym; if(filter && label.toLowerCase().indexOf(filter)<0) return; aRows.push(ovRow(id,label,ovDefColor(id))); });
+    group('assets','Assets (own scale)', aRows);
+    var sRows=[]; OV_SERIES.forEach(function(s){ if(filter && s.label.toLowerCase().indexOf(filter)<0) return; sRows.push(ovRow(s.id,s.label,s.color)); });
+    group('series','Series (own axis)', sRows); }
 
   function initAssetSelector(){
     var aBtn=document.getElementById('wk-assetBtn'), aMenu=document.getElementById('wk-assetMenu'), aSrch=document.getElementById('wk-assetSrch');
