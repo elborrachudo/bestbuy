@@ -2369,6 +2369,52 @@
     var t0=sm.top, b0=sm.bottom, t1=0.04, b1=(idx===0?0.06:0.08);
     animate('autofit'+idx, ANIM_MS, function(e){ try{ ps.applyOptions({scaleMargins:{top:t0+(t1-t0)*e, bottom:b0+(b1-b0)*e}}); }catch(_){} }); }
 
+  // ── RIGOROUS vertical fit (double-click / double-tap) ──────────────────────────────────────────
+  //   Price pane (0) fits EVERYTHING that shares its scale in the visible window: candles/line +
+  //   forecast (scenSeries, same 'right' scale, unioned by LWC) + every user-drawing anchor. Native
+  //   autoScale ignores drawings, so a drawing-aware autoscaleInfoProvider extends the range. LOG-aware
+  //   (works in value space; the scale maps to log). Oscillator panes fit their own content natively.
+  var _fitRange=null;   // while set, the price-scale provider returns this exact range (drives the animated fit)
+  function visibleDrawingRange(){ if(!drawMgr) return null; var w=null; try{ w=visibleEpochRange(); }catch(e){}
+    var mn=Infinity, mx=-Infinity;
+    try{ (drawMgr.exportDrawings()||[]).forEach(function(d){ var horiz=(d.type==='horizontal-line'||d.type==='horizontal-ray');
+      (d.anchors||[]).forEach(function(a){ if(!a || a.price==null || !isFinite(a.price)) return;
+        var inWin=horiz; if(!inWin){ var e=toEpoch(a.time); inWin=(w==null || e==null || (e>=w.from && e<=w.to)); }   // anchor within the visible window (horizontals always span it)
+        if(inWin){ if(a.price<mn) mn=a.price; if(a.price>mx) mx=a.price; } }); }); }catch(e){}
+    return mn===Infinity ? null : {minValue:mn, maxValue:mx}; }
+  function fitProvider(orig){ var r=orig?orig():null;
+    if(_fitRange) return {priceRange:{minValue:_fitRange.min, maxValue:_fitRange.max}};        // animation owns the range
+    var dr=visibleDrawingRange(); if(!dr) return r;                                             // no drawings → native behaviour
+    if(!r || !r.priceRange) return {priceRange:{minValue:dr.minValue, maxValue:dr.maxValue}};
+    return {priceRange:{minValue:Math.min(r.priceRange.minValue,dr.minValue), maxValue:Math.max(r.priceRange.maxValue,dr.maxValue)}}; }
+  function installFitProvider(){ try{ if(area) area.applyOptions({autoscaleInfoProvider:fitProvider}); }catch(e){} try{ if(candle) candle.applyOptions({autoscaleInfoProvider:fitProvider}); }catch(e){} }
+  function computePane0Target(){ if(!ACTIVE.length) return null;
+    var lr=null; try{ lr=chart.timeScale().getVisibleLogicalRange(); }catch(e){}
+    var n=ACTIVE.length, i0=0, i1=n-1; if(lr){ i0=Math.max(0,Math.floor(lr.from)); i1=Math.min(n-1,Math.ceil(lr.to)); }
+    var mn=Infinity, mx=-Infinity;
+    for(var i=i0;i<=i1;i++){ var d=ACTIVE[i]; if(!d) continue; var lo=(d.low!=null?d.low:d.close), hi=(d.high!=null?d.high:d.close); if(lo!=null&&lo<mn)mn=lo; if(hi!=null&&hi>mx)mx=hi; }
+    if(scenSeries && scenData && scenData.length){ var w=null; try{ w=visibleEpochRange(); }catch(e){}
+      scenData.forEach(function(p){ var e=toEpoch(p.time); if(w==null || (e>=w.from && e<=w.to)){ var lo=(p.low!=null?p.low:p.close), hi=(p.high!=null?p.high:p.close); if(lo!=null&&lo<mn)mn=lo; if(hi!=null&&hi>mx)mx=hi; } }); }
+    var dr=visibleDrawingRange(); if(dr){ if(dr.minValue<mn)mn=dr.minValue; if(dr.maxValue>mx)mx=dr.maxValue; }
+    if(mn===Infinity||mx===-Infinity||!(mx>mn)) return null; if(!(mn>0)) mn=Math.max(1e-9, mx*1e-6);   // LOG needs positive
+    return {min:mn, max:mx}; }
+  function fitPane0Animated(){ if(!area){ autofitPane(0); return; }
+    var ps=area.priceScale(), tgt=computePane0Target(); if(!tgt){ autofitPane(0); return; }
+    var h=0; try{ h=chart.panes()[0].getHeight(); }catch(e){}
+    var curMax=null,curMin=null; try{ curMax=area.coordinateToPrice(2); curMin=area.coordinateToPrice(Math.max(6,h-2)); }catch(e){}
+    var sm={top:0.1,bottom:0.1}; try{ var o=ps.options(); if(o&&o.scaleMargins) sm=o.scaleMargins; }catch(e){}
+    var t0=sm.top,b0=sm.bottom,t1=0.04,b1=0.06;
+    var canLog=(curMax!=null&&curMin!=null&&curMax>0&&curMin>0&&curMax>curMin);
+    var lo0=canLog?Math.log(curMin):0, hi0=canLog?Math.log(curMax):0, lo1=Math.log(tgt.min), hi1=Math.log(tgt.max);
+    animate('fitPane0', ANIM_MS, function(e){
+      _fitRange = canLog ? {min:Math.exp(lo0+(lo1-lo0)*e), max:Math.exp(hi0+(hi1-hi0)*e)} : {min:tgt.min, max:tgt.max};
+      try{ ps.applyOptions({autoScale:true, scaleMargins:{top:t0+(t1-t0)*e, bottom:b0+(b1-b0)*e}}); }catch(_){}
+    }, function(){ _fitRange=null; try{ ps.applyOptions({autoScale:true, scaleMargins:{top:t1,bottom:b1}}); }catch(_){} });   // settle to the live (native + drawings) range
+  }
+  function fitVerticalRigorous(){ if(!chart) return;
+    try{ var ps=chart.panes(); fitPane0Animated(); for(var i=1;i<ps.length;i++) autofitPane(i); }catch(e){ try{ autofitPane(0); }catch(_){} } }
+  try{ window.__fitProbe=function(price){ var o={paneH:0,y:null}; try{ o.paneH=chart.panes()[0].getHeight(); }catch(e){} try{ o.y=(price!=null&&area)?area.priceToCoordinate(price):null; }catch(e){} return o; }; }catch(e){}   // read-only test hook
+
   // ── momentum pan (inertia): release with lateral velocity → slide + ease to a stop ─────────
   var _pan={tracking:false, samples:[], raf:null};
   function cancelMomentum(){ if(_pan.raf){ cancelAnimationFrame(_pan.raf); _pan.raf=null; } }
@@ -2490,6 +2536,7 @@
     // PRICE pane (0): area (always present — carries the phase primitive + markers) + candles
     area=chart.addSeries(L.AreaSeries,{lineColor:'#a78bfa',topColor:'rgba(167,139,250,.18)',bottomColor:'rgba(167,139,250,0)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
     candle=chart.addSeries(L.CandlestickSeries,{upColor:'#22c55e',downColor:'#f43f5e',wickUpColor:'#22c55e',wickDownColor:'#f43f5e',borderVisible:false,priceLineVisible:false,lastValueVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
+    installFitProvider();   // price-pane autoscale now includes user drawings (double-click fit is rigorous)
     setSeriesData();   // real candles + future whitespace (so drawings can land beyond today)
     // phase bands + halving lines as custom v5 primitives on pane 0 (init from persisted layers)
     ind.phases=layers.phases; ind.halving=layers.halvings;
@@ -2536,8 +2583,13 @@
     try{ window.addEventListener('resize', function(){ if(bodyEl.classList.contains('wk-b')) relayout(); }); }catch(e){}
     try{ window.addEventListener('orientationchange', function(){ setTimeout(function(){ if(bodyEl.classList.contains('wk-b')) relayout(); }, 220); }); }catch(e){}
     try{ el.addEventListener('pointerup', function(){ setTimeout(positionTitles,40); }); }catch(e){}   // reposition titles after a manual separator drag
-    // double-click a pane → animated vertical auto-fit (ignore the oscillator titles + chrome)
-    try{ el.addEventListener('dblclick', function(e){ if(e.target.closest('.wk-ptitle')||e.target.closest('.wk-layers')||e.target.closest('.wk-modetog')) return; autofitPane(paneIndexAtY(e.clientY)); }); }catch(e){}
+    // double-click the empty chart area → RIGOROUS vertical fit of every pane (price pane includes
+    // candles + forecast + user drawings). Skip chrome, an active draw tool, and on-drawing hits
+    // (those open the style panel via the drawing handler). Replaces the old dead resetChartView().
+    try{ el.addEventListener('dblclick', function(e){ if(e.target.closest('.wk-ptitle')||e.target.closest('.wk-layers')||e.target.closest('.wk-modetog')) return;
+      if(drawTool) return;
+      try{ var r=el.getBoundingClientRect(); if(lineDrawingAt(e.clientX-r.left, e.clientY-r.top)) return; }catch(_){}
+      fitVerticalRigorous(); }); }catch(e){}
     // momentum pan: track scroll velocity during drag, glide to a stop on release; new touch cancels
     try{ el.addEventListener('pointerdown', panDown); el.addEventListener('pointermove', panMove, {passive:true}); el.addEventListener('pointerup', panUp); el.addEventListener('pointercancel', function(){ _pan.tracking=false; }); }catch(e){}
     wireTitles(); wireConfigurator(); updateMenuLabels();
@@ -3900,7 +3952,10 @@
     // double-TAP (mobile) on a line drawing → same panel (cursor mode only)
     var lastTap=0, lastTX=0, lastTY=0;
     chEl.addEventListener('touchend', function(ev){ if(drawTool) return; var p=ev.changedTouches[0]; var now=Date.now();
-      if(now-lastTap<320 && Math.abs(p.clientX-lastTX)<24 && Math.abs(p.clientY-lastTY)<24){ styleFromPoint(p.clientX, p.clientY); lastTap=0; ev.preventDefault(); }
+      if(now-lastTap<320 && Math.abs(p.clientX-lastTX)<24 && Math.abs(p.clientY-lastTY)<24){
+        var r=chEl.getBoundingClientRect(); var hit=null; try{ hit=lineDrawingAt(p.clientX-r.left, p.clientY-r.top); }catch(_){}
+        if(hit) styleFromPoint(p.clientX, p.clientY); else fitVerticalRigorous();   // drawing → style panel; empty area → rigorous fit
+        lastTap=0; ev.preventDefault(); }
       else { lastTap=now; lastTX=p.clientX; lastTY=p.clientY; } });
     document.addEventListener('keydown', function(e){
       if(!bodyEl.classList.contains('wk-b')) return;
