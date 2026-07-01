@@ -464,6 +464,26 @@
   .wk-ad-item.on .wk-ad-chk::after{content:'✓';}
   .wk-ad-nm{flex:1;}
   .wk-ad-exp{font-size:9px;text-transform:uppercase;letter-spacing:.04em;color:#fbbf24;border:1px solid rgba(251,191,36,.4);border-radius:999px;padding:1px 5px;}
+  /* ── Phase PZ: Pivot Zone (parent grouping Accumulation / Distribution / Manipulation) ── */
+  .wk-pz-wrap{position:relative;display:inline-flex;}
+  .wk-pz-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:28px;border:1px solid #1a3a44;background:rgba(45,212,191,.04);color:#3c6d68;cursor:pointer;padding:0;line-height:1;}
+  .wk-pz-btn:hover{color:#5ED6C4;}
+  .wk-pz-btn.on{color:#5ED6C4;border-color:#2f8b7d;background:rgba(94,214,196,.14);}   /* bright teal when any layer on */
+  .wk-pz-menu{width:172px;left:0;right:auto;}
+  .wk-pz-l2{display:flex;align-items:center;gap:8px;width:100%;font-size:12px;color:#cfe7ec;padding:8px 10px;border:0;background:none;border-radius:8px;cursor:pointer;text-align:left;font-family:inherit;}
+  .wk-pz-l2:hover{background:rgba(94,234,212,.10);}
+  .wk-pz-l2.on{color:#eaf6f3;font-weight:600;}
+  .wk-pz-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;opacity:.38;}
+  .wk-pz-l2.on .wk-pz-dot{opacity:1;}
+  .wk-pz-dot.acc{background:#22c55e;}     /* Accumulation green */
+  .wk-pz-dot.dist{background:#f43f5e;}    /* Distribution red */
+  .wk-pz-dot.manip{background:rgba(255,255,255,.85);}   /* Manipulation white */
+  .wk-pz-nm{flex:1;}
+  .wk-pz-arw{color:#4f7780;font-size:11px;}
+  /* Top-bar restyle: square corners (0px) on every button/pill in the Screen B top bar — radius only */
+  .wk-topbar .wk-nav,.wk-topbar .wk-pair,.wk-topbar .wk-plus,.wk-topbar .wk-rocket,.wk-topbar .wk-layer,
+  .wk-topbar .wk-ad-btn,.wk-topbar .wk-ind-btn,.wk-topbar .wk-scaletoggle,.wk-topbar .wk-per-btn,
+  .wk-topbar .wk-pm,.wk-topbar .wk-phasetag,.wk-topbar .wk-pz-btn{border-radius:0;}
   /* scenarios (rocket) */
   .wk-rocket{width:26px;height:24px;border-radius:8px;border:1px solid #1f4a55;background:#0e242c;font-size:14px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;}
   .wk-rocket:hover{background:rgba(45,212,191,.16);}
@@ -515,7 +535,7 @@
     .wk-topbar{flex-direction:row;flex-wrap:nowrap;align-items:center;gap:8px;overflow:visible;}
     .wk-tb1,.wk-tb2,.wk-tb2-left,.wk-tb2-right{display:contents;}
     .wk-pairwrap{order:1;} .wk-cs-wrap{order:2;} .wk-per-wrap:not(.wk-cs-wrap){order:3;} .wk-ind-wrap{order:4;} .wk-scaletoggle{order:5;}
-    .wk-tb2-right .wk-layer{order:6;} .wk-tb2-right .wk-cyc-wrap{order:6;margin-left:auto;} .wk-tb2-right .wk-dom-wrap{order:6;}
+    .wk-tb2-right .wk-layer{order:6;} .wk-tb2-right .wk-cyc-wrap{order:6;margin-left:auto;} .wk-tb2-right .wk-dom-wrap{order:6;} .wk-tb2-right .wk-pz-wrap{order:6;}
     .wk-phasetag{order:7;} .wk-quote{order:8;margin-left:6px;}
   }
   .wk-ind-wrap{position:relative;}
@@ -796,19 +816,38 @@
               </div>
             </div>
             <button class="wk-layer" data-layer="halvings" title="Halvings"><span class="wk-hbtc">H₿</span></button>
-            <button class="wk-layer" data-layer="manip">Manip</button>
-            <div class="wk-ad-wrap" id="wk-accWrap">
-              <button class="wk-ad-btn" id="wk-accBtn" title="Accumulation (bottom)">Accumulation <span class="wk-per-caret">▾</span></button>
+            <!-- Phase PZ: "Pivot Zone" — one parent grouping Accumulation / Distribution / Manipulation.
+                 Level-2 rows reuse the existing #wk-accBtn/#wk-distBtn triggers + #wk-accMenu/#wk-distMenu
+                 method panels (same handlers/detection/colours). Manipulation's fused layer is split into
+                 two independent toggles (Current / Historical). All menus carry .open → portalizeMenus(). -->
+            <div class="wk-pz-wrap" id="wk-pzWrap">
+              <button class="wk-pz-btn" id="wk-pzBtn" title="Pivot Zone" aria-label="Pivot Zone">
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3"  y="13" width="3.2" height="7"  fill="currentColor" stroke="none"/>
+                  <rect x="9"  y="10" width="3.2" height="10" fill="currentColor" stroke="none"/>
+                  <rect x="15" y="6"  width="3.2" height="14" fill="currentColor" stroke="none"/>
+                  <path d="M4.6 12l6-3 6-5"/>
+                  <circle cx="4.6"  cy="12" r="1.7" fill="currentColor" stroke="none"/>
+                  <circle cx="10.6" cy="9"  r="1.7" fill="currentColor" stroke="none"/>
+                  <circle cx="16.6" cy="4"  r="1.7" fill="currentColor" stroke="none"/>
+                </svg>
+              </button>
+              <div class="wk-cyc-menu wk-pz-menu" id="wk-pzMenu">
+                <button class="wk-pz-l2" id="wk-accBtn" data-grp="acc" title="Accumulation"><span class="wk-pz-dot acc"></span><span class="wk-pz-nm">Accumulation</span><span class="wk-pz-arw">▸</span></button>
+                <button class="wk-pz-l2" id="wk-distBtn" data-grp="dist" title="Distribution"><span class="wk-pz-dot dist"></span><span class="wk-pz-nm">Distribution</span><span class="wk-pz-arw">▸</span></button>
+                <button class="wk-pz-l2" id="wk-manipBtn" data-grp="manip" title="Manipulation"><span class="wk-pz-dot manip"></span><span class="wk-pz-nm">Manipulation</span><span class="wk-pz-arw">▸</span></button>
+              </div>
               <div class="wk-cyc-menu wk-ad-menu" id="wk-accMenu">
                 <div class="wk-ad-item" data-ad="accStruct"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Structural</span></div>
                 <div class="wk-ad-item" data-ad="accWyck"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Wyckoff events</span><span class="wk-ad-exp">exp.</span></div>
               </div>
-            </div>
-            <div class="wk-ad-wrap" id="wk-distWrap">
-              <button class="wk-ad-btn" id="wk-distBtn" title="Distribution (top)">Distribution <span class="wk-per-caret">▾</span></button>
               <div class="wk-cyc-menu wk-ad-menu" id="wk-distMenu">
                 <div class="wk-ad-item" data-ad="distStruct"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Structural</span></div>
                 <div class="wk-ad-item" data-ad="distWyck"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Wyckoff events</span><span class="wk-ad-exp">exp.</span></div>
+              </div>
+              <div class="wk-cyc-menu wk-ad-menu" id="wk-manipMenu">
+                <div class="wk-ad-item" data-mnp="cur"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Current</span></div>
+                <div class="wk-ad-item" data-mnp="hist"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Historical</span></div>
               </div>
             </div>
             <button class="wk-layer" data-layer="maw">50/200W</button>
@@ -1941,8 +1980,11 @@
   var INTRADAY_WINDOW_DAYS=60;               // rolling minute window (must match lib/btcintraday.js)
   // top toggle bar: independent layers, persisted. phases/halvings are live; manip/maw/mad are
   // placeholders for Fases III/IV (present but inactive — they just persist + hint for now).
-  var LAYER_DEFAULTS={phases:true, halvings:true, manip:false, maw:false, mad:false};
-  function loadLayers(){ var b=Object.assign({},LAYER_DEFAULTS); try{ var s=JSON.parse(sessionStorage.getItem('wk_layers')||'{}'); Object.keys(s).forEach(function(k){ if(k in b) b[k]=!!s[k]; }); }catch(e){} return b; }
+  // Phase PZ: Manipulation split into two independent flags — manipCur (current deviation vs
+  // previous-cycle high + stats box) and manipHist (past deviation blocks). `manip` stays as the
+  // derived "any manip on" master used for attach/fade (recomputed from the two sub-flags on load).
+  var LAYER_DEFAULTS={phases:true, halvings:true, manip:false, manipCur:false, manipHist:false, maw:false, mad:false};
+  function loadLayers(){ var b=Object.assign({},LAYER_DEFAULTS); try{ var s=JSON.parse(sessionStorage.getItem('wk_layers')||'{}'); Object.keys(s).forEach(function(k){ if(k in b) b[k]=!!s[k]; }); }catch(e){} b.manip=!!(b.manipCur||b.manipHist); return b; }
   var layers=loadLayers();
   function saveLayers(){ try{ sessionStorage.setItem('wk_layers', JSON.stringify(layers)); }catch(e){} }
   // shared easing engine (~0.5s ease-out via rAF), reused by auto-fit + intraday auto-adjust
@@ -2217,7 +2259,6 @@
     if(k==='phases'){ e.stopPropagation(); toggleCycMenu(); }   // the "Fases" button now opens the cycle-mode dropdown
     else if(k==='halvings'){ setHalvings(!layers.halvings); }
     else if(k==='maw' || k==='mad'){ if(b.classList.contains('wk-cs-off')){ notify('Cycle MAs only on candles ≥ 1D'); return; } setMaLayer(k, !layers[k]); }
-    else if(k==='manip'){ setManip(!layers.manip); }
     else { layers[k]=!layers[k]; saveLayers(); b.classList.toggle('on',layers[k]); notify('Layer "'+b.textContent.trim()+'" is coming in a future phase'); }
   }; }); syncLayerUI(); }
 
@@ -2388,7 +2429,7 @@
     if(!liveTimer){ fetchLive(); liveTimer=setInterval(fetchLive, 5000); }
 
     wireDrawing();   // Fase VII: attach the drawing manager + build the toolbar (no-op if the CDN didn't load)
-    try{ buildManipBox(); if(layers.manip) showManipBox(true); }catch(e){}   // manipulation v2 comparison box
+    try{ buildManipBox(); if(layers.manipCur) showManipBox(true); }catch(e){}   // manipulation v2 comparison box (Current only)
 
     // autoSize:true handles width from the container's ResizeObserver; relayout() snaps the
     // container to the available viewport height (dvh) and redistributes panes via stretch
@@ -2402,7 +2443,7 @@
     try{ el.addEventListener('pointerdown', panDown); el.addEventListener('pointermove', panMove, {passive:true}); el.addEventListener('pointerup', panUp); el.addEventListener('pointercancel', function(){ _pan.tracking=false; }); }catch(e){}
     wireTitles(); wireConfigurator(); updateMenuLabels();
     relayout(); wireToolbar(); wireLayers(); initCycMode(); initDom(); applyInitialPeriod(); applyInitialCandleSize();
-    initAssetSelector(); initRocket(); initAccDist(); portalizeMenus();
+    initAssetSelector(); initRocket(); initAccDist(); initPivotZone(); portalizeMenus();
     // restore a persisted non-BTC asset (data + layers ready by now)
     try{ var sa=sessionStorage.getItem('wk_asset'); if(sa && sa!=='BTC' && ASSET_LIST.some(function(a){return a.sym===sa;})) applyAsset(sa); }catch(e){}
     rebuildMaLayers();   // build any MA layers persisted on (applyInitialCandleSize only builds them for non-1D)
@@ -2616,7 +2657,8 @@
       paneViews:function(){ return [ {zOrder:function(){return 'bottom';},renderer:function(){return shade;}}, {zOrder:function(){return 'top';},renderer:function(){return marks;}} ]; } }; }
   function refreshAccDistUI(){ var ab=document.getElementById('wk-accBtn'), db=document.getElementById('wk-distBtn');
     if(ab) ab.classList.toggle('on', accDist.accStruct||accDist.accWyck); if(db) db.classList.toggle('on', accDist.distStruct||accDist.distWyck);
-    Array.prototype.forEach.call(document.querySelectorAll('.wk-ad-item'),function(it){ it.classList.toggle('on', !!accDist[it.dataset.ad]); }); }
+    Array.prototype.forEach.call(document.querySelectorAll('.wk-ad-item[data-ad]'),function(it){ it.classList.toggle('on', !!accDist[it.dataset.ad]); });
+    updatePZBtn(); }
   function redrawAccDist(){ try{ if(accDistReq) accDistReq(); }catch(e){} }
   function initAccDist(){ loadAccDist();
     function wire(btnId, menuId){ var btn=document.getElementById(btnId), menu=document.getElementById(menuId); if(!btn||!menu) return;
@@ -2627,6 +2669,26 @@
     document.addEventListener('click',function(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-ad-menu.open'),function(m){ m.classList.remove('open'); }); });
     refreshAccDistUI(); }
 
+  // Phase PZ: Pivot Zone parent. Level 1 = #wk-pzBtn → #wk-pzMenu (3 rows). Level 2 rows reuse the
+  // existing #wk-accBtn/#wk-distBtn triggers (wired by initAccDist) + a new #wk-manipBtn. Level 3 =
+  // the method/toggle panels. Every panel opens via `.open` so portalizeMenus() places it above the
+  // chart (mobile + desktop, viewport-clamped). No separate z-index solution.
+  function initPivotZone(){
+    var pzBtn=document.getElementById('wk-pzBtn'), pzMenu=document.getElementById('wk-pzMenu');
+    function closeSubs(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-ad-menu.open'),function(m){ m.classList.remove('open'); }); }
+    if(pzBtn&&pzMenu){ pzBtn.addEventListener('click',function(e){ e.stopPropagation();
+        var open=pzMenu.classList.contains('open');
+        if(open){ pzMenu.classList.remove('open'); closeSubs(); } else { pzMenu.classList.add('open'); } }); }
+    var mBtn=document.getElementById('wk-manipBtn'), mMenu=document.getElementById('wk-manipMenu');
+    if(mBtn&&mMenu){
+      mBtn.addEventListener('click',function(e){ e.stopPropagation(); var open=mMenu.classList.contains('open');
+        Array.prototype.forEach.call(document.querySelectorAll('.wk-ad-menu.open'),function(m){ m.classList.remove('open'); }); if(!open) mMenu.classList.add('open'); });
+      mMenu.addEventListener('click',function(e){ e.stopPropagation(); var it=e.target.closest('.wk-ad-item'); if(!it) return;
+        var w=(it.dataset.mnp==='cur')?'manipCur':'manipHist'; setManipLayer(w, !layers[w]); }); }
+    document.addEventListener('click',function(){ if(pzMenu) pzMenu.classList.remove('open'); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ if(pzMenu) pzMenu.classList.remove('open'); closeSubs(); } });
+    refreshManipUI(); updatePZBtn(); }
+
   // ── TASK 1: dropdowns must open IN FRONT of the chart ─────────────────────────────────────────
   // The LWC canvas otherwise paints over the menus, and on mobile the horizontally-scrolling
   // toolbar (.wk-tb2 overflow) CLIPS any menu that drops into the chart area. Fix once for ALL
@@ -2635,7 +2697,7 @@
   function portalizeMenus(){
     var pairs=[['wk-csBtn','wk-csMenu'],['wk-perBtn','wk-perMenu'],['wk-indBtn','wk-indMenu'],['wk-cycBtn','wk-cycMenu'],
       ['wk-domBtn','wk-domMenu'],['wk-assetBtn','wk-assetMenu'],['wk-ovBtn','wk-ovMenu'],['wk-rocketBtn','wk-rocketMenu'],
-      ['wk-accBtn','wk-accMenu'],['wk-distBtn','wk-distMenu']];
+      ['wk-pzBtn','wk-pzMenu'],['wk-accBtn','wk-accMenu'],['wk-distBtn','wk-distMenu'],['wk-manipBtn','wk-manipMenu']];
     pairs.forEach(function(pr){ var btn=document.getElementById(pr[0]), menu=document.getElementById(pr[1]); if(!btn||!menu) return;
       function place(){ if(!menu.classList.contains('open')){ menu.style.position=''; menu.style.left=''; menu.style.top=''; menu.style.right=''; menu.style.zIndex=''; menu.style.maxHeight=''; menu.style.overflowY=''; return; }
         menu.style.position='fixed'; menu.style.zIndex='999990'; menu.style.right='auto';
@@ -2663,11 +2725,14 @@
     var r={ draw:function(target){ if(!ch || !layers.manip || isIntra() || layerAlpha.manip<=0.01) return; var ts=ch.timeScale(); var M=ANCHOR.manip; if(!M||!M.refHigh) return;
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save(); var a=layerAlpha.manip;
         var yHigh; try{ yHigh=area.priceToCoordinate(M.refHigh.price); }catch(e){ yHigh=null; }
-        // current-deviation horizontal band: current price → previous cycle high (white ~5%)
+        // CURRENT layer — current-deviation horizontal band: today's price → previous cycle high (white ~5%)
+        if(layers.manipCur){
         var today=(livePrice!=null?livePrice:(ACTIVE.length?ACTIVE[ACTIVE.length-1].close:null));
         if(today!=null && yHigh!=null && today<M.refHigh.price){ var yP; try{ yP=area.priceToCoordinate(today); }catch(e){ yP=null; }
           if(yP!=null){ ctx.fillStyle='rgba(255,255,255,'+(0.05*a)+')'; ctx.fillRect(0,Math.min(yHigh,yP),W,Math.abs(yP-yHigh)); } }
-        // deviation zones — white 1px outline + faint fill (current cycle, price-bounded by [low, latest high])
+        }
+        // HISTORICAL layer — deviation zones: white 1px outline + faint fill (past blocks below the ref high)
+        if(layers.manipHist)
         (M.devZones||[]).forEach(function(z){ var x0,x1,yl; try{ x0=ts.timeToCoordinate(z.from); x1=ts.timeToCoordinate(z.to); yl=area.priceToCoordinate(z.low); }catch(e){ return; }
           if(yHigh==null||yl==null) return; if(x0==null)x0=0; if(x1==null)x1=W; var bx=Math.max(0,x0), bw=Math.min(W,x1)-bx; if(bw<=1) return; var top=Math.min(yHigh,yl), hh=Math.abs(yl-yHigh); if(hh<1) return;
           ctx.fillStyle='rgba(255,255,255,'+(0.06*a)+')'; ctx.fillRect(bx,top,bw,hh);
@@ -2676,10 +2741,22 @@
       }); } };
     return { attached:function(p){ ch=p.chart; if(p.requestUpdate) primReqs.push(p.requestUpdate); }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'bottom'; }, renderer:function(){ return r; } } ]; } };
   }
-  function setManip(on){ layers.manip=on; saveLayers();
-    if(on){ if(!manipAttached){ try{ area.attachPrimitive(manipPrim); manipAttached=true; }catch(e){} } layerAlpha.manip=0; fadeLayer('manip',1); showManipBox(true); }
-    else { fadeLayer('manip',0, function(){ try{ area.detachPrimitive(manipPrim); manipAttached=false; }catch(e){} }); showManipBox(false); }
-    syncLayerUI(); }
+  // Phase PZ: toggle ONE manipulation sub-layer ('manipCur' | 'manipHist'). The primitive stays
+  // attached while EITHER is on (derived `layers.manip`); the deviation stats box tracks Current only.
+  function setManipLayer(which, on){ layers[which]=on; var any=!!(layers.manipCur||layers.manipHist);
+    var was=layers.manip; layers.manip=any; saveLayers();
+    if(any){ if(!manipAttached){ try{ area.attachPrimitive(manipPrim); manipAttached=true; }catch(e){} }
+      if(!was){ layerAlpha.manip=0; fadeLayer('manip',1); } else { tickPrims(); } }   // fade in on first sub-layer; else just redraw
+    else { fadeLayer('manip',0, function(){ try{ area.detachPrimitive(manipPrim); manipAttached=false; }catch(e){} }); }
+    showManipBox(!!layers.manipCur);
+    refreshManipUI(); updatePZBtn(); syncLayerUI(); }
+  function refreshManipUI(){ var mb=document.getElementById('wk-manipBtn');
+    if(mb) mb.classList.toggle('on', !!(layers.manipCur||layers.manipHist));
+    var mm=document.getElementById('wk-manipMenu'); if(mm) Array.prototype.forEach.call(mm.querySelectorAll('.wk-ad-item'),function(it){
+      it.classList.toggle('on', it.dataset.mnp==='cur' ? !!layers.manipCur : !!layers.manipHist); }); }
+  function updatePZBtn(){ var b=document.getElementById('wk-pzBtn'); if(!b) return;
+    var any=!!(accDist.accStruct||accDist.accWyck||accDist.distStruct||accDist.distWyck||layers.manipCur||layers.manipHist);
+    b.classList.toggle('on', any); }
   // ── manipulation v2 comparison box (draggable HTML overlay, position persisted) ───────────────
   var manipBox=null;
   function buildManipBox(){ if(manipBox) return manipBox; var host=document.getElementById('wk-chart'); if(!host) return null;
@@ -3233,7 +3310,7 @@
     if(lb.high==null||livePrice>lb.high) lb.high=livePrice; if(lb.low==null||livePrice<lb.low) lb.low=livePrice; lb.close=livePrice; lb.value=livePrice;
     try{ area.update({time:lb.time,value:livePrice}); }catch(e){}
     try{ candle.update({time:lb.time,open:lb.open,high:lb.high,low:lb.low,close:livePrice}); }catch(e){}
-    positionLiveTag(); updateQuote(); if(layers.manip) updateManipBox(); tickPrims(); }   // tickPrims → live-price line follows the new tick
+    positionLiveTag(); updateQuote(); if(layers.manipCur) updateManipBox(); tickPrims(); }   // tickPrims → live-price line follows the new tick
   // Fase T: big headline price + 24h change in the top bar (green/red on the %)
   function updateQuote(){ var bp=document.getElementById('wk-bigprice'), ch=document.getElementById('wk-chg24'); if(!bp) return;
     if(ASSET!=='BTC'){ bp.textContent='—'; if(ch){ ch.textContent=''; ch.className='wk-chg24'; } return; }   // live quote is BTC-only
