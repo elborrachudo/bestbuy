@@ -464,6 +464,12 @@
   .wk-rk-item.soon{opacity:.5;cursor:not-allowed;}
   .wk-rk-num{width:18px;height:18px;border-radius:50%;background:#08161b;border:1px solid #2f6d63;font-size:10px;display:inline-flex;align-items:center;justify-content:center;color:#7fd9c9;flex:0 0 auto;}
   .wk-rk-soon{margin-left:auto;font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#6f9aa2;border:1px solid #2a4a52;border-radius:999px;padding:1px 6px;}
+  /* rocket menu — same "+"-style fit: wide enough for one-line full labels, collapsible groups */
+  #wk-rocketMenu.wk-rocket-menu{width:300px;max-width:calc(100vw - 16px);}   /* ID beats .wk-rocket-menu(236px); long labels never wrap/cut; clamped on mobile */
+  .wk-rk-nm{flex:1;white-space:nowrap;}
+  .wk-rk-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset;}
+  #wk-rkList .wk-ov-group{margin-top:2px;}
+  #wk-rkList .wk-ov-body{padding-top:1px;}
   /* rocket PIN modal (chart-scoped, pjdc266 style) */
   .wk-rkpin{position:absolute;inset:0;z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:radial-gradient(ellipse at center,rgba(4,10,7,.82),rgba(2,5,4,.94));font-family:'Courier New',monospace;}
   .wk-rkpin.on{display:flex;}
@@ -3467,11 +3473,20 @@
   // ── Scenarios engine (rocket → PIN 0223 → dropdown → animated future projection) ──────────────
   // Honest, client-side (no ML). Horizon-aware config so future intraday horizons can be added.
   var SCENARIOS=[
-    {id:'dual-horizon', n:1, name:'Dual-Horizon Heuristic', label:'Trend + vol bootstrap', soon:false},
-    {id:'knn', n:2, name:'Cycle-State k-NN', soon:true},
-    {id:'stretch', n:3, name:'Cycle Stretch-Fit', soon:true},
-    {id:'meanrev', n:4, name:'Mean-Reversion (200W/Mayer)', soon:true},
-    {id:'quantile', n:5, name:'Quantile Scenario Bands', soon:true}];
+    // — Heuristic engine (existing) —
+    {id:'dual-horizon', n:1, name:'Dual-Horizon Heuristic', label:'Trend + vol bootstrap', group:'engine', soon:false},
+    {id:'knn', n:2, name:'Cycle-State k-NN', group:'engine', soon:true},
+    {id:'stretch', n:3, name:'Cycle Stretch-Fit', group:'engine', soon:true},
+    {id:'meanrev', n:4, name:'Mean-Reversion (200W/Mayer)', group:'engine', soon:true},
+    {id:'quantile', n:5, name:'Quantile Scenario Bands', group:'engine', soon:true},
+    // — Group A · CredibleCrypto (as drawn) — clean schematic LINES faithful to his hand-drawn view —
+    {id:'cc-bull', name:'Bullish — vertical, top ~2026', label:'CredibleCrypto (as drawn) · line', group:'credible', kind:'line', dot:'#22c55e', color:'34,197,94', soon:false},
+    {id:'cc-bal',  name:'Balanced — dip 64k, top ~2028',  label:'CredibleCrypto (as drawn) · line', group:'credible', kind:'line', dot:'#3b82f6', color:'59,130,246', soon:false},
+    {id:'cc-bear', name:'Bearish — deep 21k, top ~2030',  label:'CredibleCrypto (as drawn) · line', group:'credible', kind:'line', dot:'#f43f5e', color:'244,63,94', soon:false},
+    // — Group B · Hybrid (realistic, data-anchored) — synthetic DAILY CANDLES, algorithmic (NOT his view) —
+    {id:'hy-bull', name:'Bullish (hybrid)',  label:'Hybrid (realistic) · daily candles', group:'hybrid', kind:'candle', dot:'#22c55e', color:'34,197,94', soon:false},
+    {id:'hy-bal',  name:'Balanced (hybrid)', label:'Hybrid (realistic) · daily candles', group:'hybrid', kind:'candle', dot:'#3b82f6', color:'59,130,246', soon:false},
+    {id:'hy-bear', name:'Bearish (hybrid)',  label:'Hybrid (realistic) · daily candles', group:'hybrid', kind:'candle', dot:'#f43f5e', color:'244,63,94', soon:false}];
   var HORIZON={ tf:'1D', endDate:'2036-07-01' };   // 1D → summer 2036 (only active horizon for now)
   var scenSeries=null, activeScenario=null, scenAnim=null, scenData=null, scenKK=null;   // scenKK = candles drawn so far (for the reverse close)
   function rocketUnlocked(){ try{ return sessionStorage.getItem('wk_rocket_ok')==='1'; }catch(e){ return false; } }
@@ -3516,7 +3531,71 @@
     }
     return out;
   }
-  var SCEN_BUILDERS={ 'dual-horizon': buildDualHorizon };
+  // ── CredibleCrypto scenarios — owner-confirmed anchor levels (EXACT, cross-checked vs real BTC) ──
+  // Group A ("as drawn"): clean schematic LINES through his pivots → top zone (faithful to his view).
+  // Group B ("hybrid"): realistic synthetic DAILY CANDLES to the SAME destinations/timing, with
+  // intra-trend corrections, reaccumulation/base, and a volatile distribution top. Group B is my
+  // algorithmic interpretation — NOT his view, NOT advice. Both reuse the Dual-Horizon micro machinery.
+  var CC={ TOP_LO:180000, TOP_HI:300000, TOP_MID:230000, P0:126000, P50:64000, P85:21000, FLOOR:3000 };
+  function scenBase(){ var src=(tierCache.daily||[]).filter(function(d){ return d.c>0; });
+    if(src.length<400) return null; var lastDate=src[src.length-1].t, last=src[src.length-1].c; return {src:src, lastDate:lastDate, last:last}; }
+  function seqWP(a){ for(var i=1;i<a.length;i++){ if(!(a[i].t>a[i-1].t)) a[i].t=addDaysStr(a[i-1].t,20); } return a; }   // enforce strictly-increasing dates
+  // dense daily interpolation of [{t,price}] waypoints in LOG space (smoothstep easing at each control)
+  function interpWP(wp){ wp=seqWP(wp); var out=[]; for(var i=0;i<wp.length-1;i++){ var A=wp[i],B=wp[i+1];
+      var d0=daysBetween(A.t,B.t); if(d0<1)d0=1; var la=Math.log(A.price), lb=Math.log(B.price);
+      for(var k=(i===0?0:1);k<=d0;k++){ var e=k/d0, s=e*e*(3-2*e); out.push({time:addDaysStr(A.t,k), value:Math.exp(la+(lb-la)*s)}); } }
+    return out; }
+  // volatile distribution top: alternate hi/lo inside [TOP_LO,TOP_HI] over ~months (double / triple tops)
+  function distribWP(startT, months, rnd){ var pts=[], base=startT, seq=[CC.TOP_HI, CC.TOP_LO+15000, CC.TOP_HI-25000, CC.TOP_LO+30000, CC.TOP_MID], step=Math.max(20,Math.round(months*30/seq.length));
+    for(var i=0;i<seq.length;i++){ base=addDaysStr(base, step); var jit=rnd?(0.92+rnd()*0.16):1; pts.push({t:base, price:Math.round(seq[i]*jit)}); } return pts; }
+  function ccWaypoints(){ var b=scenBase(); if(!b) return null; var D=b.lastDate, last=b.last;
+    function fut(dabs,minD){ var c=addDaysStr(D,minD); return dabs>c?dabs:c; }   // later of an absolute target date and D+minDays → always projects forward
+    // shared milestone dates (destinations/timing identical across Group A and Group B)
+    var bullTop=fut('2026-12-01',300),
+        balDip=fut('2027-01-01',210), balLat=fut('2027-10-01',520), balTop=fut('2028-06-01',720),
+        bearBot=fut('2027-02-01',240), bearBase=fut('2029-03-01',980), bearTop=fut('2030-01-01',1300);
+    var A={}, B={};
+    // ---- Group A — clean schematic lines ----
+    A.bull=[{t:D,price:last},{t:bullTop,price:CC.TOP_MID}].concat(distribWP(bullTop,9));
+    A.bal =[{t:D,price:last},{t:balDip,price:CC.P50},{t:balLat,price:Math.round(CC.P50*1.05)},{t:balTop,price:CC.TOP_MID}].concat(distribWP(balTop,9));
+    A.bear=[{t:D,price:last},{t:bearBot,price:CC.P85},{t:bearBase,price:Math.round(CC.P85*1.4)},{t:bearTop,price:CC.TOP_MID}].concat(distribWP(bearTop,9));
+    // ---- Group B — same destinations + realistic corrections / base ----
+    B.bull=[{t:D,price:last},
+      {t:fut('2026-02-01',90),price:Math.round(last*1.5)},
+      {t:fut('2026-04-01',150),price:Math.round(last*1.5*0.68)},   // ~-32% pullback
+      {t:fut('2026-08-01',210),price:CC.TOP_LO},
+      {t:fut('2026-10-01',260),price:Math.round(CC.TOP_LO*0.72)},  // ~-28% pullback
+      {t:bullTop,price:CC.TOP_MID}].concat(distribWP(bullTop,10,mulberry32(0xB1B1)));
+    B.bal=[{t:D,price:last},
+      {t:fut('2026-09-01',150),price:Math.round(CC.P50*1.18)},
+      {t:balDip,price:CC.P50},                                     // reach 50% fib (~64k)
+      {t:fut('2027-06-01',380),price:Math.round(CC.P50*1.1)},      // multi-month lateral base
+      {t:balLat,price:Math.round(CC.P50*0.94)},
+      {t:balTop,price:CC.TOP_MID}].concat(distribWP(balTop,10,mulberry32(0xB2B2)));
+    B.bear=[{t:D,price:last},
+      {t:fut('2026-10-01',170),price:CC.P50},                      // step down through 50%
+      {t:bearBot,price:CC.P85},                                    // capitulation to ~21k (85% fib)
+      {t:fut('2027-11-01',430),price:Math.round(CC.P85*1.35)},     // long base
+      {t:fut('2028-09-01',700),price:Math.round(CC.P85*1.1)},
+      {t:bearBase,price:Math.round(CC.P85*1.7)},
+      {t:bearTop,price:CC.TOP_MID}].concat(distribWP(bearTop,10,mulberry32(0xB3B3)));
+    return {A:A, B:B, base:b}; }
+  function ccLine(which){ var w=ccWaypoints(); if(!w||!w.A[which]) return null;
+    return interpWP(w.A[which]).map(function(p){ return {time:p.time, value:p.value, close:p.value}; }); }   // close → picked up by the fit union
+  function ccCandles(which, colorRGB, seed){ var w=ccWaypoints(); if(!w||!w.B[which]) return null;
+    var macro=interpWP(w.B[which]), src=w.base.src;
+    var rwin=Math.min(365, src.length-1), rr=[]; for(var k=src.length-rwin;k<src.length;k++){ var s=src[k]; if(s.h>0&&s.l>0&&s.c>0) rr.push((s.h-s.l)/s.c); }
+    var avgRange=rr.length?(rr.reduce(function(a,b){return a+b;},0)/rr.length):0.04;
+    var rnd=mulberry32(seed), N=macro.length, out=[], prevClose=w.base.last;
+    for(var t=0;t<N;t++){ var m=macro[t].value, noise=(rnd()-0.5)*2*avgRange*0.9, close=m*Math.exp(noise); if(close<=0) close=prevClose*0.95;
+      var open=prevClose, rng=close*avgRange*(0.5+rnd()); var hi=Math.max(open,close)+rng*0.6, lo=Math.min(open,close)-rng*0.6; if(lo<=0) lo=Math.min(open,close)*0.9;
+      var alpha=Math.max(0.1, 0.9-0.78*(t/N)), col='rgba('+colorRGB+','+alpha.toFixed(3)+')';
+      out.push({time:macro[t].time, open:open, high:hi, low:lo, close:close, color:col, wickColor:col, borderColor:col}); prevClose=close; }
+    return out; }
+
+  var SCEN_BUILDERS={ 'dual-horizon': buildDualHorizon,
+    'cc-bull':function(){ return ccLine('bull'); }, 'cc-bal':function(){ return ccLine('bal'); }, 'cc-bear':function(){ return ccLine('bear'); },
+    'hy-bull':function(){ return ccCandles('bull','34,197,94',0x51A1); }, 'hy-bal':function(){ return ccCandles('bal','59,130,246',0x51A2); }, 'hy-bear':function(){ return ccCandles('bear','244,63,94',0x51A3); } };
 
   function clearScenario(){ if(scenAnim){ cancelAnimationFrame(scenAnim); scenAnim=null; }
     try{ if(_anims && _anims['scenReverse']){ cancelAnimationFrame(_anims['scenReverse']); delete _anims['scenReverse']; } }catch(e){}   // stop an in-flight reverse close
@@ -3555,7 +3634,9 @@
     e.stopPropagation(); closeScenarioAnimated();
   });
   try{ window.__scenState=function(){ var vr=null; try{ vr=chart&&chart.timeScale().getVisibleRange(); }catch(e){}
-    return { active:!!scenSeries, kk:scenKK, activeScenario:activeScenario,
+    var mn=null,mx=null,kind=null; if(scenData&&scenData.length){ mn=Infinity;mx=-Infinity; var sc=SCENARIOS.filter(function(s){return s.id===activeScenario;})[0]; kind=sc?sc.kind||'candle':null;
+      scenData.forEach(function(p){ var lo=(p.low!=null?p.low:(p.value!=null?p.value:p.close)), hi=(p.high!=null?p.high:(p.value!=null?p.value:p.close)); if(lo!=null&&lo<mn)mn=lo; if(hi!=null&&hi>mx)mx=hi; }); }
+    return { active:!!scenSeries, kk:scenKK, activeScenario:activeScenario, kind:kind, scenMin:mn===Infinity?null:mn, scenMax:mx===-Infinity?null:mx,
       panel:!!(document.getElementById('wk-scen')&&document.getElementById('wk-scen').classList.contains('show')),
       rocketOn:!!(document.getElementById('wk-rocketBtn')&&document.getElementById('wk-rocketBtn').classList.contains('on')),
       visibleTo:vr?vr.to:null, lastReal:ACTIVE.length?ACTIVE[ACTIVE.length-1].time:null, dataLen:scenData?scenData.length:0 }; }; }catch(e){}
@@ -3567,7 +3648,8 @@
       clearScenario();
       var data=build(); if(!data||!data.length){ notify('Not enough history to project'); return; }
       activeScenario=id; scenData=data;
-      scenSeries=chart.addSeries(L.CandlestickSeries,{priceScaleId:'right',borderVisible:true,priceLineVisible:false,lastValueVisible:false,upColor:'rgba(45,212,191,.7)',downColor:'rgba(45,212,191,.7)'},0);
+      if(sc.kind==='line'){ scenSeries=chart.addSeries(L.LineSeries,{priceScaleId:'right',color:'rgba('+(sc.color||'45,212,191')+',0.95)',lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false},0); }
+      else { var cu='rgba('+(sc.color||'45,212,191')+',0.7)'; scenSeries=chart.addSeries(L.CandlestickSeries,{priceScaleId:'right',borderVisible:true,priceLineVisible:false,lastValueVisible:false,upColor:cu,downColor:cu},0); }
       try{ var from=ACTIVE.length?ACTIVE[Math.max(0,ACTIVE.length-200)].time:data[0].time; chart.timeScale().setVisibleRange({from:from, to:data[data.length-1].time}); }catch(e){}
       var T0=null, DUR=3000, nfull=data.length;        // animate in ~3s, left→right, single batched series
       function frame(ts){ if(T0==null) T0=ts; var pr=Math.min(1,(ts-T0)/DUR); var e=1-Math.pow(1-pr,3); var kk=Math.max(1,Math.floor(e*nfull)); scenKK=kk;
@@ -3623,17 +3705,69 @@
       +'- No exogenous inputs (macro/liquidity/news); volatility is stationary-bootstrapped while real regimes shift.\n'
       +'- The true distribution is far wider than any single drawn path; opacity decay only hints at this.\n';
     }
+    if(id.indexOf('cc-')===0 || id.indexOf('hy-')===0){
+      var isLine=(id.indexOf('cc-')===0), which=id.slice(3);
+      var groupName=isLine?'Group A — CredibleCrypto (as drawn)':'Group B — Hybrid (realistic, data-anchored)';
+      var honesty=isLine
+        ? 'This is **CredibleCrypto’s view as drawn** — a schematic, hand-drawn-style path. It is his scenario, reproduced faithfully. NOT a prediction, NOT financial advice.'
+        : 'This is an **algorithmic / hybrid interpretation** (my realistic reading of his view against BTC history) — synthetic daily candles. It is **NOT CredibleCrypto’s drawing** and **NOT financial advice**.';
+      var path={ bull:'**Bullish** — near-vertical rise from the current price straight into the top zone by ~2026, with no significant correction'
+                     + (isLine?'' : '; the hybrid adds 1–2 realistic pullbacks (~25–35%) on the way up'),
+                 bal:'**Balanced** — a dip / reaccumulation to the ~50% fib (~64k, = the 2021 top ≈ old ATH turned support), lateral through 2025–2027'
+                     + (isLine?', then an impulse to the top ~2028' : ' as a multi-month lateral base, then an impulse to the top ~2028'),
+                 bear:'**Bearish** — a deep correction to the ~85% fib (~21k, = the 2017 top ≈ deep structural support)'
+                     + (isLine?', a long base, then an impulse to the top ~2029–2030' : ', capitulation then a LONG base (12–18 months, like 2018–2020 / 2022–2023), then markup to the top ~2029–2030') }[which];
+      return ''
+        +'# WAKAWAKA Scenario — '+sc.name+'\n\n'
+        +'**'+groupName+'**\n\n'
+        +'**Type:** '+(isLine?'schematic line (faithful to his hand-drawn view)':'synthetic daily candles (algorithmic hybrid)')+' — scenario / simulation, NOT a prediction.\n\n'
+        +'> ⚠️ **Honesty note.** '+honesty+'\n\n'
+        +'## This path\n- '+path+'.\n- The **top is plotted as a volatile RANGE** (distribution, double / triple tops), not a single peak.\n'
+        +(isLine?'':'- Volatility and candle **opacity decay with distance** into the future (near-term solid → far-future faded).\n')+'\n'
+        +'## Anchor levels used (owner-confirmed, cross-checked with real BTC structure)\n'
+        +'| Level | Price | Meaning |\n|---|---|---|\n'
+        +'| Top / distribution zone | **180,000–300,000** (centre ~230,000) | volatile range, not a line |\n'
+        +'| Pivot 0% (current ATH) | **~126,000** | real current-cycle top / launch |\n'
+        +'| Pivot 50% | **~64,000** | balanced reaccumulation (2021 top ~69k = support) |\n'
+        +'| Pivot 85% | **~21,000** | bearish bottom (2017 top ~20k = deep support) |\n'
+        +'| Extreme floor | **~3,000** | reference only (capitulation, unlikely in his view) |\n\n'
+        +'**Timing:** Bull top ~mid-2026 · Balanced top ~2028 · Bearish bottom 2025–26, base to 2028–29, top ~2030. '
+        +'Dates are clamped forward from the last real candle so the projection always starts in the future.\n\n'
+        +'## Honest caveats\n'
+        +'- A **scenario, not a forecast** — one plausible path under fixed assumptions.\n'
+        +'- BTC-specific; only offered for BTC. Anchored to the exact owner-confirmed levels above.\n'
+        +(isLine?'- Group A is schematic on purpose (a few control points, smoothly interpolated) — it mirrors his drawing, it is not a model.\n'
+                :'- Group B reuses the Dual-Horizon micro machinery (seeded PRNG, bootstrapped daily range, opacity decay); the macro path passes through the anchor pivots at the anchor times.\n')
+        +'- The true distribution of outcomes is far wider than any single drawn path.\n';
+    }
     return '# WAKAWAKA Scenario — '+sc.name+'\n\nNot yet implemented (coming soon).\n'; }
   function downloadScenReport(id){ if(!id) return; var md=scenReportMd(id); var blob=new Blob([md],{type:'text/markdown'}); var url=URL.createObjectURL(blob);
     var a=document.createElement('a'); a.href=url; a.download='wakawaka-scenario-'+id+'.md'; document.body.appendChild(a); a.click(); setTimeout(function(){ try{ document.body.removeChild(a); }catch(e){} URL.revokeObjectURL(url); },120); }
 
   // ── rocket button + PIN 0223 + dropdown ───────────────────────────────────────────────────────
   function refreshRkUI(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-rkList .wk-rk-item'),function(it){ it.classList.toggle('on', it.dataset.id===activeScenario); }); }
+  var RK_GRP_KEY='wk_rocket_groups';
+  function loadRkGroups(){ try{ return JSON.parse(localStorage.getItem(RK_GRP_KEY)||'{}')||{}; }catch(e){ return {}; } }
+  function saveRkGroups(st){ try{ localStorage.setItem(RK_GRP_KEY, JSON.stringify(st)); }catch(e){} }
+  function rkItem(s){ var it=document.createElement('div'); it.className='wk-rk-item'+(s.soon?' soon':'')+(s.id===activeScenario?' on':''); it.dataset.id=s.id;
+    var lead=s.dot?('<span class="wk-rk-dot" style="background:'+s.dot+'"></span>'):('<span class="wk-rk-num">'+(s.n||'')+'</span>');
+    it.innerHTML=lead+'<span class="wk-rk-nm">'+s.name+'</span>'+(s.soon?'<span class="wk-rk-soon">soon</span>':'');
+    if(!s.soon) it.onclick=function(){ runScenario(s.id); };
+    return it; }
+  // Rocket menu as three collapsible groups (same "+"-menu chrome), persisted in wk_rocket_groups.
   function buildRkList(){ var host=document.getElementById('wk-rkList'); if(!host) return; host.innerHTML='';
-    SCENARIOS.forEach(function(s){ var it=document.createElement('div'); it.className='wk-rk-item'+(s.soon?' soon':'')+(s.id===activeScenario?' on':''); it.dataset.id=s.id;
-      it.innerHTML='<span class="wk-rk-num">'+s.n+'</span><span class="wk-rk-nm">'+s.name+'</span>'+(s.soon?'<span class="wk-rk-soon">soon</span>':'');
-      if(!s.soon) it.onclick=function(){ runScenario(s.id); };
-      host.appendChild(it); }); }
+    var grpState=loadRkGroups();
+    function group(key, title, rows){ if(!rows.length) return;
+      var g=document.createElement('div'); g.className='wk-ov-group'; g.dataset.grp=key;
+      if(grpState[key]===true) g.classList.add('collapsed');
+      var h=document.createElement('div'); h.className='wk-ov-head'; h.innerHTML='<span class="wk-ov-chev">▾</span><span>'+title+'</span>';
+      h.onclick=function(){ g.classList.toggle('collapsed'); var st=loadRkGroups(); st[key]=g.classList.contains('collapsed'); saveRkGroups(st); };
+      var body=document.createElement('div'); body.className='wk-ov-body'; rows.forEach(function(s){ body.appendChild(rkItem(s)); });
+      g.appendChild(h); g.appendChild(body); host.appendChild(g); }
+    function byGroup(k){ return SCENARIOS.filter(function(s){ return (s.group||'engine')===k; }); }
+    group('engine','Heuristic engine', byGroup('engine'));
+    group('credible','CredibleCrypto (as drawn)', byGroup('credible'));
+    group('hybrid','Hybrid (realistic)', byGroup('hybrid')); }
   function openRocketMenu(){ buildRkList(); var menu=document.getElementById('wk-rocketMenu'); if(!menu) return;
     var am=document.getElementById('wk-assetMenu'); if(am) am.classList.remove('open'); var om=document.getElementById('wk-ovMenu'); if(om) om.classList.remove('open'); menu.classList.toggle('open'); }
   function buildRkPin(){ var host=document.getElementById('wk-chart'); if(!host || document.getElementById('wk-rkpin')) return;
