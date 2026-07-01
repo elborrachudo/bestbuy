@@ -3575,51 +3575,82 @@
       var d0=daysBetween(A.t,B.t); if(d0<1)d0=1; var la=Math.log(A.price), lb=Math.log(B.price);
       for(var k=(i===0?0:1);k<=d0;k++){ var e=k/d0, s=e*e*(3-2*e); out.push({time:addDaysStr(A.t,k), value:Math.exp(la+(lb-la)*s)}); } }
     return out; }
-  // volatile distribution top: oscillate around `mid` (the scenario's top), clamped to the 180-300k zone
-  function distribWP(startT, months, rnd, mid){ mid=mid||CC.TOP_MID; var seq=[mid*1.18, mid*0.9, mid*1.12, mid*0.85, mid], base=startT, step=Math.max(20,Math.round(months*30/seq.length)), pts=[];
-    for(var i=0;i<seq.length;i++){ base=addDaysStr(base, step); var jit=rnd?(0.94+rnd()*0.12):1; pts.push({t:base, price:Math.max(150000,Math.min(305000,Math.round(seq[i]*jit)))}); } return pts; }
-  // jagged/serrated segment between lo↔hi across [startT,endT] — for the balanced lateral base & the bearish base
-  function serrated(startT, endT, lo, hi, n, rnd){ var out=[], d0=daysBetween(startT,endT); if(d0<n)d0=n;
-    for(var i=1;i<=n;i++){ var t=addDaysStr(startT, Math.round(d0*i/n)), band=(i%2? hi:lo), jit=rnd?(0.9+rnd()*0.2):1; out.push({t:t, price:Math.round(band*jit)}); } return out; }
-  // FIX 1 — FAITHFUL to CredibleCrypto's drawn squiggles: each scenario has its OWN shape/levels/timing.
-  function ccWP(which){ var b=scenBase(); if(!b) return null; var D=b.lastDate, last=b.last;
-    function fut(dabs,minD){ var c=addDaysStr(D,minD); return dabs>c?dabs:c; }
-    if(which==='bull'){ var top=fut('2026-07-01',120);   // 🟢 near-vertical, IMMEDIATE, tops MID-2026 (short) — no correction
-      return [{t:D,price:last},{t:top,price:230000}].concat(distribWP(top,6,null,230000)); }
-    if(which==='bal'){ var dip=fut('2026-08-01',80), latEnd=fut('2027-11-01',560), top=fut('2028-05-01',730);   // 🔵 soft dip → serrated lateral 60-70k → steep LATE rise ~2028
-      var wp=[{t:D,price:last},{t:dip,price:CC.P50}];
-      wp=wp.concat(serrated(dip, latEnd, 60000, 70000, 8, mulberry32(0xBA1)));
-      wp.push({t:top,price:200000});
-      return wp.concat(distribWP(top,7,mulberry32(0xBA2),200000)); }
-    if(which==='bear'){ var bot=fut('2026-09-01',150), baseEnd=fut('2029-06-01',1120), top=fut('2030-03-01',1350);   // 🔴 deep to 21k → LONG jagged base 21-40k → latest, steepest rise ~2030
-      var wp=[{t:D,price:last},{t:bot,price:CC.P85}];
-      wp=wp.concat(serrated(bot, baseEnd, 21000, 40000, 12, mulberry32(0xBE1)));
-      wp.push({t:top,price:235000});
-      return wp.concat(distribWP(top,7,mulberry32(0xBE2),235000)); }
-    return null; }
-  function ccLine(which){ var wp=ccWP(which); if(!wp) return null;
-    return interpWP(wp).map(function(p){ return {time:p.time, value:p.value, close:p.value}; }); }   // squiggle = faithful clean line (close → picked up by the fit union)
-  // FIX 3 — historical-ANALOG hybrid: lay CONTIGUOUS blocks of real BTC daily log-returns along the macro
-  // path (trend/consolidation/vol-clustering, not IID noise). Reuses the buildDualHorizon bootstrap idea.
-  function analogCandles(macro, colorRGB, seed){ if(!macro||!macro.length) return null; var b=scenBase(); if(!b) return null; var src=b.src;
+  // ── Phase-analog hybrid v2 ──────────────────────────────────────────────────────────────────────
+  // The analyst's drawn path defines the macro trajectory, the levels AND the timeline (skeleton). The
+  // pivot PHASES (long bottom base, reaccumulation, top distribution) are filled with REAL BTC price
+  // action from an analogous historical Wyckoff run (ANCHOR.runs), time-matched to the analyst's window
+  // and rescaled to the phase's price band — NOT synthetic waves. Impulse legs keep the block-bootstrap
+  // texture. Deterministic (seeded). Honest fallback (keep the smooth macro) if no analog run exists.
+  var ANALOG_PICKS={};   // label -> [{type,from,to,cycle,fallback}]  (for the report + probe)
+  function ccDailyBetween(from,to){ var d=tierCache.daily||[], out=[]; for(var i=0;i<d.length;i++){ var x=d[i]; if(x.t>=from && x.t<=to && x.c>0) out.push(x); } return out; }
+  function cycleLabelOf(from,to){ var y0=(from||'').slice(0,4), y1=(to||'').slice(0,4); return (y1&&y1!==y0)?(y0+'–'+y1.slice(2)):y0; }   // e.g. "2018–20", "2021–22"
+  function ccRunsOf(type){ var out=[]; try{ ((ANCHOR&&ANCHOR.runs)||[]).forEach(function(r){ if(r.phase===type){ var seg=ccDailyBetween(r.from,r.to); if(seg.length>=15) out.push({from:r.from,to:r.to,seg:seg}); } }); }catch(e){} return out; }
+  // pick a real run of `type`, best-fit by relative magnitude vs the phase band; deterministic via seed
+  function pickAnalogRun(type, lo, hi, seed){ var cands=ccRunsOf(type); if(!cands.length) return null;
+    var tgt=Math.log((hi||1)/(lo||1));
+    cands.forEach(function(c){ var cl=c.seg.map(function(x){return x.c;}), mn=Math.min.apply(null,cl), mx=Math.max.apply(null,cl); c.mag=Math.log(mx/(mn||1)); c.score=Math.abs(c.mag-tgt); });
+    cands.sort(function(a,b){ return a.score-b.score; });
+    var topK=cands.slice(0, Math.min(3,cands.length)); return topK[(seed>>>0)%topK.length]; }
+  // real analog phase, normalized to a 0..1 log-shape and resampled to nDays (time-match to the window)
+  function analogForPhase(type, nDays, lo, hi, seed){ var run=pickAnalogRun(type, lo, hi, seed); if(!run) return null;
+    var lg=run.seg.map(function(x){ return Math.log(x.c); }), lmin=Math.min.apply(null,lg), lmax=Math.max.apply(null,lg), rng=(lmax-lmin)||1;
+    var norm=lg.map(function(v){ return (v-lmin)/rng; }), out=[];
+    for(var i=0;i<nDays;i++){ var f=(nDays>1)?(i/(nDays-1))*(norm.length-1):0, a=Math.floor(f), bb=Math.min(norm.length-1,a+1), fr=f-a; out.push(norm[a]+(norm[bb]-norm[a])*fr); }
+    return { norm:out, run:{from:run.from, to:run.to, cycle:cycleLabelOf(run.from, run.to)} }; }
+  // Build the hybrid candles from a plan { macro:[{t,price}], phases:[{type,from,to,lo,hi}] }
+  function analogHybrid(plan, colorRGB, seed, label){ if(!plan||!plan.macro||plan.macro.length<2) return null;
+    var macroPts=interpWP(plan.macro); if(!macroPts.length) return null; var b=scenBase(); if(!b) return null; var src=b.src;
     var closes=src.map(function(d){return d.c;}), R=[], HL=[];
     for(var i=1;i<src.length;i++){ if(closes[i]>0&&closes[i-1]>0){ R.push(Math.log(closes[i]/closes[i-1])); var s=src[i]; HL.push((s.h>0&&s.l>0&&s.c>0)?(s.h-s.l)/s.c:0.04); } }
     if(R.length<200) return null;
-    var srAll=fcSRLevels(), rnd=mulberry32(seed||0x1234), N=macro.length, out=[], prevClose=macro[0].value, dev=0, bi=0, blockLeft=0;
-    function newBlock(){ bi=Math.floor(rnd()*Math.max(1,R.length-95)); blockLeft=30+Math.floor(rnd()*60); }   // contiguous 30-90-day real segment
+    var days=macroPts.map(function(m){return m.time;}), macroV=macroPts.map(function(m){return m.value;}), N=days.length;
+    var target=macroV.slice(), phaseFlag=new Array(N); for(var z=0;z<N;z++) phaseFlag[z]=false;
+    var picks=[];
+    (plan.phases||[]).forEach(function(ph, pi){
+      var i0=days.findIndex(function(d){return d>=ph.from;}); if(i0<0) return;
+      var i1=days.findIndex(function(d){return d>=ph.to;}); if(i1<0) i1=N-1; var n=i1-i0+1; if(n<8) return;
+      var ana=analogForPhase(ph.type, n, ph.lo, ph.hi, ((seed>>>0)+pi*0x9e3779b1)>>>0);
+      if(!ana){ picks.push({type:ph.type, fallback:true}); return; }   // honest fallback → smooth macro stays
+      picks.push({type:ph.type, from:ana.run.from, to:ana.run.to, cycle:ana.run.cycle});
+      var ramp=Math.max(1,Math.round(n*0.15));   // smoothstep crossfade at the window edges → continuity with the skeleton
+      for(var i=0;i<n;i++){ var norm=ana.norm[i], ap=Math.exp(Math.log(ph.lo)+norm*(Math.log(ph.hi)-Math.log(ph.lo)));
+        var edge=Math.min(1, Math.min(i,n-1-i)/ramp), w=edge*edge*(3-2*edge);
+        target[i0+i]=Math.exp(Math.log(macroV[i0+i])*(1-w)+Math.log(ap)*w); phaseFlag[i0+i]=true; }
+    });
+    if(label) ANALOG_PICKS[label]=picks;
+    var srAll=fcSRLevels(), rnd=mulberry32(seed||0x1234), out=[], prevClose=target[0], dev=0, bi=0, blockLeft=0;
+    function newBlock(){ bi=Math.floor(rnd()*Math.max(1,R.length-95)); blockLeft=30+Math.floor(rnd()*60); }
     newBlock();
     for(var t=0;t<N;t++){ if(blockLeft<=0 || bi>=R.length) newBlock();
-      var r=R[bi], hl=HL[bi]; bi++; blockLeft--;
-      dev=dev*0.975 + r; if(dev>0.5)dev=0.5; if(dev<-0.5)dev=-0.5;   // OU-like accumulation of REAL contiguous returns → impulses/corrections/bases, kept bounded
-      var m=macro[t].value, near=fcNearestSR(m, srAll), mag=0, extra=0, fbreak=0;
-      if(near){ var dist=Math.abs(m-near)/near; if(dist<0.08){ var pull=(1-dist/0.08); mag=(near-m)*0.5*pull; extra=hl*0.8*pull; if(rnd()<0.08*pull) fbreak=(rnd()<0.5?-1:1)*hl*1.9*near*pull; } }   // S/R magnet + tests + false break (never a clean V AT levels)
-      var close=(m*Math.exp(dev)+mag); if(close<=0) close=prevClose*0.95; close=close*0.7 + m*0.3;   // tether so texture rides the drawn macro, doesn't wander off
+      var r=R[bi], hl=HL[bi]; bi++; blockLeft--; var m=target[t], close;
+      if(phaseFlag[t]){ dev=dev*0.9; close=m*Math.exp((rnd()-0.5)*hl*0.5); }   // phase = REAL analog shape (already textured) → only light micro
+      else { dev=dev*0.975+r; if(dev>0.5)dev=0.5; if(dev<-0.5)dev=-0.5; close=m*Math.exp(dev); }   // impulse legs = block-bootstrap texture
+      if(close<=0) close=prevClose*0.95; close=close*0.75 + m*0.25;   // tether
+      var near=fcNearestSR(close, srAll), mag=0, extra=0, fbreak=0;
+      if(near){ var dist=Math.abs(close-near)/near; if(dist<0.08){ var pull=(1-dist/0.08); mag=(near-close)*0.45*pull; extra=hl*0.9*pull; if(rnd()<0.07*pull) fbreak=(rnd()<0.5?-1:1)*hl*1.8*near*pull; } }   // S/R magnet + tests + false break preserved
+      close=close+mag; if(close<=0) close=prevClose*0.95;
       var open=prevClose, rng=close*(hl*(0.7+rnd()*0.6)+extra);
       var hi=Math.max(open,close)+rng*0.55+Math.max(0,fbreak), lo=Math.min(open,close)-rng*0.55+Math.min(0,fbreak); if(lo<=0) lo=Math.min(open,close)*0.9;
       var alpha=Math.max(0.1, 0.9-0.78*(t/N)), col='rgba('+colorRGB+','+alpha.toFixed(3)+')';
-      out.push({time:macro[t].time, open:open, high:hi, low:lo, close:close, color:col, wickColor:col, borderColor:col}); prevClose=close; }
+      out.push({time:days[t], open:open, high:hi, low:lo, close:close, color:col, wickColor:col, borderColor:col}); prevClose=close; }
     return out; }
-  function ccCandles(which, colorRGB, seed){ var wp=ccWP(which); if(!wp) return null; return analogCandles(interpWP(wp), colorRGB, seed); }
+  // FAITHFUL CredibleCrypto plan — smooth macro skeleton (levels+timeline) + the pivot phase windows.
+  function ccPlan(which){ var b=scenBase(); if(!b) return null; var D=b.lastDate, last=b.last;
+    function fut(dabs,minD){ var c=addDaysStr(D,minD); return dabs>c?dabs:c; }
+    if(which==='bull'){ var top=fut('2026-07-01',120), topEnd=addDaysStr(top,180);   // 🟢 near-vertical, tops MID-2026
+      return { macro:[{t:D,price:last},{t:top,price:230000},{t:topEnd,price:225000}],
+        phases:[{type:'distribution', from:top, to:topEnd, lo:180000, hi:300000}] }; }
+    if(which==='bal'){ var dip=fut('2026-08-01',80), latEnd=fut('2027-11-01',560), top=fut('2028-05-01',730), topEnd=addDaysStr(top,200);   // 🔵 dip → reaccumulation base → steep late 2028
+      return { macro:[{t:D,price:last},{t:dip,price:CC.P50},{t:latEnd,price:66000},{t:top,price:200000},{t:topEnd,price:195000}],
+        phases:[{type:'accumulation', from:dip, to:latEnd, lo:58000, hi:72000},{type:'distribution', from:top, to:topEnd, lo:170000, hi:250000}] }; }
+    if(which==='bear'){ var bot=fut('2026-09-01',150), baseEnd=fut('2029-06-01',1120), top=fut('2030-03-01',1350), topEnd=addDaysStr(top,200);   // 🔴 deep to 21k → LONG base → steepest ~2030
+      return { macro:[{t:D,price:last},{t:bot,price:CC.P85},{t:baseEnd,price:33000},{t:top,price:235000},{t:topEnd,price:228000}],
+        phases:[{type:'accumulation', from:bot, to:baseEnd, lo:20000, hi:42000},{type:'distribution', from:top, to:topEnd, lo:190000, hi:300000}] }; }
+    return null; }
+  function ccLine(which){ var p=ccPlan(which); if(!p) return null;
+    return interpWP(p.macro).map(function(x){ return {time:x.time, value:x.value, close:x.value}; }); }   // squiggle = faithful smooth path (no serrated/distrib artifacts)
+  function ccCandles(which, colorRGB, seed){ var p=ccPlan(which); if(!p) return null; return analogHybrid(p, colorRGB, seed, 'cc-'+which); }
+  try{ window.__analogPicks=function(){ return ANALOG_PICKS; }; }catch(e){}
 
   // Builders keyed by 'baseId|layer' — squiggle (clean line) + hybrid (analog candles) per scenario.
   var SCEN_BUILDERS={ 'dual-horizon': buildDualHorizon,
@@ -3756,15 +3787,19 @@
     if(id.indexOf('cc-')===0){
       var which=id.slice(3);
       var path={ bull:'**Bullish** — near-vertical, IMMEDIATE rise into the top zone by **MID-2026**, short, no significant correction',
-                 bal:'**Balanced** — a soft dip to the ~50% fib (~64,676), a **serrated lateral base** ~60–70k through 2026–2027, then a very vertical **LATE** rise to ~200k by **~2028**',
-                 bear:'**Bearish** — a deep drop to the ~85% fib (~21,458), a **LONG, jagged, serrated base** 21–40k across 2026–2029, then the latest, steepest rise to ~235k by **~2030**' }[which];
+                 bal:'**Balanced** — a soft dip to the ~50% fib (~64,676), a **reaccumulation base** ~58–72k through 2026–2027, then a very vertical **LATE** rise to ~200k by **~2028**',
+                 bear:'**Bearish** — a deep drop to the ~85% fib (~21,458), a **LONG bottom base** 20–42k across 2026–2029, then the latest, steepest rise to ~235k by **~2030**' }[which];
+      var picks=ANALOG_PICKS['cc-'+which]||[], picksMd=picks.length
+        ? picks.map(function(pk){ return '- **'+pk.type+'** phase ← real '+(pk.fallback?'(no analog run available → smooth-macro fallback)':(pk.cycle+' run, '+pk.from+' → '+pk.to)); }).join('\n')
+        : '- (analog runs are auto-picked when the hybrid is built)';
       return ''
         +'# WAKAWAKA Scenario — '+sc.name+'\n\n'
         +'**CredibleCrypto (as drawn)** — one scenario, two layers you toggle independently: **squiggle** (his faithful clean line) and **hybrid** (historical-analog daily candles).\n\n'
         +'**Type:** scenario / simulation, NOT a prediction.\n\n'
-        +'> ⚠️ **Honesty note.** The **squiggle** is CredibleCrypto’s view reproduced faithfully to his drawn shape/levels/timing. The **hybrid** is an **algorithmic interpretation** — synthetic candles built by laying contiguous blocks of REAL BTC daily returns along that path (trend/consolidation/vol-clustering, S/R reactions). It is **NOT his drawing** and **NOT financial advice / not a prediction**.\n\n'
-        +'## This path (faithful to his squiggle)\n- '+path+'.\n- The **top is a volatile RANGE** (distribution, double / triple tops), not a single peak.\n'
-        +'- Hybrid: volatility and candle **opacity decay with distance**; near an S/R level the candles consolidate, retest, and occasionally false-break — never a clean V.\n\n'
+        +'> ⚠️ **Honesty note.** The **squiggle** is CredibleCrypto’s view reproduced faithfully to his drawn shape/levels/timing. The **hybrid** is an **algorithmic interpretation** — the pivot phases are filled with REAL BTC price action from an analogous historical Wyckoff run (time-matched to his window, rescaled to the band); impulse legs use a block-bootstrap of real daily returns. It is **NOT his drawing** and **NOT financial advice / not a prediction**.\n\n'
+        +'## This path (faithful to his squiggle)\n- '+path+'.\n- The **top is a volatile RANGE** (real distribution behaviour, double / triple tops), not a single peak — **top distribution only, no post-top markdown**.\n'
+        +'- Hybrid: near an S/R level the candles consolidate, retest, and occasionally false-break — never a clean V. Opacity decays with distance.\n\n'
+        +'## Historical phase-analogs auto-picked for the hybrid (best magnitude match)\n'+picksMd+'\n\n'
         +'## Anchor levels used (owner-confirmed, cross-checked with real BTC structure)\n'
         +'| Level | Price | Meaning |\n|---|---|---|\n'
         +'| Top / distribution zone | **180,000–300,000** (centre ~230,000) | volatile range, not a line |\n'
@@ -4345,8 +4380,17 @@
     try{ if(ANCHOR && ANCHOR.extremes){ ANCHOR.extremes.forEach(function(e){ if(e && e.price>0) out.push(e.price); }); } }catch(e){}   // auto-detected cycle highs/lows (never fabricated)
     out.sort(function(a,b){ return a-b; }); var ded=[]; out.forEach(function(v){ if(!ded.length || Math.abs(v-ded[ded.length-1])/v>0.03) ded.push(v); }); return ded; }
   function fcNearestSR(v, arr){ var best=null,bd=Infinity; arr.forEach(function(x){ var d=Math.abs(x-v); if(d<bd){ bd=d; best=x; } }); return best; }
-  function ufcHybrid(rec){ var wp=ufcWP(rec); if(wp.length<2) return null;
-    return analogCandles(interpWP(wp), '245,158,11', rec.seed||0x1234); }   // FIX 3: same historical-analog method as CC (block bootstrap + S/R)
+  // detect pivot phases in a user's drawn path: long low-change segments = accumulation bases; the segment
+  // after the global-max waypoint = the top distribution. The shared phase-analog engine fills them.
+  function ufcPlan(rec){ var wp=ufcWP(rec); if(wp.length<2) return null; var maxi=0, i;
+    for(i=1;i<wp.length;i++){ if(wp[i].price>wp[maxi].price) maxi=i; }
+    var phases=[];
+    for(i=0;i<wp.length-1;i++){ var a=wp[i], c=wp[i+1], dur=daysBetween(a.t,c.t), ratio=Math.max(a.price,c.price)/Math.min(a.price,c.price);
+      if(i<maxi && dur>=120 && ratio<1.3){ phases.push({type:'accumulation', from:a.t, to:c.t, lo:Math.min(a.price,c.price)*0.9, hi:Math.max(a.price,c.price)*1.18}); } }   // reaccumulation / base
+    if(maxi<wp.length-1){ var mx=wp[maxi], en=wp[wp.length-1]; if(daysBetween(mx.t,en.t)>=45){ phases.push({type:'distribution', from:mx.t, to:en.t, lo:Math.min(mx.price,en.price)*0.85, hi:Math.max(mx.price,en.price)*1.15}); } }   // top distribution only (no markdown)
+    return { macro:wp.map(function(p){ return {t:p.t, price:p.price}; }), phases:phases }; }
+  function ufcHybrid(rec){ var p=ufcPlan(rec); if(!p) return null;
+    return analogHybrid(p, '245,158,11', rec.seed||0x1234, 'ufc:'+rec.name); }   // shared phase-analog engine
 
   function initFcCore(){ ensureFcOverlay(); loadUserForecasts(); try{ redrawFcOverlays(); }catch(e){} try{ restoreScenLayers(); }catch(e){}   // re-render persisted scenario layers (CC + user) on load
     try{ window.__fcState=function(){
