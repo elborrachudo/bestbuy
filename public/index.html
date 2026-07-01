@@ -207,18 +207,18 @@
 <div id="pjdc266-scan"></div>
 <div id="pjdc266-gate">
   <div class="pjdc266-crest">⚠</div>
-  <div class="pjdc266-seized">A página a que tentou aceder foi apreendida por irregularidades</div>
+  <div class="pjdc266-seized">The page you tried to access has been seized for irregularities</div>
   <div style="height:18px"></div>
   <div class="pjdc266-prompt" id="pjdc266-prompt"></div>
   <div class="pjdc266-pins" id="pjdc266-pins">
-    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="dígito 1">
-    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="dígito 2">
-    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="dígito 3">
-    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="dígito 4">
+    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="digit 1">
+    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="digit 2">
+    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="digit 3">
+    <input class="pjdc266-pin" maxlength="1" inputmode="numeric" pattern="[0-9]" aria-label="digit 4">
   </div>
-  <div class="pjdc266-status" id="pjdc266-status">a aguardar autenticação…</div>
+  <div class="pjdc266-status" id="pjdc266-status">awaiting authentication…</div>
   <div class="pjdc266-valbar" id="pjdc266-valbar"><div class="pjdc266-valfill" id="pjdc266-valfill"></div></div>
-  <div class="pjdc266-foot">PJDC266 · acesso restrito · sessão monitorizada</div>
+  <div class="pjdc266-foot">PJDC266 · restricted access · session monitored</div>
 </div>
 <div id="pjdc266-flash"></div>
 <script>
@@ -254,7 +254,7 @@
 
     /* ---- typewriter prompt ---- */
     var promptEl=document.getElementById('pjdc266-prompt');
-    var msg='Se é investigador da equipa PJDC266, insira o código pin';
+    var msg='If you are a PJDC266 team investigator, enter the pin code';
     var idx=0;
     (function type(){
       if(idx<=msg.length){ promptEl.innerHTML=msg.slice(0,idx)+'<span class="pjdc266-cursor">&nbsp;</span>'; idx++; setTimeout(type,38); }
@@ -286,7 +286,7 @@
       var scan=document.getElementById('pjdc266-scan');
       var content=[document.querySelector('.wrap'),document.querySelector('.modal-back')].filter(Boolean);
 
-      var steps=[['» a validar credenciais…',22],['» a desencriptar sessão…',55],['» a libertar conteúdo…',82],['✓ ACESSO CONCEDIDO',100]];
+      var steps=[['» validating credentials…',22],['» decrypting session…',55],['» releasing content…',82],['✓ ACCESS GRANTED',100]];
       status.className='pjdc266-status pjdc266-good';
       valbar.classList.add('pjdc266-on');
       clearInterval(qTimer);
@@ -319,19 +319,19 @@
 
     function check(){
       var code=pins.map(function(p){return p.value;}).join('');
-      if(code.length<4){ status.textContent='a aguardar autenticação…'; status.className='pjdc266-status'; return; }
+      if(code.length<4){ status.textContent='awaiting authentication…'; status.className='pjdc266-status'; return; }
       if(code===PIN_A || code===PIN_B){
         try{ sessionStorage.setItem('waka_screen', code===PIN_B ? 'B' : 'A'); }catch(e){}
         pins.forEach(function(p){ p.classList.remove('pjdc266-err'); p.classList.add('pjdc266-ok'); p.blur(); });
         runValidation();
       } else {
         pins.forEach(function(p){ p.classList.add('pjdc266-err'); });
-        status.textContent='✗ CÓDIGO INVÁLIDO · tentativa registada';
+        status.textContent='✗ INVALID CODE · attempt logged';
         status.className='pjdc266-status pjdc266-bad';
         setTimeout(function(){
           pins.forEach(function(p){ p.classList.remove('pjdc266-err'); p.value=''; });
           pins[0].focus();
-          status.textContent='a aguardar autenticação…';
+          status.textContent='awaiting authentication…';
           status.className='pjdc266-status';
         },1100);
       }
@@ -346,7 +346,7 @@
 <div class="wrap">
   <header>
     <div>
-      <div class="title" id="logo" title="Ver relatório">Compro o quê?!</div>
+      <div class="title" id="logo" title="View report">Compro o quê?!</div>
       <div class="sub" id="dateline">—</div>
     </div>
     <div class="live"><span class="dot" id="livedot"></span><span id="livetext">—</span></div>
@@ -355,7 +355,7 @@
   <!-- Score progression chart ON TOP -->
   <div class="card">
     <div class="chart-head">
-      <button class="lbl lbl-toggle" id="view-toggle" title="Tocar para alternar vista">Sinais de entrada ⤢</button>
+      <button class="lbl lbl-toggle" id="view-toggle" title="Tap to toggle view">Entry signals ⤢</button>
       <div class="head-controls">
         <div class="pillars" id="pillars"></div>
         <div class="ranges" id="ranges"></div>
@@ -379,20 +379,20 @@
 
   <!-- Export all raw data to Excel -->
   <div class="export">
-    <button class="export-btn" id="export-btn"><i class="ti ti-file-spreadsheet"></i> Descarregar dados (Excel)</button>
+    <button class="export-btn" id="export-btn"><i class="ti ti-file-spreadsheet"></i> Download data (Excel)</button>
     <div class="export-note" id="export-note"></div>
   </div>
 </div>
 
 <!-- Benchmarking report (opens when the logo is tapped) -->
 <div class="modal-back" id="report-back">
-  <div class="modal" role="dialog" aria-modal="true" aria-label="Relatório Compro o quê?!">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Compro o quê?! Report">
     <div class="modal-head">
       <div>
-        <h2>Relatório Compro o quê?!</h2>
+        <h2>Compro o quê?! Report</h2>
         <div class="when" id="report-when"></div>
       </div>
-      <button class="modal-x" id="report-x" aria-label="Fechar">×</button>
+      <button class="modal-x" id="report-x" aria-label="Close">×</button>
     </div>
     <div id="report-body"></div>
   </div>
@@ -691,22 +691,22 @@
   .wk-loading{display:flex;align-items:center;justify-content:center;height:72dvh;color:#4f7780;font-size:13px;}
 </style>
 <div id="screenB">
-  <div class="wk-progress" id="wk-progress" role="progressbar" aria-label="A carregar"><div class="wk-pg-bar"><div class="wk-pg-fill"></div></div><div class="wk-pg-txt"></div></div>
+  <div class="wk-progress" id="wk-progress" role="progressbar" aria-label="Loading"><div class="wk-pg-bar"><div class="wk-pg-fill"></div></div><div class="wk-pg-txt"></div></div>
   <div class="wk-wrap">
     <div class="wk-card">
       <div class="wk-topbar">
         <div class="wk-tb1">
           <div class="wk-pairwrap">
-            <button class="wk-nav" id="wk-navA" title="Trocar de ecrã" aria-label="Trocar de ecrã"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg></button>
+            <button class="wk-nav" id="wk-navA" title="Switch screen" aria-label="Switch screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M7 7h13l-3-3M17 17H4l3 3"/></svg></button>
             <div class="wk-asset-wrap" id="wk-assetWrap">
-              <button class="wk-pair" id="wk-assetBtn" title="Ativo principal"><span id="wk-assetLabel">BTC</span> <span class="wk-per-caret">▾</span></button>
+              <button class="wk-pair" id="wk-assetBtn" title="Main asset"><span id="wk-assetLabel">BTC</span> <span class="wk-per-caret">▾</span></button>
               <div class="wk-per-menu wk-asset-menu" id="wk-assetMenu">
-                <div class="wk-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="text" id="wk-assetSrch" placeholder="Pesquisar ativo…" autocomplete="off"></div>
+                <div class="wk-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="text" id="wk-assetSrch" placeholder="Search asset…" autocomplete="off"></div>
                 <div class="wk-asset-list" id="wk-assetList"></div>
               </div>
-              <button class="wk-plus" id="wk-ovBtn" title="Sobrepor ativos / séries" aria-label="Sobreposições">+</button>
+              <button class="wk-plus" id="wk-ovBtn" title="Overlay assets / series" aria-label="Overlays">+</button>
               <div class="wk-per-menu wk-ov-menu" id="wk-ovMenu">
-                <div class="wk-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="text" id="wk-ovSrch" placeholder="Pesquisar sobreposição…" autocomplete="off"></div>
+                <div class="wk-srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="text" id="wk-ovSrch" placeholder="Search overlay…" autocomplete="off"></div>
                 <div class="wk-ov-list" id="wk-ovList"></div>
               </div>
               <button class="wk-rocket" id="wk-rocketBtn" title="Scenarios" aria-label="Scenarios">🚀</button>
@@ -719,28 +719,28 @@
         <div class="wk-tb2">
           <div class="wk-tb2-left">
         <div class="wk-ind-wrap">
-          <div class="wk-ind-btn wk-dots" id="wk-indBtn" title="Definições / indicadores" aria-label="Definições / indicadores">
+          <div class="wk-ind-btn wk-dots" id="wk-indBtn" title="Settings / indicators" aria-label="Settings / indicators">
             <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
           </div>
           <div class="wk-ind-menu" id="wk-indMenu">
-            <div class="wk-ind-head">Detetor de ciclo</div>
-            <div class="wk-ind-item on" data-ind="phases"><span class="wk-ind-radio"></span><span class="wk-nm">Fases do ciclo</span><span class="wk-csw" style="background:linear-gradient(90deg,#22c55e,#fb923c)"></span></div>
+            <div class="wk-ind-head">Cycle detector</div>
+            <div class="wk-ind-item on" data-ind="phases"><span class="wk-ind-radio"></span><span class="wk-nm">Cycle phases</span><span class="wk-csw" style="background:linear-gradient(90deg,#22c55e,#fb923c)"></span></div>
             <div class="wk-pm-row" id="wk-pmRow">
-              <button class="wk-pm on" data-pm="structural">Estrutural</button>
-              <button class="wk-pm wk-pm-soon" data-pm="wyckoff" disabled title="Em breve — Wyckoff por eventos/volume">Wyckoff <span>em breve</span></button>
+              <button class="wk-pm on" data-pm="structural">Structural</button>
+              <button class="wk-pm wk-pm-soon" data-pm="wyckoff" disabled title="Soon — Wyckoff by events/volume">Wyckoff <span>soon</span></button>
             </div>
             <div class="wk-ind-item on" data-ind="halving"><span class="wk-ind-radio"></span><span class="wk-nm">Halvings</span><span class="wk-csw" style="background:#8a93a3"></span></div>
             <div class="wk-ind-sep"></div>
-            <div class="wk-ind-head">Osciladores (painel próprio)</div>
+            <div class="wk-ind-head">Oscillators (own pane)</div>
             <div class="wk-ind-item" data-ind="rsi"><span class="wk-ind-radio"></span><span class="wk-nm">RSI (14)</span><span class="wk-csw" style="background:#5b8cff"></span></div>
             <div class="wk-ind-item" data-ind="stoch"><span class="wk-ind-radio"></span><span class="wk-nm">StochRSI</span><span class="wk-csw" style="background:#22d3ee"></span></div>
             <div class="wk-ind-item" data-ind="macd"><span class="wk-ind-radio"></span><span class="wk-nm">MACD</span><span class="wk-csw" style="background:#5b8cff"></span></div>
             <div class="wk-ind-item" data-ind="mayer"><span class="wk-ind-radio"></span><span class="wk-nm">Mayer Multiple</span><span class="wk-csw" style="background:#a78bfa"></span></div>
-            <div class="wk-ind-item" data-ind="pct"><span class="wk-ind-radio"></span><span class="wk-nm">Percentil histórico</span><span class="wk-csw" style="background:#22d3ee"></span></div>
+            <div class="wk-ind-item" data-ind="pct"><span class="wk-ind-radio"></span><span class="wk-nm">Historical percentile</span><span class="wk-csw" style="background:#22d3ee"></span></div>
           </div>
         </div>
         <div class="wk-per-wrap wk-cs-wrap">
-          <div class="wk-per-btn wk-icobtn" id="wk-csBtn" title="Tamanho de vela"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="21"/><rect x="5.5" y="7" width="5" height="9" rx="1"/><line x1="16" y1="5" x2="16" y2="19"/><rect x="13.5" y="9.5" width="5" height="6" rx="1"/></svg> <span id="wk-csLabel">1D</span> <span class="wk-per-caret">▾</span></div>
+          <div class="wk-per-btn wk-icobtn" id="wk-csBtn" title="Candle size"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="8" y1="3" x2="8" y2="21"/><rect x="5.5" y="7" width="5" height="9" rx="1"/><line x1="16" y1="5" x2="16" y2="19"/><rect x="13.5" y="9.5" width="5" height="6" rx="1"/></svg> <span id="wk-csLabel">1D</span> <span class="wk-per-caret">▾</span></div>
           <div class="wk-per-menu wk-cs-menu" id="wk-csMenu">
             <div class="wk-cs-item" data-cs="1m">1m</div>
             <div class="wk-cs-item" data-cs="5m">5m</div>
@@ -752,12 +752,12 @@
             <div class="wk-cs-item" data-cs="1M">1M</div>
             <div class="wk-cs-item" data-cs="3M">3M</div>
             <div class="wk-cs-item" data-cs="6M">6M</div>
-            <div class="wk-cs-item" data-cs="1A">1A</div>
-            <div class="wk-cs-item" data-cs="2A">2A</div>
+            <div class="wk-cs-item" data-cs="1Y">1Y</div>
+            <div class="wk-cs-item" data-cs="2Y">2Y</div>
           </div>
         </div>
         <div class="wk-per-wrap">
-          <div class="wk-per-btn wk-icobtn" id="wk-perBtn" title="Período visualizado"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg> <span id="wk-perLabel">90D</span> <span class="wk-per-caret">▾</span></div>
+          <div class="wk-per-btn wk-icobtn" id="wk-perBtn" title="Visible period"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg> <span id="wk-perLabel">90D</span> <span class="wk-per-caret">▾</span></div>
           <div class="wk-per-menu" id="wk-perMenu">
             <div class="wk-per-item" data-d="1">1D</div>
             <div class="wk-per-item" data-d="7">7D</div>
@@ -766,8 +766,8 @@
             <div class="wk-per-item" data-d="60">60D</div>
             <div class="wk-per-item on" data-d="90">90D</div>
             <div class="wk-per-item" data-d="182">6M</div>
-            <div class="wk-per-item" data-d="365">1A</div>
-            <div class="wk-per-item" data-d="1460">4A</div>
+            <div class="wk-per-item" data-d="365">1Y</div>
+            <div class="wk-per-item" data-d="1460">4Y</div>
             <div class="wk-per-item" data-d="0">ALL</div>
           </div>
         </div>
@@ -775,37 +775,37 @@
           </div>
           <div class="wk-tb2-right" id="wk-layers">
             <div class="wk-cyc-wrap" id="wk-cycWrap">
-              <button class="wk-layer" data-layer="phases" id="wk-cycBtn">Fases <span class="wk-per-caret">▾</span></button>
+              <button class="wk-layer" data-layer="phases" id="wk-cycBtn">Phases <span class="wk-per-caret">▾</span></button>
               <div class="wk-cyc-menu" id="wk-cycMenu">
-                <div class="wk-cyc-item" data-mode="overlap">Ciclos sobrepostos</div>
-                <div class="wk-cyc-item" data-mode="spiral">Espiral de ciclos</div>
-                <div class="wk-cyc-item" data-mode="bands">Bandas de fase</div>
-                <div class="wk-cyc-item" data-mode="heatmap">Heatmap de fases</div>
-                <div class="wk-cyc-item" data-mode="bars">Barras de duração</div>
+                <div class="wk-cyc-item" data-mode="overlap">Overlapping cycles</div>
+                <div class="wk-cyc-item" data-mode="spiral">Cycle spiral</div>
+                <div class="wk-cyc-item" data-mode="bands">Phase bands</div>
+                <div class="wk-cyc-item" data-mode="heatmap">Phase heatmap</div>
+                <div class="wk-cyc-item" data-mode="bars">Duration bars</div>
               </div>
             </div>
             <div class="wk-dom-wrap" id="wk-domWrap">
-              <button class="wk-layer wk-dom-btn" id="wk-domBtn" title="Dominância / market cap" aria-label="Dominância">
+              <button class="wk-layer wk-dom-btn" id="wk-domBtn" title="Dominance / market cap" aria-label="Dominance">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.2v14.6M8.5 19.8h7M3.8 7h16.4"/><path d="M3.8 7L1.4 11.7h4.8zM1.4 11.7a2.4 2.4 0 0 0 4.8 0M20.2 7l-2.4 4.7h4.8zM17.8 11.7a2.4 2.4 0 0 0 4.8 0"/><circle cx="12" cy="4.4" r="1.25"/></svg>
               </button>
               <div class="wk-cyc-menu wk-dom-menu" id="wk-domMenu">
                 <div class="wk-dom-item" data-dom="btcd"><span class="wk-dom-dot" style="background:#f7931a"></span><span class="wk-dom-nm">BTC.D</span><span class="wk-dom-val" id="wk-domv-btcd">—</span></div>
                 <div class="wk-dom-item" data-dom="othersd"><span class="wk-dom-dot" style="background:#a78bfa"></span><span class="wk-dom-nm">OTHERS.D</span><span class="wk-dom-val" id="wk-domv-othersd">—</span></div>
                 <div class="wk-dom-item" data-dom="mcap"><span class="wk-dom-dot" style="background:#5eead4"></span><span class="wk-dom-nm">Total market cap</span><span class="wk-dom-val" id="wk-domv-mcap">—</span></div>
-                <div class="wk-dom-note" id="wk-domNote">dados: CoinGecko /global</div>
+                <div class="wk-dom-note" id="wk-domNote">data: CoinGecko /global</div>
               </div>
             </div>
             <button class="wk-layer" data-layer="halvings" title="Halvings"><span class="wk-hbtc">H₿</span></button>
             <button class="wk-layer" data-layer="manip">Manip</button>
             <div class="wk-ad-wrap" id="wk-accWrap">
-              <button class="wk-ad-btn" id="wk-accBtn" title="Accumulation (fundo)">Accumulation <span class="wk-per-caret">▾</span></button>
+              <button class="wk-ad-btn" id="wk-accBtn" title="Accumulation (bottom)">Accumulation <span class="wk-per-caret">▾</span></button>
               <div class="wk-cyc-menu wk-ad-menu" id="wk-accMenu">
                 <div class="wk-ad-item" data-ad="accStruct"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Structural</span></div>
                 <div class="wk-ad-item" data-ad="accWyck"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Wyckoff events</span><span class="wk-ad-exp">exp.</span></div>
               </div>
             </div>
             <div class="wk-ad-wrap" id="wk-distWrap">
-              <button class="wk-ad-btn" id="wk-distBtn" title="Distribution (topo)">Distribution <span class="wk-per-caret">▾</span></button>
+              <button class="wk-ad-btn" id="wk-distBtn" title="Distribution (top)">Distribution <span class="wk-per-caret">▾</span></button>
               <div class="wk-cyc-menu wk-ad-menu" id="wk-distMenu">
                 <div class="wk-ad-item" data-ad="distStruct"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Structural</span></div>
                 <div class="wk-ad-item" data-ad="distWyck"><span class="wk-ad-chk"></span><span class="wk-ad-nm">Wyckoff events</span><span class="wk-ad-exp">exp.</span></div>
@@ -820,22 +820,22 @@
         <!-- Fase VII: drawing toolbar built from JS (DRAW_TOOLS) and powered by the
              lightweight-charts-drawing lib. 6 parent groups (Linhas/Rectangle/Fib/Previsão/Text/Brush)
              + cursor + trash. Submenus (flyouts) open to the right. -->
-        <div class="wk-drawbar" id="wk-drawbar" aria-label="Ferramentas de desenho"></div>
-        <div id="wk-chart"><div class="wk-loading" id="wk-loading">a carregar série BTC 2011→hoje…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div><div class="wk-livetag" id="wk-livetag"></div><canvas class="wk-cycleoverlay" id="wk-cycleoverlay"></canvas><canvas class="wk-heatstrip" id="wk-heatstrip"></canvas>
+        <div class="wk-drawbar" id="wk-drawbar" aria-label="Drawing tools"></div>
+        <div id="wk-chart"><div class="wk-loading" id="wk-loading">loading BTC series 2011→today…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div><div class="wk-livetag" id="wk-livetag"></div><canvas class="wk-cycleoverlay" id="wk-cycleoverlay"></canvas><canvas class="wk-heatstrip" id="wk-heatstrip"></canvas>
         <div class="wk-modetog" id="wk-modetog">
-          <button class="wk-mode-b wk-rulertog" id="wk-rulertog" title="Régua / medição" aria-label="Régua"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg></button>
+          <button class="wk-mode-b wk-rulertog" id="wk-rulertog" title="Ruler / measure" aria-label="Ruler"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg></button>
           <div class="wk-mode-sep"></div>
-          <button class="wk-mode-b on" data-mode="line" title="Linha" aria-label="Linha"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-6 4 3 6-8"/></svg></button>
-          <button class="wk-mode-b" data-mode="candle" title="Velas" aria-label="Velas"><svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.5" fill="currentColor"><line x1="7" y1="3" x2="7" y2="21"/><rect x="5" y="8" width="4" height="8" rx="0.5"/><line x1="17" y1="5" x2="17" y2="19"/><rect x="15" y="10" width="4" height="6" rx="0.5"/></svg></button>
+          <button class="wk-mode-b on" data-mode="line" title="Line" aria-label="Line"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l5-6 4 3 6-8"/></svg></button>
+          <button class="wk-mode-b" data-mode="candle" title="Candles" aria-label="Candles"><svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="1.5" fill="currentColor"><line x1="7" y1="3" x2="7" y2="21"/><rect x="5" y="8" width="4" height="8" rx="0.5"/><line x1="17" y1="5" x2="17" y2="19"/><rect x="15" y="10" width="4" height="6" rx="0.5"/></svg></button>
         </div></div>
       </div>
     </div>
   </div>
   <div class="wk-cfg-back" id="wk-cfgBack"></div>
-  <div class="wk-cfg" id="wk-cfg" role="dialog" aria-label="Configurar oscilador">
-    <div class="wk-cfg-h"><span id="wk-cfg-title">Oscilador</span><button class="wk-cfg-x" id="wk-cfg-x" aria-label="Fechar">✕</button></div>
+  <div class="wk-cfg" id="wk-cfg" role="dialog" aria-label="Configure oscillator">
+    <div class="wk-cfg-h"><span id="wk-cfg-title">Oscillator</span><button class="wk-cfg-x" id="wk-cfg-x" aria-label="Close">✕</button></div>
     <div class="wk-cfg-body" id="wk-cfg-body"></div>
-    <div class="wk-cfg-foot"><button id="wk-cfg-reset">Repor</button><button id="wk-cfg-apply">Aplicar</button></div>
+    <div class="wk-cfg-foot"><button id="wk-cfg-reset">Reset</button><button id="wk-cfg-apply">Apply</button></div>
   </div>
 </div>
 <script src="https://unpkg.com/lightweight-charts@5/dist/lightweight-charts.standalone.production.js"></script>
@@ -880,12 +880,12 @@
 
   // Market-cycle phase palette + how each phase conditions the contrarian signals.
   var PHASE_COL = { accumulation:'#22c55e', rise:'#3b82f6', euphoria:'#f59e0b', correction:'#a855f7' };
-  var PHASE_PT = { accumulation:'Acumulação', rise:'Subida', euphoria:'Euforia', correction:'Correção' };
+  var PHASE_PT = { accumulation:'Accumulation', rise:'Rise', euphoria:'Euphoria', correction:'Correction' };
   var PHASE_RULE = {
-    accumulation:'só compras (vendas suprimidas)',
-    rise:'compras e vendas',
-    euphoria:'só vendas (compras suprimidas)',
-    correction:'só vendas — compras suprimidas (não apanhar a faca)'
+    accumulation:'buys only (sells suppressed)',
+    rise:'buys and sells',
+    euphoria:'sells only (buys suppressed)',
+    correction:'sells only — buys suppressed (don\'t catch the knife)'
   };
 
   // Blend a reading from its stored pillar scores over the currently-active pillars.
@@ -1147,7 +1147,7 @@
   };
 
   // ── pillar toggle icons ───────────────────────────────────────────────────────
-  var PILLAR_LABEL = { fundamentals:'Fundamentals', technicals:'Technicals', activity:'Atividade' };
+  var PILLAR_LABEL = { fundamentals:'Fundamentals', technicals:'Technicals', activity:'Activity' };
   function renderPillars(){
     var box=document.getElementById('pillars'); box.innerHTML='';
     PILLAR_DEFS.forEach(function(p){
@@ -1281,7 +1281,7 @@
     var ph=cur? cur.phase : null;
     var iv=cur && cur.indicator_values ? cur.indicator_values : null;
     var conf=iv && iv.phase_confidence!=null ? Math.round(Number(iv.phase_confidence)*100) : null;
-    var confTxt=conf!=null ? ' · confiança '+conf+'%' : '';
+    var confTxt=conf!=null ? ' · confidence '+conf+'%' : '';
     var mayerTxt=iv && iv.mayer!=null ? ' · Mayer '+Number(iv.mayer).toFixed(2) : '';
     // M2 liquidity confirmer (informational): expanding = tailwind, contracting = headwind.
     var m2Txt='';
@@ -1290,22 +1290,22 @@
       var yoy=iv.m2_yoy_pct!=null?(' '+(Number(iv.m2_yoy_pct)>=0?'+':'')+Number(iv.m2_yoy_pct).toFixed(1)+'% YoY'):'';
       var lvl=iv.m2_value!=null?(' ≈ $'+Number(iv.m2_value).toFixed(1)+' tri'):'';
       var parts=[];
-      if(iv.m2_us!=null) parts.push('EUA $'+Number(iv.m2_us).toFixed(1));
-      if(iv.m2_eu!=null) parts.push('Zona Euro $'+Number(iv.m2_eu).toFixed(1));
+      if(iv.m2_us!=null) parts.push('US $'+Number(iv.m2_us).toFixed(1));
+      if(iv.m2_eu!=null) parts.push('Eurozone $'+Number(iv.m2_eu).toFixed(1));
       if(iv.m2_cn!=null) parts.push('China $'+Number(iv.m2_cn).toFixed(1));
       var bd=parts.length?(' <span style="opacity:.7">('+parts.join(' · ')+' tri)</span>'):'';
-      m2Txt=' &nbsp;·&nbsp; Liquidez M2 global'+lvl+': <b style="color:'+(exp?'#22c55e':'#f59e0b')+'">'+(exp?'a expandir (vento a favor)':'a contrair (vento contra)')+'</b>'+yoy+bd;
+      m2Txt=' &nbsp;·&nbsp; Global M2 liquidity'+lvl+': <b style="color:'+(exp?'#22c55e':'#f59e0b')+'">'+(exp?'expanding (tailwind)':'contracting (headwind)')+'</b>'+yoy+bd;
     }
     if(state.view==='long'){
       var chips=Object.keys(PHASE_PT).map(function(k){ return '<span style="color:'+PHASE_COL[k]+';font-weight:700">●</span> '+PHASE_PT[k]; }).join(' &nbsp; ');
-      box.innerHTML='Fases: '+chips+(ph? ' &nbsp;·&nbsp; <b>agora: <span class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph]+'</span>'+confTxt+mayerTxt+'</b>':'')+m2Txt+
-        ' &nbsp;·&nbsp; BTC base-100 (eixo log); detetor: Mayer + 200W MA + drawdown + percentil.';
+      box.innerHTML='Phases: '+chips+(ph? ' &nbsp;·&nbsp; <b>now: <span class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph]+'</span>'+confTxt+mayerTxt+'</b>':'')+m2Txt+
+        ' &nbsp;·&nbsp; BTC base-100 (log axis); detector: Mayer + 200W MA + drawdown + percentile.';
     } else {
-      var pa=portfolioAlpha(); var aTxt=pa==null?'':' &nbsp;·&nbsp; Carteira: <b>'+(pa>=0?'+':'')+pa.toFixed(0)+'pp</b> vs segurar';
-      var sizeTxt = ph==='accumulation' ? ' &nbsp;·&nbsp; sizing 1.5× (fundo)' : (ph==='rise' ? ' &nbsp;·&nbsp; sizing 1.0×' : '');
+      var pa=portfolioAlpha(); var aTxt=pa==null?'':' &nbsp;·&nbsp; Portfolio: <b>'+(pa>=0?'+':'')+pa.toFixed(0)+'pp</b> vs holding';
+      var sizeTxt = ph==='accumulation' ? ' &nbsp;·&nbsp; sizing 1.5× (bottom)' : (ph==='rise' ? ' &nbsp;·&nbsp; sizing 1.0×' : '');
       box.innerHTML=ph
-        ? 'Ciclo: <b class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph].toUpperCase()+'</b>'+confTxt+' — sinais condicionados: '+PHASE_RULE[ph]+'.'+sizeTxt+m2Txt+aTxt
-        : 'Ciclo de mercado: a aguardar dados (Fase 1).'+aTxt;
+        ? 'Cycle: <b class="ph" style="color:'+PHASE_COL[ph]+'">'+PHASE_PT[ph].toUpperCase()+'</b>'+confTxt+' — conditioned signals: '+PHASE_RULE[ph]+'.'+sizeTxt+m2Txt+aTxt
+        : 'Market cycle: awaiting data (Phase 1).'+aTxt;
     }
   }
 
@@ -1335,7 +1335,7 @@
     if(!cyc.length){
       var cv=ctx.canvas; ctx.clearRect(0,0,cv.width,cv.height);
       ctx.fillStyle='#a1a1aa'; ctx.font='13px -apple-system,sans-serif'; ctx.textAlign='center';
-      ctx.fillText('Ciclo de mercado: sem dados ainda (corre /api/backfill-cycle).', cv.clientWidth/2, 110);
+      ctx.fillText('Market cycle: no data yet (run /api/backfill-cycle).', cv.clientWidth/2, 110);
       return;
     }
     var btc0=Number(cyc[0].btc_price);
@@ -1379,7 +1379,7 @@
     // Eye toggle before the first token: open = all selected, closed = chart cleared.
     var allVisible = state.tokens.length>0 && state.tokens.every(function(t){ return !state.hidden[t.id]; });
     var eye=el('i','legend-eye ti '+(allVisible?'ti-eye':'ti-eye-off'));
-    eye.title = allVisible ? 'Limpar gráfico (esconder todos)' : 'Selecionar todos';
+    eye.title = allVisible ? 'Clear chart (hide all)' : 'Select all';
     eye.onclick=function(){
       var hideAll = allVisible;                 // if everything is shown, clear; else select all
       state.tokens.forEach(function(t){ state.hidden[t.id]=hideAll; });
@@ -1422,20 +1422,20 @@
     var mcap = (latest.price!=null && latest.circ_supply!=null) ? Number(latest.price)*Number(latest.circ_supply) : null;
     var mult = (mcap!=null && rev!=null && Number(rev)>0) ? Math.round(mcap/Number(rev)) : null;
     var multTxt = mult!=null ? ' · '+mult+'x' : '';
-    var revVal = (rev==null) ? 'a recolher' : fmtUsd(rev)+multTxt;
+    var revVal = (rev==null) ? 'collecting' : fmtUsd(rev)+multTxt;
     var fund;
     if(kind==='none'){
-      fund=[{k:'Fundamentals', val:'sem cobertura', d:{txt:'Technicals + Atividade', cls:'na'}}];
+      fund=[{k:'Fundamentals', val:'no coverage', d:{txt:'Technicals + Activity', cls:'na'}}];
     } else if(kind==='chain-fees'){
       fund=[{k:'Chain fees (ann.)', val:revVal, d:delta('holders_revenue',true)}];
     } else if(kind==='rev'){
-      fund=[{k:'Receita (ann.)', val:revVal, d:delta('holders_revenue',true)}];
+      fund=[{k:'Revenue (ann.)', val:revVal, d:delta('holders_revenue',true)}];
     } else if(kind==='rev-tvl'){
-      fund=[{k:'Receita (ann.)', val:revVal, d:delta('holders_revenue',true)},
+      fund=[{k:'Revenue (ann.)', val:revVal, d:delta('holders_revenue',true)},
             {k:'TVL', val:fmtUsd(tvl), d:delta('tvl',true)}];
     } else { // tvl-rev (defi/rwa)
       fund=[{k:'TVL', val:fmtUsd(tvl), d:delta('tvl',true)},
-            {k:'Receita (ann.)', val:revVal, d:delta('holders_revenue',true)}];
+            {k:'Revenue (ann.)', val:revVal, d:delta('holders_revenue',true)}];
     }
     return [
       {k:'Price vs MAs',        val:fmtScore(r1(latest.score_price_ma)), d:delta('score_price_ma',true)},
@@ -1443,13 +1443,13 @@
       {k:'RSI (14d)',           val:fmtNum(latest.rsi_14,1), d:delta('rsi_14',false)}
     ].concat(fund).concat([
       {k:'Inflation (annual)',  val:latest.emissions_rate==null?'n/a':fmtPct(latest.emissions_rate)+' / yr', d:delta('emissions_rate',false)},
-      {k:'Endereços ativos',    val:fmtCount(latest.active_addresses), d:delta('active_addresses',true)},
+      {k:'Active addresses',    val:fmtCount(latest.active_addresses), d:delta('active_addresses',true)},
       {k:'Holders (on-chain)',  val:fmtCount(latest.holder_count),     d:delta('holder_count',true)},
-      {k:'Transferências',      val:fmtCount(latest.transfer_count),   d:delta('transfer_count',true)}
+      {k:'Transfers',           val:fmtCount(latest.transfer_count),   d:delta('transfer_count',true)}
     ]);
   }
-  // On-chain counts: "a recolher" while empty (live-only, accumulating) — never 0.
-  function fmtCount(n){ return (n==null||isNaN(n))?'a recolher':Number(n).toLocaleString('pt-PT'); }
+  // On-chain counts: "collecting" while empty (live-only, accumulating) — never 0.
+  function fmtCount(n){ return (n==null||isNaN(n))?'collecting':Number(n).toLocaleString('en-US'); }
 
   function fmtPrice(n){
     if(n==null||isNaN(n)) return '';
@@ -1486,17 +1486,17 @@
       if(latest.reweighted){
         var noCov = (t.category==='payment' || t.category==='uncovered');
         tok.appendChild(el('div','flag', noCov
-          ? 'sem cobertura de Fundamentals · Technicals + Atividade'
-          : 'market-only · sem dados de Fundamentals'));
+          ? 'no Fundamentals coverage · Technicals + Activity'
+          : 'market-only · no Fundamentals data'));
       }
       if(isStructuralDecline(t.id)){
-        var sd=el('div','flag','⚠ declínio estrutural · compras suprimidas');
+        var sd=el('div','flag','⚠ structural decline · buys suppressed');
         sd.style.color='#f59e0b'; sd.style.fontStyle='normal';
         tok.appendChild(sd);
       }
       var alpha=alphaForToken(t.id);
       if(alpha){
-        var aEl=el('div','alpha', (alpha.alphaPP>=0?'protegeu +':'')+alpha.alphaPP.toFixed(0)+'pp vs segurar');
+        var aEl=el('div','alpha', (alpha.alphaPP>=0?'protected +':'')+alpha.alphaPP.toFixed(0)+'pp vs holding');
         aEl.style.color = alpha.alphaPP>=0 ? 'var(--good)' : '#f87171';
         tok.appendChild(aEl);
       }
@@ -1534,15 +1534,15 @@
       var right=el('div','panel-pillars');
       var mini=el('div','pillars-mini');
       mini.appendChild(el('h4',null,'PILLARS'));
-      [{key:'fundamentals',lab:'Fundamentals'},{key:'technicals',lab:'Technicals'},{key:'activity',lab:'Atividade'}].forEach(function(p){
+      [{key:'fundamentals',lab:'Fundamentals'},{key:'technicals',lab:'Technicals'},{key:'activity',lab:'Activity'}].forEach(function(p){
         var val=latest['score_'+p.key];
         var pm=el('div','pmini');
         var head=el('div','pmini-head');
         head.appendChild(el('span','lab',p.lab));
-        head.appendChild(el('span','pv',val==null?(p.key==='activity'?'a recolher':'n/a'):Number(val).toFixed(1)));
+        head.appendChild(el('span','pv',val==null?(p.key==='activity'?'collecting':'n/a'):Number(val).toFixed(1)));
         pm.appendChild(head);
         if(val==null && p.key==='activity'){
-          pm.appendChild(el('div','pmini-off','recolha on-chain a iniciar'));
+          pm.appendChild(el('div','pmini-off','on-chain collection starting'));
         } else {
           var tr=el('div','ptrack'); var fl=el('span');
           fl.style.width=(val==null?0:Math.max(0,Math.min(100,Number(val)*10)))+'%';
@@ -1606,9 +1606,9 @@
   // the series can be analysed later (e.g. Activity-vs-Price correlation). Activity
   // cells are left BLANK (never 0) wherever there is no on-chain snapshot, and the
   // Legenda sheet states the exact date Activity collection began.
-  var XLS_COLS = ['Data/hora','Tipo','Preço','Score Final','Fundamentals','Technicals','Atividade',
-    'TVL','Holders Revenue','Emissões %','MA50','MA200','RSI','Dist. do mínimo %',
-    'Endereços ativos','Holders','Transferências'];
+  var XLS_COLS = ['Date/time','Type','Price','Final Score','Fundamentals','Technicals','Activity',
+    'TVL','Holders Revenue','Emissions %','MA50','MA200','RSI','Dist. from low %',
+    'Active addresses','Holders','Transfers'];
 
   function numOrBlank(v){ return (v==null||v===''||isNaN(Number(v))) ? null : Number(v); }
   function rnd(v,d){ var n=numOrBlank(v); return n==null?null:Math.round(n*Math.pow(10,d))/Math.pow(10,d); }
@@ -1665,40 +1665,40 @@
   function legendSheet(startMs){
     var X = startMs==null ? null : new Date(startMs);
     var xTxt = X==null
-      ? 'AINDA NÃO COMEÇOU — não há registos de Atividade live até à data deste ficheiro.'
-      : ('começa em ' + ptDate(X.toISOString()) + ' (' + X.toISOString().slice(0,10) + ').');
+      ? 'HAS NOT STARTED YET — there are no live Activity records up to the date of this file.'
+      : ('starts on ' + ptDate(X.toISOString()) + ' (' + X.toISOString().slice(0,10) + ').');
     var L=[
-      ['Compro o quê?! — arquivo de dados'],
+      ['Compro o quê?! — data archive'],
       [''],
-      ['IMPORTANTE — leia antes de analisar:'],
-      ['Fundamentals, Technicals e Preço têm ~1 ANO de histórico (reconstruído).'],
-      ['A coluna ATIVIDADE (on-chain) ' + xTxt],
-      ['Antes dessa data as células de Atividade estão VAZIAS (não é zero — é "sem dado").'],
-      ['Para correlacionar Atividade vs Preço, use APENAS as linhas a partir dessa data;'],
-      ['caso contrário estará a comparar preço real com células vazias e a tirar conclusões falsas.'],
+      ['IMPORTANT — read before analysing:'],
+      ['Fundamentals, Technicals and Price have ~1 YEAR of history (reconstructed).'],
+      ['The ACTIVITY column (on-chain) ' + xTxt],
+      ['Before that date the Activity cells are EMPTY (not zero — it means "no data").'],
+      ['To correlate Activity vs Price, use ONLY the rows from that date onward;'],
+      ['otherwise you will be comparing real price against empty cells and drawing false conclusions.'],
       [''],
-      ['Tipo de cada linha:'],
-      ['  backfill = reconstruído de dados históricos (1 ponto/dia).'],
-      ['  live = recolhido ao vivo no momento (3x/dia).'],
+      ['Type of each row:'],
+      ['  backfill = reconstructed from historical data (1 point/day).'],
+      ['  live = collected live at the moment (3x/day).'],
       [''],
-      ['O que cada coluna significa:'],
-      ['  Preço — preço USD no momento da leitura (eixo para correlação).'],
-      ['  Score Final — nota 0–10 (mistura Fundamentals 45% / Technicals 35% / Atividade 20%).'],
-      ['  Fundamentals — métrica de valor por categoria (TVL+receita p/ DeFi/RWA, receita p/ AI/infra,'],
-      ['    chain-fees p/ L1s) normalizada por múltiplo de avaliação (MC÷valor) + emissões. payment/'],
-      ['    uncovered não têm cobertura → pontuados só por Technicals + Atividade.'],
-      ['  Technicals — preço vs médias, distância ao topo de 1 ano, RSI.'],
-      ['  Atividade — adoção on-chain: endereços ativos, crescimento de holders, transferências.'],
-      ['  TVL — valor depositado no protocolo (USD).'],
-      ['  Holders Revenue — receita anualizada (USD).'],
-      ['  Emissões % — inflação anual da oferta (mais baixo é melhor).'],
-      ['  MA50 / MA200 — médias móveis do preço.'],
-      ['  RSI — força relativa (0–100; <30 barato, >70 esticado).'],
-      ['  Dist. do mínimo % — quanto o preço está acima do mínimo de 1 ano.'],
-      ['  Endereços ativos / Holders / Transferências — métricas on-chain cruas (só live).'],
+      ['What each column means:'],
+      ['  Price — USD price at the time of the reading (axis for correlation).'],
+      ['  Final Score — grade 0–10 (blends Fundamentals 45% / Technicals 35% / Activity 20%).'],
+      ['  Fundamentals — value metric by category (TVL+revenue for DeFi/RWA, revenue for AI/infra,'],
+      ['    chain-fees for L1s) normalized by valuation multiple (MC÷value) + emissions. payment/'],
+      ['    uncovered have no coverage → scored only by Technicals + Activity.'],
+      ['  Technicals — price vs moving averages, distance to 1-year high, RSI.'],
+      ['  Activity — on-chain adoption: active addresses, holder growth, transfers.'],
+      ['  TVL — value deposited in the protocol (USD).'],
+      ['  Holders Revenue — annualized revenue (USD).'],
+      ['  Emissions % — annual supply inflation (lower is better).'],
+      ['  MA50 / MA200 — price moving averages.'],
+      ['  RSI — relative strength (0–100; <30 cheap, >70 stretched).'],
+      ['  Dist. from low % — how far the price is above the 1-year low.'],
+      ['  Active addresses / Holders / Transfers — raw on-chain metrics (live only).'],
       [''],
-      ['Gerado em ' + new Date().toISOString().slice(0,19).replace('T',' ') + ' UTC.'],
-      ['Isto não é aconselhamento financeiro.']
+      ['Generated at ' + new Date().toISOString().slice(0,19).replace('T',' ') + ' UTC.'],
+      ['This is not financial advice.']
     ];
     var ws=XLSX.utils.aoa_to_sheet(L);
     ws['!cols']=[{wch:95}];
@@ -1706,19 +1706,19 @@
   }
 
   function exportExcel(){
-    if(typeof XLSX==='undefined'){ alert('Biblioteca Excel ainda a carregar — tente novamente num instante.'); return; }
+    if(typeof XLSX==='undefined'){ alert('Excel library still loading — please try again in a moment.'); return; }
     var btn=document.getElementById('export-btn'); var note=document.getElementById('export-note');
     btn.disabled=true;
     try {
       var startMs=activityStartDate();
       var wb=XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, legendSheet(startMs), 'Legenda');
+      XLSX.utils.book_append_sheet(wb, legendSheet(startMs), 'Legend');
 
       var header=XLS_COLS.slice();
-      var actHdr='Atividade'+(startMs!=null?(' (desde '+new Date(startMs).toISOString().slice(0,10)+')'):' (sem dados)');
+      var actHdr='Activity'+(startMs!=null?(' (from '+new Date(startMs).toISOString().slice(0,10)+')'):' (no data)');
       header[6]=actHdr;
 
-      // Consolidated "Todos" first, then one sheet per token.
+      // Consolidated "All" first, then one sheet per token.
       var allRows=[['Token'].concat(header)];
       state.tokens.forEach(function(t){
         var rs=sortedReadings(t.id);
@@ -1730,32 +1730,32 @@
         var name=String(t.symbol).slice(0,31).replace(/[\\\/\?\*\[\]:]/g,'');
         XLSX.utils.book_append_sheet(wb, makeSheet(sheetRows,false), name||('Token'+t.id.slice(0,4)));
       });
-      // Insert "Todos" right after Legenda for visibility.
+      // Insert "All" right after Legend for visibility.
       var todos=makeSheet(allRows,true);
-      XLSX.utils.book_append_sheet(wb, todos, 'Todos');
-      wb.SheetNames.splice(wb.SheetNames.indexOf('Todos'),1);
-      wb.SheetNames.splice(1,0,'Todos');
+      XLSX.utils.book_append_sheet(wb, todos, 'All');
+      wb.SheetNames.splice(wb.SheetNames.indexOf('All'),1);
+      wb.SheetNames.splice(1,0,'All');
 
-      var fname='bestbuy_dados_'+new Date().toISOString().slice(0,10)+'.xlsx';
+      var fname='bestbuy_data_'+new Date().toISOString().slice(0,10)+'.xlsx';
       XLSX.writeFile(wb, fname);
-      note.textContent='Exportado: '+fname+(startMs==null?' · Atividade ainda sem registos.':'');
+      note.textContent='Exported: '+fname+(startMs==null?' · Activity still has no records.':'');
     } catch(e){
-      note.textContent='Falha ao exportar: '+e.message;
+      note.textContent='Export failed: '+e.message;
     } finally {
       btn.disabled=false;
     }
   }
 
-  // ── benchmarking report (pt-PT) — opens on logo tap ──────────────────────────
-  var PT_MON=['jan.','fev.','mar.','abr.','mai.','jun.','jul.','ago.','set.','out.','nov.','dez.'];
-  function ptDate(iso){ var d=iso?new Date(iso):new Date(); return d.getUTCDate()+' '+PT_MON[d.getUTCMonth()]+' '+d.getUTCFullYear(); }
+  // ── benchmarking report (English) — opens on logo tap ──────────────────────────
+  var PT_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function ptDate(iso){ var d=iso?new Date(iso):new Date(); return PT_MON[d.getUTCMonth()]+' '+d.getUTCDate()+', '+d.getUTCFullYear(); }
   function ptVerdict(s){
-    if(s==null)   return 'sem dados suficientes';
-    if(s>=8.0)    return 'sinal forte de compra';
-    if(s>=6.5)    return 'boa altura para comprar';
-    if(s>=4.5)    return 'momento neutro, sem pressa';
-    if(s>=3.0)    return 'fraco, melhor aguardar';
-    return 'arriscado, evitar por agora';
+    if(s==null)   return 'not enough data';
+    if(s>=8.0)    return 'strong buy signal';
+    if(s>=6.5)    return 'good time to buy';
+    if(s>=4.5)    return 'neutral, no rush';
+    if(s>=3.0)    return 'weak, better to wait';
+    return 'risky, avoid for now';
   }
   function clsScore(s){ return s==null?'n': s>=6.5?'g': s<=4.5?'r':'n'; }
   function clsDelta(cur,prev,higherBetter){
@@ -1780,13 +1780,13 @@
 
     if(!ranked.length){
       document.getElementById('report-when').textContent='';
-      body.appendChild(el('div','report-intro','Ainda não há dados suficientes para gerar o relatório.'));
+      body.appendChild(el('div','report-intro','Not enough data yet to generate the report.'));
       return;
     }
-    document.getElementById('report-when').textContent='Atualizado a '+ptDate(ranked[0].l.fetched_at);
+    document.getElementById('report-when').textContent='Updated '+ptDate(ranked[0].l.fetched_at);
     body.appendChild(el('div','report-intro',
-      'Comparação simples dos '+ranked.length+' ativos do seu painel, sem termos complicados. '+
-      'Os números a verde são bons sinais; os números a vermelho são sinais de alerta.'));
+      'A simple comparison of the '+ranked.length+' assets on your dashboard, without complicated terms. '+
+      'Numbers in green are good signals; numbers in red are warning signs.'));
 
     function topic(title,desc){
       var box=el('div','report-topic');
@@ -1795,70 +1795,70 @@
       body.appendChild(box); return box;
     }
 
-    // 1 — Nota geral
-    var t1=topic('Nota geral (1 a 10)','A nossa nota junta todos os sinais numa única pontuação fácil de ler.');
+    // 1 — Overall grade
+    var t1=topic('Overall grade (1 to 10)','Our grade combines every signal into a single, easy-to-read score.');
     ranked.forEach(function(x){
       var s=Number(x.l.final_score);
-      t1.appendChild(rLine(['O '+x.t.symbol+' está com ', {n:fmtScore(s)+'/10', c:clsScore(s)}, ' — '+ptVerdict(s)+'.']));
+      t1.appendChild(rLine([x.t.symbol+' is at ', {n:fmtScore(s)+'/10', c:clsScore(s)}, ' — '+ptVerdict(s)+'.']));
     });
 
-    // 2 — Preço face à média
-    var t2=topic('Preço face à média','Mostra se o preço está acima (bom sinal) ou abaixo (sinal fraco) da média recente.');
+    // 2 — Price vs average
+    var t2=topic('Price vs the average','Shows whether the price is above (good signal) or below (weak signal) the recent average.');
     ranked.forEach(function(x){
       var v=x.l.score_price_ma, sv=v==null?null:Number(v);
       t2.appendChild(rLine([x.t.symbol+': ', {n:(sv==null?'—':fmtScore(sv)+'/10'), c:clsScore(sv)},
-        ' — preço '+(sv==null?'sem dados':(sv>=5?'acima':'abaixo')+' da média recente')+'.']));
+        ' — price '+(sv==null?'no data':(sv>=5?'above':'below')+' the recent average')+'.']));
     });
 
-    // 3 — Barato ou esticado (RSI)
-    var t3=topic('Está barato ou esticado? (RSI)','O RSI vai de 0 a 100: abaixo de 30 costuma estar barato, acima de 70 esticado.');
+    // 3 — Cheap or stretched (RSI)
+    var t3=topic('Cheap or stretched? (RSI)','RSI runs from 0 to 100: below 30 tends to be cheap, above 70 stretched.');
     ranked.forEach(function(x){
       var r=x.l.rsi_14, rv=r==null?null:Number(r);
       var c=rv==null?'n': rv<30?'g': rv>70?'r':'n';
-      var txt=rv==null?'sem dados': rv<30?'pode estar barato': rv>70?'pode estar caro (esticado)':'em equilíbrio';
+      var txt=rv==null?'no data': rv<30?'may be cheap': rv>70?'may be expensive (stretched)':'in balance';
       t3.appendChild(rLine([x.t.symbol+': ', {n:(rv==null?'—':fmtNum(rv,0)), c:c}, ' — '+txt+'.']));
     });
 
-    // 4 — Distância ao topo do último ano
-    var t4=topic('Quão longe do topo do último ano?','Quanto mais abaixo do valor máximo dos últimos 12 meses, mais barato o ativo parece estar.');
+    // 4 — Distance to the last year's high
+    var t4=topic('How far from the last year\'s high?','The further below the maximum of the last 12 months, the cheaper the asset appears to be.');
     ranked.forEach(function(x){
       var v=x.l.score_below_high, sv=v==null?null:Number(v);
-      var txt=sv==null?'sem dados': sv>=6?'bem abaixo do topo, mais barato': sv<=4?'perto do topo, mais caro':'a meio caminho';
+      var txt=sv==null?'no data': sv>=6?'well below the high, cheaper': sv<=4?'near the high, more expensive':'halfway';
       t4.appendChild(rLine([x.t.symbol+': ', {n:(sv==null?'—':fmtScore(sv)+'/10'), c:clsScore(sv)}, ' — '+txt+'.']));
     });
 
-    // 5 — Fundamentos
-    var t5=topic('O projeto tem uso real? (fundamentos)','Dinheiro depositado no projeto (TVL) e as receitas mostram se há uso verdadeiro.');
+    // 5 — Fundamentals
+    var t5=topic('Does the project have real usage? (fundamentals)','Money deposited in the project (TVL) and revenues show whether there is genuine usage.');
     ranked.forEach(function(x){
       if(x.l.reweighted){
-        t5.appendChild(rLine([x.t.symbol+': ', {n:'sem dados', c:'n'}, ' — avaliado apenas pelo preço de mercado.']));
+        t5.appendChild(rLine([x.t.symbol+': ', {n:'no data', c:'n'}, ' — valued only by market price.']));
       } else {
         var pr=x.p||{};
-        t5.appendChild(rLine([x.t.symbol+': depósitos ', {n:fmtUsd(x.l.tvl), c:clsDelta(x.l.tvl,pr.tvl,true)},
-          ', receita anual ', {n:fmtUsd(x.l.holders_revenue), c:clsDelta(x.l.holders_revenue,pr.holders_revenue,true)}, '.']));
+        t5.appendChild(rLine([x.t.symbol+': deposits ', {n:fmtUsd(x.l.tvl), c:clsDelta(x.l.tvl,pr.tvl,true)},
+          ', annual revenue ', {n:fmtUsd(x.l.holders_revenue), c:clsDelta(x.l.holders_revenue,pr.holders_revenue,true)}, '.']));
       }
     });
 
-    // 6 — Inflação (emissões de novas moedas)
-    var t6=topic('Inflação anual (moedas novas)','Quantas moedas novas entram em circulação por ano. Mais inflação = mais pressão de venda; menos é melhor.');
+    // 6 — Inflation (new coin emissions)
+    var t6=topic('Annual inflation (new coins)','How many new coins enter circulation per year. More inflation = more sell pressure; less is better.');
     ranked.forEach(function(x){
       var ir=x.l.emissions_rate, es=x.l.score_emissions;
       var sv=es==null?null:Number(es);
-      var txt=ir==null?'sem dados': sv>=6.5?'baixa — pouca diluição': sv<=4.5?'alta — muita pressão de venda':'moderada';
-      t6.appendChild(rLine([x.t.symbol+': ', {n:(ir==null?'—':fmtPct(ir)+' ao ano'), c:clsScore(sv)}, ' — '+txt+'.']));
+      var txt=ir==null?'no data': sv>=6.5?'low — little dilution': sv<=4.5?'high — heavy sell pressure':'moderate';
+      t6.appendChild(rLine([x.t.symbol+': ', {n:(ir==null?'—':fmtPct(ir)+' per year'), c:clsScore(sv)}, ' — '+txt+'.']));
     });
 
-    // 7 — Conclusão
+    // 7 — Conclusion
     var top=ranked[0], bot=ranked[ranked.length-1];
-    var t7=topic('Conclusão',null);
-    t7.appendChild(rLine(['Hoje, o '+top.t.symbol+' reúne os melhores sinais, com ',
+    var t7=topic('Conclusion',null);
+    t7.appendChild(rLine(['Today, '+top.t.symbol+' gathers the best signals, with ',
       {n:fmtScore(Number(top.l.final_score))+'/10', c:clsScore(Number(top.l.final_score))}, '.']));
     if(bot!==top){
-      t7.appendChild(rLine(['O '+bot.t.symbol+' é o mais arriscado de momento, com ',
+      t7.appendChild(rLine([bot.t.symbol+' is the riskiest right now, with ',
         {n:fmtScore(Number(bot.l.final_score))+'/10', c:clsScore(Number(bot.l.final_score))}, '.']));
     }
     body.appendChild(el('div','report-disc',
-      'Isto não é aconselhamento financeiro. São apenas sinais automáticos — faça sempre a sua própria análise antes de investir.'));
+      'This is not financial advice. These are just automated signals — always do your own research before investing.'));
   }
   function openReport(){ buildReport(); document.getElementById('report-back').classList.add('show'); }
   function closeReport(){ document.getElementById('report-back').classList.remove('show'); }
@@ -1889,7 +1889,7 @@
   // Tap the chart title (Screen A) → open the pro charting screen (Screen B). Screen A keeps
   // the signals view; the long/cycle view now lives in the Lightweight-Charts Screen B.
   (function(){ var b=document.getElementById('view-toggle'); if(b){
-    state.view='short'; b.textContent='Ciclo de mercado ⤢';
+    state.view='short'; b.textContent='Market cycle ⤢';
     b.onclick=function(){ if(window.WAKA) window.WAKA.showScreen('B'); };
   } })();
   document.getElementById('logo').onclick=openReport;
@@ -1907,7 +1907,7 @@
   "use strict";
   var bodyEl=document.body;
   var PHC={accu:'#22c55e',rise:'#3a7bd5',euph:'#fb923c',corr:'#a78bfa'};
-  var PHPT={accu:'Acumulação',rise:'Subida',euph:'Euforia',corr:'Correção'};
+  var PHPT={accu:'Accumulation',rise:'Rise',euph:'Euphoria',corr:'Correction'};
   var FULL={accumulation:'accu',rise:'rise',euphoria:'euph',correction:'corr'};
   // Halvings — exact block times (UTC): #210000 2012-11-28 15:24 · #420000 2016-07-09 16:46 ·
   // #630000 2020-05-11 19:23 · #840000 2024-04-20 00:09.
@@ -1934,9 +1934,9 @@
     '1m':{tier:'1m',kind:'intra',sec:60},   '5m':{tier:'1m',kind:'intra',sec:300},  '15m':{tier:'1m',kind:'intra',sec:900},
     '1H':{tier:'1h',kind:'intra',sec:3600}, '4H':{tier:'1h',kind:'intra',sec:14400},
     '1D':{tier:'daily',kind:'day',grp:'D'}, '1W':{tier:'daily',kind:'day',grp:'W'}, '1M':{tier:'daily',kind:'day',grp:'M'},
-    '3M':{tier:'daily',kind:'day',grp:'Q'}, '6M':{tier:'daily',kind:'day',grp:'H'}, '1A':{tier:'daily',kind:'day',grp:'Y'}, '2A':{tier:'daily',kind:'day',grp:'2Y'},
+    '3M':{tier:'daily',kind:'day',grp:'Q'}, '6M':{tier:'daily',kind:'day',grp:'H'}, '1Y':{tier:'daily',kind:'day',grp:'Y'}, '2Y':{tier:'daily',kind:'day',grp:'2Y'},
   };
-  var CS_WIN={'1m':0.25,'5m':1,'15m':3,'1H':14,'4H':60,'1D':90,'1W':365,'1M':1460,'3M':2920,'6M':0,'1A':0,'2A':0};  // default visible window (days); 0=ALL
+  var CS_WIN={'1m':0.25,'5m':1,'15m':3,'1H':14,'4H':60,'1D':90,'1W':365,'1M':1460,'3M':2920,'6M':0,'1Y':0,'2Y':0};  // default visible window (days); 0=ALL
   var DAILY_ONLY=['mayer','pct'];   // dropdown cycle indicators valid only on daily-family buckets
   var INTRADAY_WINDOW_DAYS=60;               // rolling minute window (must match lib/btcintraday.js)
   // top toggle bar: independent layers, persisted. phases/halvings are live; manip/maw/mad are
@@ -1993,8 +1993,8 @@
   function fix(mn,mx){ return function(){ return {priceRange:{minValue:mn,maxValue:mx}}; }; }
   function mkLine(color,paneIdx,opts){ return chart.addSeries(L.LineSeries, Object.assign({color:color,lineWidth:1,priceLineVisible:false,lastValueVisible:false},opts||{}), paneIdx); }
 
-  // ── adaptive PT timeline: years → months → days (library picks density) ───────
-  var PTM=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+  // ── adaptive timeline: years → months → days (library picks density) ───────
+  var PTM=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   function wkTick(time,tmType){ var y,m,d; if(typeof time==='string'){ var pp=time.split('-'); y=+pp[0]; m=+pp[1]; d=+pp[2]; } else if(time&&time.year){ y=time.year; m=time.month; d=time.day; } else { var dt=new Date(time*1000); y=dt.getUTCFullYear(); m=dt.getUTCMonth()+1; d=dt.getUTCDate(); } if(tmType===0) return ''+y; if(tmType===1) return PTM[m-1]; return ''+d; }
 
   // ── ANCHORED phase detection (Fase IV) — 4 wide contiguous blocks per cycle, derived ONLY from
@@ -2216,9 +2216,9 @@
   function wireLayers(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-layer'),function(b){ b.onclick=function(e){ var k=b.dataset.layer;
     if(k==='phases'){ e.stopPropagation(); toggleCycMenu(); }   // the "Fases" button now opens the cycle-mode dropdown
     else if(k==='halvings'){ setHalvings(!layers.halvings); }
-    else if(k==='maw' || k==='mad'){ if(b.classList.contains('wk-cs-off')){ notify('MAs de ciclo só em velas ≥ 1D'); return; } setMaLayer(k, !layers[k]); }
+    else if(k==='maw' || k==='mad'){ if(b.classList.contains('wk-cs-off')){ notify('Cycle MAs only on candles ≥ 1D'); return; } setMaLayer(k, !layers[k]); }
     else if(k==='manip'){ setManip(!layers.manip); }
-    else { layers[k]=!layers[k]; saveLayers(); b.classList.toggle('on',layers[k]); notify('Camada "'+b.textContent.trim()+'" chega numa fase futura'); }
+    else { layers[k]=!layers[k]; saveLayers(); b.classList.toggle('on',layers[k]); notify('Layer "'+b.textContent.trim()+'" is coming in a future phase'); }
   }; }); syncLayerUI(); }
 
   // ── double-click a pane → animated vertical auto-fit (0.5s, that pane only, LOG respected) ──
@@ -2281,7 +2281,7 @@
     function show(){ if(!grab()) return; clearTimeout(hideT); bar.style.display='block'; requestAnimationFrame(function(){ if(order.length) bar.classList.add('on'); }); paint(); }
     function fade(){ if(!grab()) return; bar.classList.remove('on'); hideT=setTimeout(function(){ if(!order.length){ bar.style.display='none'; bar.classList.remove('indet'); if(fill){ fill.style.width='0'; fill.style.transform='none'; } } },440); }
     return {
-      start:function(label,opt){ opt=opt||{}; var id='ld'+(seq++); tasks[id]={label:label||'A carregar…',total:(opt.total!=null?opt.total:null),loaded:0}; order.push(id); show(); return id; },
+      start:function(label,opt){ opt=opt||{}; var id='ld'+(seq++); tasks[id]={label:label||'Loading…',total:(opt.total!=null?opt.total:null),loaded:0}; order.push(id); show(); return id; },
       update:function(id,loaded,total){ var t=tasks[id]; if(!t) return; if(total!=null) t.total=total; if(loaded!=null) t.loaded=loaded; paint(); },
       done:function(id){ if(!tasks[id]) return; var t=tasks[id]; delete tasks[id]; var i=order.indexOf(id); if(i>=0) order.splice(i,1);
         if(order.length){ paint(); } else { if(t.total!=null && grab()&&fill){ fill.style.transform='none'; fill.style.width='100%'; } fade(); } }
@@ -2304,20 +2304,20 @@
   }
   function initChart(){
     if(inited) return; inited=true;
-    var dl=wkLoading.start('A carregar histórico BTC…');   // determinate once Content-Length is read
+    var dl=wkLoading.start('Loading BTC history…');   // determinate once Content-Length is read
     fetchJSONProgress('/api/cycle-series', dl).then(function(j){
       wkLoading.done(dl);
-      if(!j||!j.ok||!j.series||!j.series.length){ document.getElementById('wk-loading').textContent='sem dados (corre /api/backfill-cycle).'; return; }
+      if(!j||!j.ok||!j.series||!j.series.length){ document.getElementById('wk-loading').textContent='no data (run /api/backfill-cycle).'; return; }
       DATA=j;
-      var rid=wkLoading.start('A renderizar gráfico…');   // indeterminate: the render time isn't countable
+      var rid=wkLoading.start('Rendering chart…');   // indeterminate: the render time isn't countable
       // yield a frame so the bar paints before the synchronous (frame-blocking) render runs
       setTimeout(function(){ try{ render(j); } finally{ wkLoading.done(rid); } }, 90);
-    }).catch(function(e){ wkLoading.done(dl); var l=document.getElementById('wk-loading'); if(l) l.textContent='erro a carregar: '+e.message; });
+    }).catch(function(e){ wkLoading.done(dl); var l=document.getElementById('wk-loading'); if(l) l.textContent='error loading: '+e.message; });
   }
 
   function render(j){
     var el=document.getElementById('wk-chart'); L=window.LightweightCharts;
-    if(!L){ document.getElementById('wk-loading').textContent='Lightweight Charts não carregou.'; return; }
+    if(!L){ document.getElementById('wk-loading').textContent='Lightweight Charts failed to load.'; return; }
     chart=L.createChart(el,{
       autoSize:true,
       layout:{background:{color:'#0a1b21'},textColor:'#7fa6ad',attributionLogo:false,fontSize:10,
@@ -2327,7 +2327,7 @@
       timeScale:{borderColor:'#16323b',timeVisible:false,minBarSpacing:0.02,rightOffset:3,fixRightEdge:false,fixLeftEdge:false,tickMarkFormatter:wkTick},   // fixRightEdge:false → free scroll into the future whitespace (draw beyond today)
       // crosshair: Normal mode (free, NO magnet/snap to candles — snap comes later) + faint 15% guides
       crosshair:{mode:0, vertLine:{color:'rgba(94,234,212,.15)', width:1, style:0, labelBackgroundColor:'#16323b'}, horzLine:{color:'rgba(94,234,212,.15)', width:1, style:0, labelBackgroundColor:'#16323b'}}, handleScroll:true, handleScale:true,
-      localization:{priceFormatter:wkFmtPrice,locale:'pt-PT'},
+      localization:{priceFormatter:wkFmtPrice,locale:'en-US'},
     });
     var lo=document.getElementById('wk-loading'); if(lo) lo.style.display='none';
     var ser=j.series;
@@ -2438,20 +2438,20 @@
   // Each oscillator: tiny pane TITLE, the configurator FIELDS, and a parameterized BUILD that
   // computes from CLOSE per its config and returns {series, priceLines}.
   var OSC={
-    rsi:{ title:'RSI', fields:[{key:'length',label:'Período'},{key:'maLen',label:'Média (laranja)'},{key:'os',label:'Sobrevenda (OS)'},{key:'ob',label:'Sobrecompra (OB)'},{key:'color',label:'Cor RSI',type:'color'},{key:'maColor',label:'Cor média',type:'color'},{key:'width',label:'Espessura',max:4}],
+    rsi:{ title:'RSI', fields:[{key:'length',label:'Length'},{key:'maLen',label:'MA (orange)'},{key:'os',label:'Oversold (OS)'},{key:'ob',label:'Overbought (OB)'},{key:'color',label:'RSI color',type:'color'},{key:'maColor',label:'MA color',type:'color'},{key:'width',label:'Width',max:4}],
       build:function(p,c){ var rsi=rsiArr(CLOSE,c.length); var ma=smaArr(rsi, Math.max(2,(c.maLen||14)));
         var s=mkLine(c.color,p,{lineWidth:c.width,autoscaleInfoProvider:fix(0,100)}); s.setData(arrData(rsi));
         var mas=mkLine(c.maColor||'#fb923c',p,{lineWidth:1,autoscaleInfoProvider:fix(0,100)}); mas.setData(arrData(ma));   // the orange RSI-MA
         try{ s.attachPrimitive(makeRsiPrimitive(s, rsi, ma, c)); }catch(e){}   // OB/OS shading + RSI×MA crossover markers
         return {series:[s, mas], priceLines:refLines(s,[{price:c.ob},{price:50,style:1},{price:c.os}])}; } },
     // StochRSI is the fastest oscillator — softened opacity + 1px keeps it from going solid in ALL.
-    stoch:{ title:'STOCH RSI', fields:[{key:'length',label:'Período RSI'},{key:'k',label:'Suavização %K'},{key:'d',label:'Suavização %D'},{key:'os',label:'Sobrevenda (OS)'},{key:'ob',label:'Sobrecompra (OB)'},{key:'kColor',label:'Cor %K',type:'color'},{key:'dColor',label:'Cor %D',type:'color'},{key:'width',label:'Espessura',max:4}],
+    stoch:{ title:'STOCH RSI', fields:[{key:'length',label:'RSI length'},{key:'k',label:'%K smoothing'},{key:'d',label:'%D smoothing'},{key:'os',label:'Oversold (OS)'},{key:'ob',label:'Overbought (OB)'},{key:'kColor',label:'%K color',type:'color'},{key:'dColor',label:'%D color',type:'color'},{key:'width',label:'Width',max:4}],
       build:function(p,c){ var sr=stochRsiArr(CLOSE,c.length,c.k,c.d); var k=mkLine(c.kColor,p,{lineWidth:c.width,autoscaleInfoProvider:fix(0,100)}); k.setData(arrData(sr.k)); var d=mkLine(c.dColor,p,{lineWidth:c.width}); d.setData(arrData(sr.d)); return {series:[k,d], priceLines:refLines(k,[{price:c.ob},{price:c.os}])}; } },
-    macd:{ title:'MACD', fields:[{key:'fast',label:'Rápida'},{key:'slow',label:'Lenta'},{key:'signal',label:'Sinal'},{key:'macdColor',label:'Cor MACD',type:'color'},{key:'signalColor',label:'Cor Sinal',type:'color'},{key:'width',label:'Espessura',max:4}],
+    macd:{ title:'MACD', fields:[{key:'fast',label:'Fast'},{key:'slow',label:'Slow'},{key:'signal',label:'Signal'},{key:'macdColor',label:'MACD color',type:'color'},{key:'signalColor',label:'Signal color',type:'color'},{key:'width',label:'Width',max:4}],
       build:function(p,c){ var mm=macdArr(CLOSE,c.fast,c.slow,c.signal); var h=chart.addSeries(L.HistogramSeries,{priceLineVisible:false,lastValueVisible:false},p); h.setData(ACTIVE.map(function(d,i){ var v=mm.hist[i]; return (v==null)?null:{time:d.time,value:v,color:v>=0?'rgba(34,197,94,.55)':'rgba(244,63,94,.55)'}; }).filter(Boolean)); var m=mkLine(c.macdColor,p,{lineWidth:c.width}); m.setData(arrData(mm.macd)); var sg=mkLine(c.signalColor,p,{lineWidth:c.width}); sg.setData(arrData(mm.signal)); return {series:[h,m,sg], priceLines:[]}; } },
-    mayer:{ title:'MAYER', fields:[{key:'ref1',label:'Ref. inferior'},{key:'ref2',label:'Ref. superior'},{key:'color',label:'Cor',type:'color'},{key:'width',label:'Espessura',max:4}],
+    mayer:{ title:'MAYER', fields:[{key:'ref1',label:'Lower ref.'},{key:'ref2',label:'Upper ref.'},{key:'color',label:'Color',type:'color'},{key:'width',label:'Width',max:4}],
       build:function(p,c){ var s=mkLine(c.color,p,{lineWidth:c.width}); s.setData(arrData(ACTIVE.map(function(d){ return d.mayer; }))); return {series:[s], priceLines:refLines(s,[{price:c.ref1},{price:c.ref2,color:'rgba(244,63,94,.5)',style:3}])}; } },
-    pct:{ title:'PERCENTIL', fields:[{key:'ref1',label:'Nível ref.'},{key:'color',label:'Cor',type:'color'},{key:'width',label:'Espessura',max:4}],
+    pct:{ title:'PERCENTILE', fields:[{key:'ref1',label:'Ref. level'},{key:'color',label:'Color',type:'color'},{key:'width',label:'Width',max:4}],
       build:function(p,c){ var s=mkLine(c.color,p,{lineWidth:c.width,autoscaleInfoProvider:fix(0,100)}); s.setData(arrData(ACTIVE.map(function(d){ return d.pct; }))); return {series:[s], priceLines:refLines(s,[{price:c.ref1}])}; } },
   };
 
@@ -2735,7 +2735,7 @@
       if(seg.length<3) continue; var base=seg[0].c; if(!base||base<=0) continue;
       var span=dd(sD,eD)||1, peak=1; seg.forEach(function(p){ var m=p.c/base; if(m>peak) peak=m; });
       var sy=sD.slice(0,4), ey=eD.slice(2,4);
-      cyc.push({startD:sD,endD:eD,incomplete:incomplete,base:base,span:span,peak:peak,seg:seg,label:sy+'–'+(incomplete?'agora':ey),dd:dd}); }
+      cyc.push({startD:sD,endD:eD,incomplete:incomplete,base:base,span:span,peak:peak,seg:seg,label:sy+'–'+(incomplete?'now':ey),dd:dd}); }
     var comp=cyc.filter(function(c){return !c.incomplete;}).map(function(c){return c.span;});
     var ref=comp.length?comp.reduce(function(a,b){return a+b;},0)/comp.length:1460;
     cyc.forEach(function(c){ c.norm=c.incomplete?ref:c.span; });
@@ -2755,12 +2755,12 @@
       ctx.fillStyle='#5b8a90'; ctx.textAlign='left'; ctx.fillText('×'+m, W-padR+5, y); });
     ctx.textAlign='center'; ctx.textBaseline='top'; [0,0.25,0.5,0.75,1].forEach(function(p){ var x=xOf(p); ctx.strokeStyle='rgba(94,234,212,.06)'; ctx.beginPath(); ctx.moveTo(x,padT); ctx.lineTo(x,H-padB); ctx.stroke();
       ctx.fillStyle='#5b8a90'; ctx.fillText(Math.round(p*100)+'%', x, H-padB+6); });
-    ctx.fillStyle='#6b9298'; ctx.textAlign='right'; ctx.fillText('progresso do ciclo →', W-padR, H-padB+18);
+    ctx.fillStyle='#6b9298'; ctx.textAlign='right'; ctx.fillText('cycle progress →', W-padR, H-padB+18);
     cyc.forEach(function(c,ci){ var col=CYC_COLORS[ci%CYC_COLORS.length]; ctx.strokeStyle=col; ctx.lineWidth=c.incomplete?2.4:1.6; ctx.globalAlpha=c.incomplete?1:0.92;
       ctx.beginPath(); var started=false; c.seg.forEach(function(p){ var px=xOf(Math.min(1,c.dd(c.startD,p.t)/c.norm)), py=yOf(p.c/c.base); if(!started){ ctx.moveTo(px,py); started=true; } else ctx.lineTo(px,py); }); ctx.stroke();
       if(c.incomplete){ var lp=c.seg[c.seg.length-1]; var ex=xOf(Math.min(1,c.dd(c.startD,lp.t)/c.norm)), ey=yOf(lp.c/c.base); ctx.globalAlpha=1; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(ex,ey,3.4,0,6.2832); ctx.fill(); } });
     ctx.globalAlpha=1;
-    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#cfe7ec'; ctx.font='700 12px '+CYC_F; ctx.fillText('Ciclos sobrepostos · múltiplo desde o fundo (log)', padL, 18);
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#cfe7ec'; ctx.font='700 12px '+CYC_F; ctx.fillText('Overlapping cycles · multiple since the bottom (log)', padL, 18);
     ctx.font='11px '+CYC_F; var lx=padL, ly=34;
     cyc.forEach(function(c,ci){ var col=CYC_COLORS[ci%CYC_COLORS.length]; var txt=c.label+'  ×'+(c.peak>=10?Math.round(c.peak):c.peak.toFixed(1));
       var tw=ctx.measureText(txt).width+20; if(lx+tw>W-padR){ lx=padL; ly+=15; }
@@ -2793,14 +2793,14 @@
     G.starts.forEach(function(s){ ctx.fillStyle='#9bbcc2'; ctx.fillText(s.label, s.x+6, s.y-2); });
     ctx.beginPath(); ctx.arc(G.cx,G.cy,G.baseR,0,6.2832); ctx.fillStyle='#0e242c'; ctx.fill(); ctx.strokeStyle='#1f4a55'; ctx.lineWidth=1.4; ctx.stroke();
     ctx.fillStyle='#9bbcc2'; ctx.font='700 10px '+CYC_F; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(G.year0, G.cx, G.cy);
-    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#cfe7ec'; ctx.font='700 12px '+CYC_F; ctx.fillText('Espiral de ciclos · cada volta = um ciclo (fase por cor)', 12, 18);
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#cfe7ec'; ctx.font='700 12px '+CYC_F; ctx.fillText('Cycle spiral · each loop = one cycle (phase by color)', 12, 18);
     var lx=12, ly=34; ctx.font='10px '+CYC_F; ctx.textBaseline='middle'; PHASE_ORDER.forEach(function(p){ ctx.fillStyle=SPIRAL_PH[p]; ctx.fillRect(lx,ly-5,10,10); ctx.fillStyle='#9bbcc2'; ctx.textAlign='left'; ctx.fillText(PHEN[p], lx+14, ly); lx+=ctx.measureText(PHEN[p]).width+22; }); }
   function drawSpiral(cv,ctx,W,H,dpr){ stopSpiral(); var G=buildSpiralGeom(W,H); if(!G){ ctx.fillStyle='#0a1b21'; ctx.fillRect(0,0,W,H); return; }
     if(!_spiralOff) _spiralOff=document.createElement('canvas'); _spiralOff.width=cv.width; _spiralOff.height=cv.height;
     var octx=_spiralOff.getContext('2d'); octx.setTransform(dpr,0,0,dpr,0,0); octx.clearRect(0,0,W,H); octx.fillStyle='#0a1b21'; octx.fillRect(0,0,W,H);
     drawSpiralStatic(octx,W,H,G);
     var tip=G.pts[G.pts.length-1], right=tip.x>W*0.62;
-    octx.fillStyle='#e9f5f4'; octx.font='700 12px '+CYC_F; octx.textAlign=right?'right':'left'; octx.textBaseline='middle'; octx.fillText('agora · '+PHEN[G.cur], tip.x+(right?-16:16), tip.y);
+    octx.fillStyle='#e9f5f4'; octx.font='700 12px '+CYC_F; octx.textAlign=right?'right':'left'; octx.textBaseline='middle'; octx.fillText('now · '+PHEN[G.cur], tip.x+(right?-16:16), tip.y);
     function frame(){ if(cycMode!=='spiral' || document.hidden){ spiralRAF=null; return; }
       ctx.setTransform(1,0,0,1,0,0); ctx.clearRect(0,0,cv.width,cv.height); ctx.drawImage(_spiralOff,0,0); ctx.setTransform(dpr,0,0,dpr,0,0);
       var t=(window.performance&&performance.now?performance.now():Date.now()), ph=(t%1400)/1400, pr=6+3.4*Math.sin(ph*6.283185);
@@ -2810,7 +2810,7 @@
     frame(); }
   // ─ mode 3: duration bars (each cycle = horizontal bar segmented by phase, proportional to days) ─
   function drawBars(ctx,W,H){ if(!cycCache) cycCache=buildCycles(); var cyc=cycCache; if(!cyc.length||!ANCHOR||!ANCHOR.runs) return;
-    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#cfe7ec'; ctx.font='700 12px '+CYC_F; ctx.fillText('Barras de duração · fases por ciclo (dias)', 12, 18);
+    ctx.textAlign='left'; ctx.textBaseline='alphabetic'; ctx.fillStyle='#cfe7ec'; ctx.font='700 12px '+CYC_F; ctx.fillText('Duration bars · phases per cycle (days)', 12, 18);
     var padL=88, padR=14, padT=40, padB=30, n=cyc.length, gap=12, rowH=Math.min(50,(H-padT-padB-(n-1)*gap)/n);
     cyc.forEach(function(c,ci){ var y=padT+ci*(rowH+gap), dur={}; PHASE_ORDER.forEach(function(p){dur[p]=0;});
       ANCHOR.runs.forEach(function(r){ if(dur[r.phase]==null) return; var f=r.from>c.startD?r.from:c.startD, t=r.to<c.endD?r.to:c.endD; if(t>f) dur[r.phase]+=cdd(f,t); });
@@ -2861,7 +2861,7 @@
   var CYC_MODES=['overlap','spiral','bands','heatmap','bars'];
   function wireCycMenu(){ var m=document.getElementById('wk-cycMenu'); if(!m) return;
     Array.prototype.forEach.call(m.querySelectorAll('.wk-cyc-item'), function(it){ it.onclick=function(e){ e.stopPropagation();
-      if(it.classList.contains('wk-cyc-soon')){ notify('"'+it.textContent.replace('em breve','').trim()+'" chega numa fase futura'); return; }
+      if(it.classList.contains('wk-cyc-soon')){ notify('"'+it.textContent.replace('soon','').trim()+'" is coming in a future phase'); return; }
       var mode=it.dataset.mode; setCycMode(mode===cycMode?'':mode); toggleCycMenu(false); }; });
     document.addEventListener('click', function(e){ if(!e.target.closest('#wk-cycWrap')) toggleCycMenu(false); });
     document.addEventListener('keydown', function(e){ if(e.key==='Escape') toggleCycMenu(false); });
@@ -2889,11 +2889,11 @@
       domData={btcd:btcd, othersd:othersd, mcap:mcap, asOf:asOf, topN:n}; updateDomVals(); tickPrims();
     }).catch(function(){ domFetching=false; domFetched=true; domData={unavailable:true}; updateDomVals(); }); }
   function updateDomVals(){ var bd=document.getElementById('wk-domv-btcd'), od=document.getElementById('wk-domv-othersd'), mc=document.getElementById('wk-domv-mcap'), nt=document.getElementById('wk-domNote'); if(!domData) return;
-    if(domData.unavailable){ if(bd)bd.textContent='n/d'; if(od)od.textContent='n/d'; if(mc)mc.textContent='n/d'; if(nt)nt.textContent='dominância indisponível (CoinGecko)'; return; }
+    if(domData.unavailable){ if(bd)bd.textContent='n/a'; if(od)od.textContent='n/a'; if(mc)mc.textContent='n/a'; if(nt)nt.textContent='dominance unavailable (CoinGecko)'; return; }
     if(bd) bd.textContent=domData.btcd!=null?domData.btcd.toFixed(1)+'%':'n/d';
     if(od) od.textContent=domData.othersd!=null?domData.othersd.toFixed(1)+'%':'n/d';
     if(mc) mc.textContent=fmtUsdBig(domData.mcap);
-    if(nt) nt.textContent='profundidade: hoje · '+(domData.asOf||'agora')+' — só presente (CoinGecko /global; histórico grátis indisponível)'; }
+    if(nt) nt.textContent='depth: today · '+(domData.asOf||'now')+' — present only (CoinGecko /global; free history unavailable)'; }
   function makeDomPrimitive(){ var ch=null;
     var r={ draw:function(target){ if(!ch || !domAny() || !domData || domData.unavailable) return;
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save();
@@ -2909,7 +2909,7 @@
         if(domOn.othersd) marker(domData.othersd,'#a78bfa','OTHERS.D '+(domData.othersd!=null?domData.othersd.toFixed(1)+'%':'n/d'));
         if(domOn.mcap && domData.mcap!=null){ var t='Total mkt '+fmtUsdBig(domData.mcap); ctx.font='700 11px '+F; var tw=ctx.measureText(t).width;
           ctx.fillStyle='rgba(10,24,29,.78)'; ctx.fillRect(rx-tw-12, top-2, tw+12, 17); ctx.textAlign='right'; ctx.textBaseline='top'; ctx.fillStyle='#5eead4'; ctx.fillText(t, rx-5, top+1); }
-        ctx.font='9px '+F; ctx.fillStyle='rgba(127,166,173,.55)'; ctx.textAlign='right'; ctx.textBaseline='bottom'; ctx.fillText('dominância · hoje ('+(domData.asOf||'agora')+')', rx, H-5);
+        ctx.font='9px '+F; ctx.fillStyle='rgba(127,166,173,.55)'; ctx.textAlign='right'; ctx.textBaseline='bottom'; ctx.fillText('dominance · today ('+(domData.asOf||'now')+')', rx, H-5);
         ctx.restore();
       }); } };
     return { attached:function(p){ ch=p.chart; if(p.requestUpdate) primReqs.push(p.requestUpdate); }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'top'; }, renderer:function(){ return r; } } ]; } };
@@ -2955,13 +2955,13 @@
   var ASSET_COLORS={BTC:'#f7931a',ETH:'#627eea',ADA:'#3468d1',AVAX:'#e84142',BNB:'#f3ba2f',DOGE:'#c2a633',DOT:'#e6007a',LTC:'#5c6bc0',SOL:'#14f195',XRP:'#7fbbe0'};
   // overlay catalogue: 10 assets (price, own hidden scale) + 9 own-axis series.
   var OV_SERIES=[
-    {id:'btcd',label:'BTC.D — dominância',color:'#f7931a'},
-    {id:'ethd',label:'ETH.D — dominância',color:'#627eea'},
-    {id:'stabled',label:'STABLE.D — presente',color:'#26a17b'},
-    {id:'othersd',label:'OTHERS.D — presente',color:'#a78bfa'},
+    {id:'btcd',label:'BTC.D — dominance',color:'#f7931a'},
+    {id:'ethd',label:'ETH.D — dominance',color:'#627eea'},
+    {id:'stabled',label:'STABLE.D — present',color:'#26a17b'},
+    {id:'othersd',label:'OTHERS.D — present',color:'#a78bfa'},
     {id:'fng',label:'Fear & Greed (0–100)',color:'#facc15'},
-    {id:'dxy',label:'DXY — dólar',color:'#e5e7eb'},
-    {id:'us10y',label:'US10Y — juro 10 anos',color:'#fb923c'},
+    {id:'dxy',label:'DXY — dollar',color:'#e5e7eb'},
+    {id:'us10y',label:'US10Y — 10-year yield',color:'#fb923c'},
     {id:'mayer',label:'Mayer Multiple',color:'#22d3ee'},
     {id:'mcap',label:'Total market cap',color:'#34d399'}];
   function ovLabel(id){ var s=OV_SERIES.filter(function(x){return x.id===id;})[0]; if(s) return s.label; return id; }
@@ -3032,22 +3032,22 @@
   function buildAssetList(filter){ var host=document.getElementById('wk-assetList'); if(!host) return; host.innerHTML=''; filter=(filter||'').trim().toUpperCase();
     ASSET_LIST.filter(function(a){ return !filter || a.sym.indexOf(filter)>=0; }).forEach(function(a){
       var it=document.createElement('div'); it.className='wk-asset-item'+(a.sym===ASSET?' on':''); it.dataset.sym=a.sym;
-      it.innerHTML='<span class="wk-ai-sym" style="color:'+(ASSET_COLORS[a.sym]||'#cfe7ec')+'">'+a.sym+'</span><span class="wk-ai-dep">desde '+a.dep+'</span>';
+      it.innerHTML='<span class="wk-ai-sym" style="color:'+(ASSET_COLORS[a.sym]||'#cfe7ec')+'">'+a.sym+'</span><span class="wk-ai-dep">since '+a.dep+'</span>';
       it.onclick=function(){ applyAsset(a.sym); }; host.appendChild(it); }); }
   function refreshOvUI(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-ovList .wk-ov-item'),function(it){ var id=it.dataset.id; var on=!!overlays[id];
       it.classList.toggle('on', on); var chk=it.querySelector('.wk-ov-chk'); if(chk) chk.textContent=on?'✓':''; var col=it.querySelector('.wk-ov-col'); if(col){ col.style.background=(overlays[id]?overlays[id].color:ovDefColor(id)); } });
     var b=document.getElementById('wk-ovBtn'); if(b) b.classList.toggle('on', Object.keys(overlays).length>0); }
   function ovRow(id,label,color){ var on=!!overlays[id];
     var it=document.createElement('div'); it.className='wk-ov-item'+(on?' on':''); it.dataset.id=id;
-    it.innerHTML='<span class="wk-ov-chk">'+(on?'✓':'')+'</span><span class="wk-ov-nm">'+label+'</span><input type="color" class="wk-ov-col" value="'+(on?overlays[id].color:color)+'" title="Cor">';
+    it.innerHTML='<span class="wk-ov-chk">'+(on?'✓':'')+'</span><span class="wk-ov-nm">'+label+'</span><input type="color" class="wk-ov-col" value="'+(on?overlays[id].color:color)+'" title="Color">';
     it.querySelector('.wk-ov-nm').onclick=function(){ toggleOverlay(id); };
     it.querySelector('.wk-ov-chk').onclick=function(){ toggleOverlay(id); };
     var ci=it.querySelector('.wk-ov-col'); ci.onclick=function(e){ e.stopPropagation(); }; ci.oninput=function(e){ if(!overlays[id]) addOverlay(id, e.target.value); else setOverlayColor(id, e.target.value); };
     return it; }
   function buildOvList(filter){ var host=document.getElementById('wk-ovList'); if(!host) return; host.innerHTML=''; filter=(filter||'').trim().toLowerCase();
-    var hA=document.createElement('div'); hA.className='wk-ov-head'; hA.textContent='Ativos (escala própria)'; host.appendChild(hA);
+    var hA=document.createElement('div'); hA.className='wk-ov-head'; hA.textContent='Assets (own scale)'; host.appendChild(hA);
     ASSET_LIST.forEach(function(a){ var id='asset:'+a.sym, label=a.sym; if(filter && label.toLowerCase().indexOf(filter)<0) return; host.appendChild(ovRow(id,label,ovDefColor(id))); });
-    var hB=document.createElement('div'); hB.className='wk-ov-head'; hB.textContent='Séries (eixo próprio)'; host.appendChild(hB);
+    var hB=document.createElement('div'); hB.className='wk-ov-head'; hB.textContent='Series (own axis)'; host.appendChild(hB);
     OV_SERIES.forEach(function(s){ if(filter && s.label.toLowerCase().indexOf(filter)<0) return; host.appendChild(ovRow(s.id,s.label,s.color)); }); }
 
   function initAssetSelector(){
@@ -3294,26 +3294,26 @@
   };
   // SINGLE place to prune/extend the exposed tools (the lib loads ~67; the bar shows these 15 in 6 groups)
   var DRAW_TOOLS=[
-    {label:'Linhas', icon:DI.line, variants:[
-      {id:'horizontal-line', label:'Linha horizontal', icon:DI.hline},
-      {id:'horizontal-ray', label:'Raio horizontal', icon:DI.hray},
-      {id:'trend-line', label:'Linha de tendência', icon:DI.line},
-      {id:'ray', label:'Raio', icon:DI.ray},
-      {id:'vertical-line', label:'Linha vertical', icon:DI.vline}
+    {label:'Lines', icon:DI.line, variants:[
+      {id:'horizontal-line', label:'Horizontal line', icon:DI.hline},
+      {id:'horizontal-ray', label:'Horizontal ray', icon:DI.hray},
+      {id:'trend-line', label:'Trend line', icon:DI.line},
+      {id:'ray', label:'Ray', icon:DI.ray},
+      {id:'vertical-line', label:'Vertical line', icon:DI.vline}
     ]},
-    {id:'rectangle', label:'Retângulo', icon:DI.rect},
+    {id:'rectangle', label:'Rectangle', icon:DI.rect},
     {label:'Fibonacci', icon:DI.fib, variants:[
-      {id:'fib-retracement', label:'Fib · Retração', icon:DI.fibret},
-      {id:'fib-extension', label:'Fib · Extensão', icon:DI.fibext},
-      {id:'fib-channel', label:'Fib · Canal', icon:DI.fibchan}
+      {id:'fib-retracement', label:'Fib · Retracement', icon:DI.fibret},
+      {id:'fib-extension', label:'Fib · Extension', icon:DI.fibext},
+      {id:'fib-channel', label:'Fib · Channel', icon:DI.fibchan}
     ]},
-    {label:'Previsão', icon:DI.fcast, variants:[
+    {label:'Forecast', icon:DI.fcast, variants:[
       {id:'long-position', label:'Long Position', icon:DI.long},
       {id:'short-position', label:'Short Position', icon:DI.short},
       {id:'forecast', label:'Forecast', icon:DI.fcast},
-      {id:'projection', label:'Projeção', icon:DI.proj}
+      {id:'projection', label:'Projection', icon:DI.proj}
     ]},
-    {id:'text-annotation', label:'Texto', icon:DI.text},
+    {id:'text-annotation', label:'Text', icon:DI.text},
     {id:'brush', label:'Brush', icon:DI.brush}
   ];
   function dtoast(m){ var t=document.getElementById('wk-toast'); if(!t) return; t.textContent=m; t.classList.add('show'); clearTimeout(t._dh); t._dh=setTimeout(function(){ t.classList.remove('show'); },1800); }
@@ -3326,15 +3326,15 @@
   // ruler = the lib's DatePriceRange measurement tool (2 anchors → Δtime in days + Δprice in % and $)
   function activateRuler(){ if(!DRAW_OK) return; drawTool='date-price-range'; drawPending=[]; try{ clearPrev(); }catch(e){} setChartNav(false);
     try{ drawMgr.setActiveTool('date-price-range'); }catch(e){} clearDrawActive(); var c=document.getElementById('wk-dCursor'); if(c) c.classList.remove('on');
-    var r=document.getElementById('wk-rulertog'); if(r) r.classList.add('on'); dtoast('Régua — toca 2 pontos'); }
+    var r=document.getElementById('wk-rulertog'); if(r) r.classList.add('on'); dtoast('Ruler — tap 2 points'); }
   function activateTool(id, btn, parentBtn, parentHost){ if(!DRAW_OK) return; drawTool=id; drawPending=[]; try{ clearPrev(); }catch(e){} setChartNav(false); clearRulerBtn();   // while a tool is active, drag draws (not pans) so the live ghost tracks cleanly
     try{ drawMgr.setActiveTool(id); }catch(e){}
     clearDrawActive(); if(btn) btn.classList.add('on'); if(parentBtn) parentBtn.classList.add('on');
     if(parentHost && btn){ var sv=btn.querySelector('svg'); if(sv) parentHost.innerHTML=sv.outerHTML; }   // parent remembers last-used icon
     closeFlyouts();
-    var reg=drawReg&&drawReg.get(id); dtoast('Desenho: '+((reg&&reg.name)||id)+' — toca '+((reg&&reg.requiredAnchors)||1)+'×'); }
+    var reg=drawReg&&drawReg.get(id); dtoast('Drawing: '+((reg&&reg.name)||id)+' — tap '+((reg&&reg.requiredAnchors)||1)+'×'); }
   function buildDrawbar(){ var bar=document.getElementById('wk-drawbar'); if(!bar) return; bar.innerHTML='';
-    var cur=document.createElement('button'); cur.className='wk-tool on'; cur.id='wk-dCursor'; cur.title='Cursor / seleção'; cur.innerHTML=dsvg(DI.cursor);
+    var cur=document.createElement('button'); cur.className='wk-tool on'; cur.id='wk-dCursor'; cur.title='Cursor / selection'; cur.innerHTML=dsvg(DI.cursor);
     cur.onclick=function(){ exitDraw(); }; bar.appendChild(cur);
     DRAW_TOOLS.forEach(function(t){
       if(t.variants){ var g=document.createElement('div'); g.className='wk-dgroup';
@@ -3348,7 +3348,7 @@
         d.onclick=function(e){ e.stopPropagation(); activateTool(t.id, d, null, null); }; bar.appendChild(d); }
     });
     var sep=document.createElement('div'); sep.className='wk-tool-sep'; bar.appendChild(sep);
-    var tr=document.createElement('button'); tr.className='wk-tool'; tr.id='wk-dTrash'; tr.title='Apagar selecionado / todos'; tr.innerHTML=dsvg(DI.trash);
+    var tr=document.createElement('button'); tr.className='wk-tool'; tr.id='wk-dTrash'; tr.title='Delete selected / all'; tr.innerHTML=dsvg(DI.trash);
     tr.onclick=function(e){ e.stopPropagation(); if(!drawMgr) return; if(drawSelId){ try{ drawMgr.removeDrawing(drawSelId); }catch(_){} drawSelId=null; } else { try{ drawMgr.clearAll(); }catch(_){} } saveDrawings(); };
     bar.appendChild(tr);
   }
@@ -3439,16 +3439,16 @@
   var SWATCHES=['#5eead4','#2dd4bf','#60a5fa','#a78bfa','#f472b6','#f43f5e','#fb923c','#facc15','#22c55e','#e5e7eb'];
   function buildStylePanel(){ if(stylePanel) return stylePanel; var host=document.getElementById('wk-chart'); if(!host) return null;
     var p=document.createElement('div'); p.className='wk-stylepanel'; p.id='wk-stylepanel';
-    p.innerHTML='<div class="wk-sp-h"><span class="wk-sp-title">Estilo</span><button class="wk-sp-x" id="wk-sp-x" aria-label="Fechar">×</button></div>'
-      +'<div class="wk-sp-row"><span class="wk-sp-lbl">Cor</span><div class="wk-sp-sw" id="wk-sp-sw"></div><input type="color" class="wk-sp-col" id="wk-sp-col" aria-label="Cor livre"></div>'
-      +'<div class="wk-sp-row"><span class="wk-sp-lbl">Espessura</span><input type="range" min="1" max="6" step="1" class="wk-sp-w" id="wk-sp-w"><span class="wk-sp-wv" id="wk-sp-wv">2</span></div>'
-      +'<div class="wk-sp-row"><span class="wk-sp-lbl">Traço</span><div class="wk-sp-styles" id="wk-sp-styles">'
-        +'<button data-st="solid" title="Sólido"><span class="wk-sp-line solid"></span></button>'
-        +'<button data-st="dashed" title="Tracejado"><span class="wk-sp-line dashed"></span></button>'
-        +'<button data-st="dotted" title="Pontilhado"><span class="wk-sp-line dotted"></span></button></div></div>'
+    p.innerHTML='<div class="wk-sp-h"><span class="wk-sp-title">Style</span><button class="wk-sp-x" id="wk-sp-x" aria-label="Close">×</button></div>'
+      +'<div class="wk-sp-row"><span class="wk-sp-lbl">Color</span><div class="wk-sp-sw" id="wk-sp-sw"></div><input type="color" class="wk-sp-col" id="wk-sp-col" aria-label="Custom color"></div>'
+      +'<div class="wk-sp-row"><span class="wk-sp-lbl">Width</span><input type="range" min="1" max="6" step="1" class="wk-sp-w" id="wk-sp-w"><span class="wk-sp-wv" id="wk-sp-wv">2</span></div>'
+      +'<div class="wk-sp-row"><span class="wk-sp-lbl">Stroke</span><div class="wk-sp-styles" id="wk-sp-styles">'
+        +'<button data-st="solid" title="Solid"><span class="wk-sp-line solid"></span></button>'
+        +'<button data-st="dashed" title="Dashed"><span class="wk-sp-line dashed"></span></button>'
+        +'<button data-st="dotted" title="Dotted"><span class="wk-sp-line dotted"></span></button></div></div>'
       // fill controls — only shown for the rectangle tool (panel gets .has-fill)
-      +'<div class="wk-sp-row wk-sp-fillrow"><span class="wk-sp-lbl">Preench.</span><div class="wk-sp-sw" id="wk-sp-fsw"></div><input type="color" class="wk-sp-col" id="wk-sp-fcol" aria-label="Cor de preenchimento"></div>'
-      +'<div class="wk-sp-row wk-sp-fillrow"><span class="wk-sp-lbl">Opacidade</span><input type="range" min="0" max="100" step="5" class="wk-sp-w" id="wk-sp-fo"><span class="wk-sp-wv" id="wk-sp-fov">12</span></div>';
+      +'<div class="wk-sp-row wk-sp-fillrow"><span class="wk-sp-lbl">Fill</span><div class="wk-sp-sw" id="wk-sp-fsw"></div><input type="color" class="wk-sp-col" id="wk-sp-fcol" aria-label="Fill color"></div>'
+      +'<div class="wk-sp-row wk-sp-fillrow"><span class="wk-sp-lbl">Opacity</span><input type="range" min="0" max="100" step="5" class="wk-sp-w" id="wk-sp-fo"><span class="wk-sp-wv" id="wk-sp-fov">12</span></div>';
     host.appendChild(p); stylePanel=p;
     var sw=p.querySelector('#wk-sp-sw'); SWATCHES.forEach(function(c){ var b=document.createElement('button'); b.className='wk-sp-chip'; b.style.background=c; b.setAttribute('data-c',c);
       b.onclick=function(){ setStyle({lineColor:c}); }; sw.appendChild(b); });
@@ -3465,7 +3465,7 @@
     p.addEventListener('touchstart', function(e){ e.stopPropagation(); }, {passive:true});
     return p; }
   function syncStylePanel(){ if(!stylePanel||!styleTool) return; var s=toolStyle(styleTool);
-    stylePanel.querySelector('.wk-sp-title').textContent='Estilo · '+(((drawReg&&drawReg.get(styleTool))||{}).name||styleTool);
+    stylePanel.querySelector('.wk-sp-title').textContent='Style · '+(((drawReg&&drawReg.get(styleTool))||{}).name||styleTool);
     stylePanel.querySelector('#wk-sp-col').value=(/^#[0-9a-f]{6}$/i.test(s.lineColor)?s.lineColor:'#5eead4');
     stylePanel.querySelector('#wk-sp-w').value=s.lineWidth; stylePanel.querySelector('#wk-sp-wv').textContent=s.lineWidth;
     Array.prototype.forEach.call(stylePanel.querySelectorAll('#wk-sp-sw .wk-sp-chip'), function(b){ b.classList.toggle('on', b.getAttribute('data-c').toLowerCase()===(s.lineColor||'').toLowerCase()); });
@@ -3541,7 +3541,7 @@
       placeAnchorAt(p.clientX, p.clientY, ev.target); lastTouchPlace=Date.now(); tStart=null; ev.preventDefault(); }, {passive:false});
     // ruler pill (above the mode toggle) → the lib's DatePriceRange measurement tool (toggle on/off)
     var rulerBtn=document.getElementById('wk-rulertog');
-    if(rulerBtn) rulerBtn.addEventListener('click', function(){ if(!DRAW_OK){ notify('Régua indisponível (lib não carregou)'); return; }
+    if(rulerBtn) rulerBtn.addEventListener('click', function(){ if(!DRAW_OK){ notify('Ruler unavailable (lib did not load)'); return; }
       if(drawTool==='date-price-range'){ exitDraw(); } else activateRuler(); });
     // double-click (desktop) on a line drawing → open its per-tool style panel (only when no tool is active)
     chEl.addEventListener('dblclick', function(ev){ if(drawTool||onUI(ev.target)) return; styleFromPoint(ev.clientX, ev.clientY); });
@@ -3618,10 +3618,10 @@
     }catch(e){ fitRealContent(); } }
 
   function applyCandleSize(size, opt){ var spec=CSPEC[size]; if(!spec) return; opt=opt||{};
-    if(ASSET!=='BTC' && size!=='1D'){ notify(ASSET+': só velas diárias (1D)'); var m=document.getElementById('wk-csMenu'); if(m) m.classList.remove('open'); return; }   // non-BTC = daily only
+    if(ASSET!=='BTC' && size!=='1D'){ notify(ASSET+': daily candles only (1D)'); var m=document.getElementById('wk-csMenu'); if(m) m.classList.remove('open'); return; }   // non-BTC = daily only
     var pre=visibleEpochRange();   // capture the current window (epoch) for the intraday (b) keep-in-place case
     // Fase P: show the bar only when the tier must actually be fetched (a cached switch is instant → no bar)
-    var pid=(!tierCache[spec.tier]) ? wkLoading.start('A mudar para '+size+'…') : null;
+    var pid=(!tierCache[spec.tier]) ? wkLoading.start('Switching to '+size+'…') : null;
     loadTier(spec.tier, function(cands){
       // intraday tier unavailable (network) → silent fallback to 1D (no toast); never an empty chart
       if(spec.kind==='intra' && (!cands || !cands.length)){ if(pid) wkLoading.done(pid); if(size!=='1D') applyCandleSize('1D', {keepRange:true}); return; }
@@ -3657,7 +3657,7 @@
     Array.prototype.forEach.call(document.querySelectorAll('.wk-cs-item'),function(it){ it.classList.toggle('on', it.dataset.cs===s); });
     refreshIndicatorAvailability(); }
 
-  var PERIODS=[{d:1,k:'1D'},{d:7,k:'7D'},{d:15,k:'15D'},{d:30,k:'30D'},{d:60,k:'60D'},{d:90,k:'90D'},{d:182,k:'6M'},{d:365,k:'1A'},{d:1460,k:'4A'},{d:0,k:'ALL'}];
+  var PERIODS=[{d:1,k:'1D'},{d:7,k:'7D'},{d:15,k:'15D'},{d:30,k:'30D'},{d:60,k:'60D'},{d:90,k:'90D'},{d:182,k:'6M'},{d:365,k:'1Y'},{d:1460,k:'4Y'},{d:0,k:'ALL'}];
   function applyPeriod(d,label){
     if(!chart||!ACTIVE.length) return;
     setRangeDays(d);   // time-type aware (daily strings vs intraday epoch seconds)
@@ -3696,12 +3696,12 @@
     indBtn.onclick=function(e){ e.stopPropagation(); indMenu.classList.toggle('open'); };
     document.addEventListener('click',function(e){ if(!e.target.closest('.wk-ind-wrap')) indMenu.classList.remove('open'); });
     Array.prototype.forEach.call(document.querySelectorAll('.wk-ind-item'),function(it){ it.onclick=function(){
-      if(it.classList.contains('wk-cs-off')){ notify('Mayer / 200W / percentil só em velas ≥ 1D'); return; }   // daily-only, disabled at intraday
+      if(it.classList.contains('wk-cs-off')){ notify('Mayer / 200W / percentile only on candles ≥ 1D'); return; }   // daily-only, disabled at intraday
       var on=!it.classList.contains('on'); it.classList.toggle('on',on); toggleInd(it.dataset.ind,on); }; });
     // phase-method selector: Estrutural is the only functional mode; Wyckoff is a disabled placeholder.
     // Switching method only changes which algorithm paints the bands (the "Fases" toggle still owns the layer).
     Array.prototype.forEach.call(document.querySelectorAll('.wk-pm'),function(pm){ pm.onclick=function(e){ e.stopPropagation();
-      if(pm.disabled || pm.classList.contains('wk-pm-soon')){ notify('Wyckoff (eventos/volume) — em breve'); return; }
+      if(pm.disabled || pm.classList.contains('wk-pm-soon')){ notify('Wyckoff (events/volume) — soon'); return; }
       var m=pm.dataset.pm; if(m===PHASE_MODE) return; PHASE_MODE=m; savePhaseMode();
       Array.prototype.forEach.call(document.querySelectorAll('.wk-pm'),function(x){ x.classList.toggle('on', x.dataset.pm===m); }); }; });
     var perBtn=document.getElementById('wk-perBtn');
