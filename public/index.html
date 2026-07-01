@@ -470,6 +470,25 @@
   .wk-rk-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset;}
   #wk-rkList .wk-ov-group{margin-top:2px;}
   #wk-rkList .wk-ov-body{padding-top:1px;}
+  /* FC-CORE: inject / save floating buttons + inject dialog */
+  .wk-fcbtn{position:absolute;z-index:9;display:none;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;border:1px solid #b45309;background:rgba(20,14,4,.92);color:#fbbf24;font-size:12px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);opacity:0;transform:translateY(4px);transition:opacity .25s ease,transform .25s ease;white-space:nowrap;}
+  .wk-fcbtn.show{display:inline-flex;opacity:1;transform:translateY(0);}
+  .wk-fcbtn:hover{background:rgba(245,158,11,.2);border-color:#f59e0b;}
+  .wk-fcbtn-ic{font-size:12px;line-height:1;}
+  .wk-fcsave{color:#5eead4;border-color:#2f8b7d;background:rgba(4,20,18,.92);}
+  .wk-fcsave:hover{background:rgba(45,212,191,.18);border-color:#2dd4bf;}
+  .wk-fcdlg{position:absolute;inset:0;z-index:40;display:none;align-items:center;justify-content:center;background:rgba(3,10,12,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+  .wk-fcdlg.on{display:flex;}
+  .wk-fcdlg-card{width:min(300px,calc(100vw - 40px));background:#0e242c;border:1px solid #1f4a55;border-radius:12px;padding:14px 15px 13px;box-shadow:0 18px 50px rgba(0,0,0,.6);}
+  .wk-fcdlg-h{font-size:13px;font-weight:700;color:#e6f1f2;margin-bottom:10px;}
+  .wk-fcdlg-lbl{display:block;font-size:11px;color:#7fa6ad;margin-bottom:5px;}
+  .wk-fcdlg-in{width:100%;box-sizing:border-box;background:#08161b;border:1px solid #2a4a52;border-radius:8px;color:#eaf6f3;font-size:13px;padding:8px 10px;outline:none;}
+  .wk-fcdlg-in:focus{border-color:#2dd4bf;}
+  .wk-fcdlg-row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;}
+  .wk-fcdlg-cancel,.wk-fcdlg-ok{font-size:12px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;border:1px solid #2a4a52;background:transparent;color:#9fc4cb;}
+  .wk-fcdlg-ok{background:rgba(45,212,191,.18);border-color:#2f8b7d;color:#5eead4;}
+  .wk-fcdlg-ok:hover{background:rgba(45,212,191,.3);}
+  .wk-fcdlg-cancel:hover{color:#cfe7ec;border-color:#3a5a62;}
   /* rocket PIN modal (chart-scoped, pjdc266 style) */
   .wk-rkpin{position:absolute;inset:0;z-index:60;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:radial-gradient(ellipse at center,rgba(4,10,7,.82),rgba(2,5,4,.94));font-family:'Courier New',monospace;}
   .wk-rkpin.on{display:flex;}
@@ -2606,8 +2625,8 @@
     // the real candles; this only mutates the in-memory last bar + the chart series for display.
     livePrice = ACTIVE.length ? ACTIVE[ACTIVE.length-1].close : null;   // seed from last close → no empty gap
     positionLiveTag(); updateQuote();
-    chart.subscribeCrosshairMove(function(){ positionLiveTag(); });
-    try{ chart.timeScale().subscribeVisibleLogicalRangeChange(function(){ positionLiveTag(); updateGoEnd(); }); }catch(e){}
+    chart.subscribeCrosshairMove(function(){ positionLiveTag(); try{ redrawFcOverlays(); }catch(e){} });
+    try{ chart.timeScale().subscribeVisibleLogicalRangeChange(function(){ positionLiveTag(); updateGoEnd(); try{ redrawFcOverlays(); }catch(e){} }); }catch(e){}
     goEndBtn=document.getElementById('wk-goend');
     if(goEndBtn && !goEndBtn._wired){ goEndBtn._wired=true; goEndBtn.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopPropagation(); goToEnd(); }); }
     updateGoEnd();
@@ -2652,7 +2671,7 @@
   function relayout(){ if(!chart) return; var n=Object.keys(oscReg).length; var el=document.getElementById('wk-chart');
     var avail=availH(), minTotal=OSC_MIN*(PRICE_STRETCH+n);
     el.style.height=(n>0 ? Math.max(avail, minTotal) : avail)+'px';   // snap to screen; grow→scroll only if min won't fit
-    applyStretch(); positionTitles(); positionLiveTag(); updateGoEnd(); try{ requestAnimationFrame(function(){ positionTitles(); positionLiveTag(); updateGoEnd(); }); }catch(e){} }
+    applyStretch(); positionTitles(); positionLiveTag(); updateGoEnd(); try{ redrawFcOverlays(); }catch(e){} try{ requestAnimationFrame(function(){ positionTitles(); positionLiveTag(); updateGoEnd(); try{ redrawFcOverlays(); }catch(e){} }); }catch(e){} }
   function lin(s){ try{ s.priceScale().applyOptions({mode:0,borderColor:'#1f2430',scaleMargins:{top:0.16,bottom:0.1}}); }catch(e){} }   // oscillator panes are LINEAR (chart log mode breaks MACD negatives)
   function addOsc(id){ if(oscReg[id]||!OSC[id]) return; var paneIdx=chart.panes().length; var built=OSC[id].build(paneIdx, oscCfg[id]); lin(built.series[0]);
     oscReg[id]={series:built.series, pane:chart.panes()[paneIdx], priceLines:built.priceLines, kind:id}; relayout(); }
@@ -3474,7 +3493,6 @@
   // Honest, client-side (no ML). Horizon-aware config so future intraday horizons can be added.
   var SCENARIOS=[
     // — Heuristic engine (existing) —
-    {id:'dual-horizon', n:1, name:'Dual-Horizon Heuristic', label:'Trend + vol bootstrap', group:'engine', soon:false},
     {id:'knn', n:2, name:'Cycle-State k-NN', group:'engine', soon:true},
     {id:'stretch', n:3, name:'Cycle Stretch-Fit', group:'engine', soon:true},
     {id:'meanrev', n:4, name:'Mean-Reversion (200W/Mayer)', group:'engine', soon:true},
@@ -3486,7 +3504,9 @@
     // — Group B · Hybrid (realistic, data-anchored) — synthetic DAILY CANDLES, algorithmic (NOT his view) —
     {id:'hy-bull', name:'Bullish (hybrid)',  label:'Hybrid (realistic) · daily candles', group:'hybrid', kind:'candle', dot:'#22c55e', color:'34,197,94', soon:false},
     {id:'hy-bal',  name:'Balanced (hybrid)', label:'Hybrid (realistic) · daily candles', group:'hybrid', kind:'candle', dot:'#3b82f6', color:'59,130,246', soon:false},
-    {id:'hy-bear', name:'Bearish (hybrid)',  label:'Hybrid (realistic) · daily candles', group:'hybrid', kind:'candle', dot:'#f43f5e', color:'244,63,94', soon:false}];
+    {id:'hy-bear', name:'Bearish (hybrid)',  label:'Hybrid (realistic) · daily candles', group:'hybrid', kind:'candle', dot:'#f43f5e', color:'244,63,94', soon:false},
+    // — Dual-Horizon: disabled (moved to the end, greyed) — builder kept in SCEN_BUILDERS, revisit later —
+    {id:'dual-horizon', n:1, name:'Dual-Horizon Heuristic', label:'Trend + vol bootstrap', group:'engine', soon:true}];
   var HORIZON={ tf:'1D', endDate:'2036-07-01' };   // 1D → summer 2036 (only active horizon for now)
   var scenSeries=null, activeScenario=null, scenAnim=null, scenData=null, scenKK=null;   // scenKK = candles drawn so far (for the reverse close)
   function rocketUnlocked(){ try{ return sessionStorage.getItem('wk_rocket_ok')==='1'; }catch(e){ return false; } }
@@ -3605,7 +3625,7 @@
   // Esc close: reverse the open animation (candles retract right→left), then remove + fit to real data.
   // Only fires when a forecast is active AND no higher-priority menu/modal/drawing tool owns Esc.
   function scenBlockingOpen(){
-    if(document.querySelector('.wk-cyc-menu.open,.wk-per-menu.open,.wk-ind-menu.open,#wk-mg.open,#wk-cfg.open,.wk-rkpin.on,.wk-stylepanel.on')) return true;
+    if(document.querySelector('.wk-cyc-menu.open,.wk-per-menu.open,.wk-ind-menu.open,#wk-mg.open,#wk-cfg.open,.wk-rkpin.on,.wk-stylepanel.on,.wk-fcdlg.on')) return true;
     try{ if(drawTool) return true; }catch(e){}
     return false;
   }
@@ -3650,7 +3670,9 @@
       activeScenario=id; scenData=data;
       if(sc.kind==='line'){ scenSeries=chart.addSeries(L.LineSeries,{priceScaleId:'right',color:'rgba('+(sc.color||'45,212,191')+',0.95)',lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false},0); }
       else { var cu='rgba('+(sc.color||'45,212,191')+',0.7)'; scenSeries=chart.addSeries(L.CandlestickSeries,{priceScaleId:'right',borderVisible:true,priceLineVisible:false,lastValueVisible:false,upColor:cu,downColor:cu},0); }
-      try{ var from=ACTIVE.length?ACTIVE[Math.max(0,ACTIVE.length-200)].time:data[0].time; chart.timeScale().setVisibleRange({from:from, to:data[data.length-1].time}); }catch(e){}
+      try{ var dFrom=data[0].time, dTo=data[data.length-1].time, realFrom=ACTIVE.length?ACTIVE[Math.max(0,ACTIVE.length-200)].time:dFrom, lastReal=ACTIVE.length?ACTIVE[ACTIVE.length-1].time:dTo;
+        var vf=(dFrom<realFrom)?dFrom:realFrom, vt=(dTo>lastReal)?dTo:lastReal;   // union of the real window + the scenario's own span → never from>to (user paths can lie anywhere in time)
+        chart.timeScale().setVisibleRange({from:vf, to:vt}); }catch(e){}
       var T0=null, DUR=3000, nfull=data.length;        // animate in ~3s, left→right, single batched series
       function frame(ts){ if(T0==null) T0=ts; var pr=Math.min(1,(ts-T0)/DUR); var e=1-Math.pow(1-pr,3); var kk=Math.max(1,Math.floor(e*nfull)); scenKK=kk;
         try{ scenSeries.setData(data.slice(0,kk)); }catch(_){}
@@ -3740,6 +3762,22 @@
                 :'- Group B reuses the Dual-Horizon micro machinery (seeded PRNG, bootstrapped daily range, opacity decay); the macro path passes through the anchor pivots at the anchor times.\n')
         +'- The true distribution of outcomes is far wider than any single drawn path.\n';
     }
+    if(id.indexOf('ufc:')===0){ var isHy=/:hybrid$/.test(id), nm=id.replace(/^ufc:/,'').replace(/:(line|hybrid)$/,'');
+      return ''
+        +'# WAKAWAKA Scenario — '+sc.name+'\n\n'
+        +'**Group:** My forecasts (user-drawn). **Type:** '+(isHy?'synthetic daily candles generated FROM your drawn path':'the faithful clean line you drew')+'.\n\n'
+        +'> ⚠️ **Honesty.** This is YOUR hand-drawn forecast path, injected as a scenario. '
+        +(isHy
+          ? 'The hybrid version is a **plausible simulation anchored to historical behaviour**, NOT a prediction and NOT deterministic. It resembles history statistically (volatility, S/R reactions, base-building) but **cannot foretell actual moves**. Bottoms/tops are drawn as PROCESSES (ranges/tests), never clean V-shapes.'
+          : 'It is a schematic line, exactly as you drew it — not a prediction and not advice.')+'\n\n'
+        +'## How it is built\n'
+        +(isHy
+          ? '- Your drawn path (control points → log-interpolated daily) is the **macro trajectory**; the algorithm adds realistic micro-behaviour on top (reuses the Dual-Horizon machinery: seeded PRNG, bootstrapped daily range, opacity decay).\n'
+            +'- **Historical S/R** (fixed anchors ~126k / ~64k / ~21k **and** auto-detected cycle highs/lows from `ANCHOR.extremes`) are drawn as discreet dotted zones while active. Near a level the candles **consolidate, retest, and occasionally wick through (false break)** before continuing — never a clean V or a single rejection.\n'
+          : '- The anchors you placed are interpolated in LOG space into a smooth line and animated in left→right, exactly like the built-in scenarios.\n')
+        +'- BTC-only. Animated draw-in; **Esc closes it with the reverse animation**. Editable: drag its pivots on the chart and press **save** to replace this scenario with the adjusted path.\n\n'
+        +'## Caveat\n- A scenario / simulation, not a forecast. The true distribution of outcomes is far wider than any single drawn path.\n';
+    }
     return '# WAKAWAKA Scenario — '+sc.name+'\n\nNot yet implemented (coming soon).\n'; }
   function downloadScenReport(id){ if(!id) return; var md=scenReportMd(id); var blob=new Blob([md],{type:'text/markdown'}); var url=URL.createObjectURL(blob);
     var a=document.createElement('a'); a.href=url; a.download='wakawaka-scenario-'+id+'.md'; document.body.appendChild(a); a.click(); setTimeout(function(){ try{ document.body.removeChild(a); }catch(e){} URL.revokeObjectURL(url); },120); }
@@ -3765,6 +3803,7 @@
       var body=document.createElement('div'); body.className='wk-ov-body'; rows.forEach(function(s){ body.appendChild(rkItem(s)); });
       g.appendChild(h); g.appendChild(body); host.appendChild(g); }
     function byGroup(k){ return SCENARIOS.filter(function(s){ return (s.group||'engine')===k; }); }
+    group('myfc','My forecasts', byGroup('myfc'));
     group('engine','Heuristic engine', byGroup('engine'));
     group('credible','CredibleCrypto (as drawn)', byGroup('credible'));
     group('hybrid','Hybrid (realistic)', byGroup('hybrid')); }
@@ -3861,7 +3900,8 @@
     short:'<path d="M5 11h14M12 5v14M9 16l3 3 3-3"/>',
     proj:'<path d="M4 18l6-4 4 2 6-7M14 9h6v6" stroke-dasharray="2.5 2.5"/>',
     text:'<path d="M5 5h14M12 5v14M9 19h6"/>',
-    brush:'<path d="M4 20l4-1 11-11-3-3L5 16z"/>'
+    brush:'<path d="M4 20l4-1 11-11-3-3L5 16z"/>',
+    fcnodes:'<path d="M3 16l5-4 4 3 5-7 4 3"/><circle cx="3" cy="16" r="1.7" fill="currentColor" stroke="none"/><circle cx="8" cy="12" r="1.7" fill="currentColor" stroke="none"/><circle cx="12" cy="15" r="1.7" fill="currentColor" stroke="none"/><circle cx="17" cy="8" r="1.7" fill="currentColor" stroke="none"/><circle cx="21" cy="11" r="1.7" fill="currentColor" stroke="none"/>'
   };
   // SINGLE place to prune/extend the exposed tools (the lib loads ~67; the bar shows these 15 in 6 groups)
   var DRAW_TOOLS=[
@@ -3885,7 +3925,8 @@
       {id:'projection', label:'Projection', icon:DI.proj}
     ]},
     {id:'text-annotation', label:'Text', icon:DI.text},
-    {id:'brush', label:'Brush', icon:DI.brush}
+    {id:'brush', label:'Brush', icon:DI.brush},
+    {id:'fc-draw', label:'Forecast draw (multi-point → inject)', icon:DI.fcnodes}   // FC-CORE: custom multi-point path
   ];
   function dtoast(m){ var t=document.getElementById('wk-toast'); if(!t) return; t.textContent=m; t.classList.add('show'); clearTimeout(t._dh); t._dh=setTimeout(function(){ t.classList.remove('show'); },1800); }
   function closeFlyouts(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-dgroup.open'),function(g){ g.classList.remove('open'); }); }
@@ -3899,10 +3940,12 @@
     try{ drawMgr.setActiveTool('date-price-range'); }catch(e){} clearDrawActive(); var c=document.getElementById('wk-dCursor'); if(c) c.classList.remove('on');
     var r=document.getElementById('wk-rulertog'); if(r) r.classList.add('on'); dtoast('Ruler — tap 2 points'); }
   function activateTool(id, btn, parentBtn, parentHost){ if(!DRAW_OK) return; drawTool=id; drawPending=[]; try{ clearPrev(); }catch(e){} setChartNav(false); clearRulerBtn();   // while a tool is active, drag draws (not pans) so the live ghost tracks cleanly
-    try{ drawMgr.setActiveTool(id); }catch(e){}
+    try{ drawMgr.setActiveTool(id==='fc-draw'?null:id); }catch(e){}   // fc-draw is our own multi-point tool (not a lib tool)
     clearDrawActive(); if(btn) btn.classList.add('on'); if(parentBtn) parentBtn.classList.add('on');
     if(parentHost && btn){ var sv=btn.querySelector('svg'); if(sv) parentHost.innerHTML=sv.outerHTML; }   // parent remembers last-used icon
     closeFlyouts();
+    try{ fcHideInject(); }catch(e){}
+    if(id==='fc-draw'){ dtoast('Forecast — click to add points, double-click to finish'); return; }
     var reg=drawReg&&drawReg.get(id); dtoast('Drawing: '+((reg&&reg.name)||id)+' — tap '+((reg&&reg.requiredAnchors)||1)+'×'); }
   function buildDrawbar(){ var bar=document.getElementById('wk-drawbar'); if(!bar) return; bar.innerHTML='';
     var cur=document.createElement('button'); cur.className='wk-tool on'; cur.id='wk-dCursor'; cur.title='Cursor / selection'; cur.innerHTML=dsvg(DI.cursor);
@@ -3957,6 +4000,7 @@
   function clearPrev(){ if(prevCtx&&prevCanvas) prevCtx.clearRect(0,0,prevCanvas.width,prevCanvas.height); }
   function anchorPx(a){ var x=null,y=null; try{ x=chart.timeScale().timeToCoordinate(a.time); }catch(e){} try{ y=area.priceToCoordinate(a.price); }catch(e){} return (x==null||y==null||!isFinite(x)||!isFinite(y))?null:{x:x,y:y}; }
   function previewKind(id){
+    if(id==='fc-draw') return 'poly';   // multi-point forecast path (all placed segments + cursor)
     if(id==='rectangle'||id==='fib-retracement'||id==='long-position'||id==='short-position'||id==='date-price-range') return 'rect';
     if(id==='horizontal-line') return 'hline';
     if(id==='horizontal-ray') return 'hray';
@@ -4066,11 +4110,13 @@
     try{ drawReg=D.getToolRegistry(); drawMgr=new D.DrawingManager(); drawMgr.attach(chart, area, document.getElementById('wk-chart')); DRAW_OK=true; }
     catch(e){ if(bar) bar.style.display='none'; return; }
     buildDrawbar(); loadLineStyles(); loadDrawings(); reapplyLineStyles();
-    try{ drawMgr.on('drawing:selected', function(ev){ drawSelId=ev&&ev.drawingId; });
-         drawMgr.on('drawing:deselected', function(){ drawSelId=null; });
-         drawMgr.on('drawing:updated', function(){ saveDrawings(); });
-         drawMgr.on('drawing:removed', function(){ saveDrawings(); });
-         drawMgr.on('drawing:cleared', function(){ saveDrawings(); }); }catch(e){}
+    try{ drawMgr.on('drawing:selected', function(ev){ drawSelId=ev&&ev.drawingId; try{ redrawFcOverlays(); }catch(e){} });
+         drawMgr.on('drawing:deselected', function(){ drawSelId=null; try{ redrawFcOverlays(); }catch(e){} });
+         drawMgr.on('drawing:updated', function(ev){ saveDrawings(); try{ redrawFcOverlays(); }catch(e){}
+           try{ var id=ev&&ev.drawingId; if(id && fcIdToName[id]){ fcPendingEditId=id; fcShowSave(id); } }catch(e){} });   // FC-CORE: pivot drag → offer "update"
+         drawMgr.on('drawing:removed', function(){ saveDrawings(); try{ redrawFcOverlays(); }catch(e){} });
+         drawMgr.on('drawing:cleared', function(){ saveDrawings(); try{ redrawFcOverlays(); }catch(e){} }); }catch(e){}
+    try{ initFcCore(); }catch(e){}   // FC-CORE: load persisted user forecasts + build overlay canvas
     // creation: each tap places one anchor (coords converted via the chart's scales — LOG aware). When the
     // active tool's required-anchor count is reached, the drawing is created. Listening on the container's
     // 'click' (which the browser suppresses after a drag) means panning never accidentally places anchors.
@@ -4081,6 +4127,7 @@
       var c=toPx(clientX,clientY);
       var t=null,price=null; try{ t=chart.timeScale().coordinateToTime(c.px); }catch(e){} try{ price=area.coordinateToPrice(c.py); }catch(e){}
       if(t==null || price==null) return;
+      if(drawTool==='fc-draw'){ drawPending.push({time:t, price:price}); try{ fcHideInject(); }catch(e){} drawPreview(c.px, c.py); return; }   // FC-CORE: keep adding points; double-click finalizes
       drawPending.push({time:t, price:price});
       var reg=drawReg.get(drawTool);
       var need=(drawTool==='date-price-range')?2:((reg&&reg.requiredAnchors)||1);   // ruler always needs 2 points (don't depend on the registry for the hidden measurement tool)
@@ -4109,13 +4156,16 @@
       var p=ev.touches[0]; tStart={x:p.clientX,y:p.clientY,time:Date.now()}; var c=toPx(p.clientX,p.clientY); drawPreview(c.px,c.py); }, {passive:true});
     chEl.addEventListener('touchmove', function(ev){ if(!drawTool||!tStart||ev.touches.length!==1) return; var p=ev.touches[0]; var c=toPx(p.clientX,p.clientY); drawPreview(c.px,c.py); ev.preventDefault(); }, {passive:false});
     chEl.addEventListener('touchend', function(ev){ if(!drawTool || !tStart) return; var p=ev.changedTouches[0];
+      if(drawTool==='fc-draw'){ var now=Date.now(); if(now-fcLastTap<340 && Math.abs(p.clientX-fcTX)<28 && Math.abs(p.clientY-fcTY)<28){ try{ fcFinalizeDraw(); }catch(e){} fcLastTap=0; tStart=null; ev.preventDefault(); return; } fcLastTap=now; fcTX=p.clientX; fcTY=p.clientY; }   // double-tap finalizes the path
       placeAnchorAt(p.clientX, p.clientY, ev.target); lastTouchPlace=Date.now(); tStart=null; ev.preventDefault(); }, {passive:false});
     // ruler pill (above the mode toggle) → the lib's DatePriceRange measurement tool (toggle on/off)
     var rulerBtn=document.getElementById('wk-rulertog');
     if(rulerBtn) rulerBtn.addEventListener('click', function(){ if(!DRAW_OK){ notify('Ruler unavailable (lib did not load)'); return; }
       if(drawTool==='date-price-range'){ exitDraw(); } else activateRuler(); });
-    // double-click (desktop) on a line drawing → open its per-tool style panel (only when no tool is active)
-    chEl.addEventListener('dblclick', function(ev){ if(drawTool||onUI(ev.target)) return; styleFromPoint(ev.clientX, ev.clientY); });
+    // double-click (desktop): finalize the fc-draw path; otherwise open a line's per-tool style panel
+    chEl.addEventListener('dblclick', function(ev){ if(onUI(ev.target)) return;
+      if(drawTool==='fc-draw'){ ev.preventDefault(); try{ fcFinalizeDraw(); }catch(e){} return; }
+      if(drawTool) return; styleFromPoint(ev.clientX, ev.clientY); });
     // double-TAP (mobile) on a line drawing → same panel (cursor mode only)
     var lastTap=0, lastTX=0, lastTY=0;
     chEl.addEventListener('touchend', function(ev){ if(drawTool) return; var p=ev.changedTouches[0]; var now=Date.now();
@@ -4136,6 +4186,161 @@
     // close the style panel on any outside press (pointerdown covers mouse + touch; touch taps don't always emit 'click')
     document.addEventListener('pointerdown', function(e){ if(stylePanel && stylePanel.classList.contains('on') && !e.target.closest('.wk-stylepanel')) closeStylePanel(); });
   }
+  // ════════════════ FC-CORE: user-drawn forecast → injected scenario (line + hybrid candles) ════════════════
+  // Reuses drawMgr (polyline drawing = editable path), buildDualHorizon micro machinery, ANCHOR.extremes
+  // (S/R), runScenario/closeScenarioAnimated (animate + Esc). Persisted in localStorage wk_user_forecasts.
+  var fcSeq=0, fcDraft=null, fcDrawIds={}, fcIdToName={}, userForecasts=[], fcPendingEditId=null;
+  var fcLastTap=0, fcTX=0, fcTY=0;
+  var fcOvCanvas=null, fcOvCtx=null, fcInjectBtn=null, fcSaveBtn=null, fcDlg=null;
+  function fcTimeStr(t){ if(t==null) return null; if(typeof t==='string') return t.slice(0,10);
+    if(typeof t==='object' && t.year){ return t.year+'-'+String(t.month).padStart(2,'0')+'-'+String(t.day).padStart(2,'0'); }
+    if(typeof t==='number'){ return new Date(t*1000).toISOString().slice(0,10); } return null; }
+  function fcHash(s){ var h=0x811c9dc5; for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193); } return h>>>0; }
+  function fcFmt(v){ if(v>=1e6) return (v/1e6).toFixed(2)+'M'; if(v>=1e3) return Math.round(v/1e3)+'k'; return Math.round(v)+''; }
+  function fcDedup(a){ var out=[]; for(var i=0;i<a.length;i++){ if(out.length){ var p=anchorPx(a[i]), q=anchorPx(out[out.length-1]); if(p&&q&&Math.hypot(p.x-q.x,p.y-q.y)<8) continue; } out.push(a[i]); } return out; }
+
+  // ── finalize the drawn path → lib polyline (editable pivots + export/import) + arrow + inject button ──
+  function fcFinalizeDraw(){ if(drawTool!=='fc-draw'||!drawReg) return;
+    var pts=fcDedup(drawPending.slice()); drawPending=[]; try{ clearPrev(); }catch(e){}
+    if(pts.length<2){ try{ exitDraw(); }catch(e){} dtoast('Need at least 2 points'); return; }
+    var id='wkfc_'+(fcSeq++)+'_'+Math.round((anchorPx(pts[0])||{x:0}).x||0);
+    var st={lineColor:'#f59e0b', lineWidth:2, lineDash:[]};   // amber = user forecast
+    var dr=null; try{ dr=drawReg.createDrawing('polyline', id, pts.slice(), st, {}); }catch(e){}
+    if(!dr){ try{ exitDraw(); }catch(e){} dtoast('Could not create path'); return; }
+    try{ drawMgr.addDrawing(dr); }catch(e){}
+    fcDrawIds[id]=true; fcDraft={ id:id, anchors:pts.slice() };
+    try{ if(drawMgr.selectDrawing){ drawMgr.selectDrawing(id); drawSelId=id; } }catch(e){}
+    try{ saveDrawings(); }catch(e){}
+    try{ exitDraw(); }catch(e){}   // back to cursor → pivots are draggable
+    try{ redrawFcOverlays(); }catch(e){}
+    fcShowInject(pts[pts.length-1]);
+  }
+
+  // ── overlay canvas: arrowheads on user-forecast paths + discreet S/R while a hybrid is active ──
+  function ensureFcOverlay(){ if(fcOvCanvas) return; var host=document.getElementById('wk-chart'); if(!host) return;
+    fcOvCanvas=document.createElement('canvas'); fcOvCanvas.id='wk-fc-ov'; fcOvCanvas.style.cssText='position:absolute;left:0;top:0;pointer-events:none;z-index:6;'; host.appendChild(fcOvCanvas); fcOvCtx=fcOvCanvas.getContext('2d'); }
+  function fcArrowHead(ctx, from, to, color){ var ang=Math.atan2(to.y-from.y, to.x-from.x), L=12, W=Math.PI/7;
+    ctx.save(); ctx.fillStyle=color; ctx.beginPath(); ctx.moveTo(to.x,to.y);
+    ctx.lineTo(to.x-L*Math.cos(ang-W), to.y-L*Math.sin(ang-W)); ctx.lineTo(to.x-L*Math.cos(ang+W), to.y-L*Math.sin(ang+W)); ctx.closePath(); ctx.fill(); ctx.restore(); }
+  function fcSRVisible(){ return !!(activeScenario && /^ufc:.*:hybrid$/.test(activeScenario)); }
+  function fcSRInRange(){ var lv=fcSRLevels(); if(!scenData||!scenData.length) return []; var mn=Infinity,mx=-Infinity;
+    scenData.forEach(function(p){ var lo=(p.low!=null?p.low:(p.value!=null?p.value:p.close)), hi=(p.high!=null?p.high:(p.value!=null?p.value:p.close)); if(lo!=null&&lo<mn)mn=lo; if(hi!=null&&hi>mx)mx=hi; });
+    if(mn===Infinity) return []; return lv.filter(function(v){ return v>=mn*0.9 && v<=mx*1.08; }); }
+  function drawFcArrows(ctx){ if(!drawMgr) return; var ids=Object.keys(fcDrawIds); if(!ids.length) return;
+    var all=[]; try{ all=drawMgr.getAllDrawings()||[]; }catch(e){}
+    ids.forEach(function(id){ var d=null; all.forEach(function(x){ if(x.id===id) d=x; }); if(!d) return;
+      var anch=(d.anchors||[]); if(anch.length<2) return; var pen=anchorPx(anch[anch.length-1]), prev=anchorPx(anch[anch.length-2]); if(!pen||!prev) return;
+      fcArrowHead(ctx, prev, pen, '#f59e0b'); }); }
+  function redrawFcOverlays(){ ensureFcOverlay(); if(!fcOvCtx||!chart||!area) return; var host=document.getElementById('wk-chart'); if(!host) return;
+    var w=host.clientWidth,h=host.clientHeight,dpr=window.devicePixelRatio||1;
+    if(fcOvCanvas.width!==Math.round(w*dpr)||fcOvCanvas.height!==Math.round(h*dpr)){ fcOvCanvas.width=Math.round(w*dpr); fcOvCanvas.height=Math.round(h*dpr); fcOvCanvas.style.width=w+'px'; fcOvCanvas.style.height=h+'px'; }
+    fcOvCtx.setTransform(dpr,0,0,dpr,0,0); fcOvCtx.clearRect(0,0,w,h); var ctx=fcOvCtx;
+    if(fcSRVisible()){ var lv=fcSRInRange();   // discreet dotted S/R zones (context, not the star)
+      lv.forEach(function(p){ var y=null; try{ y=area.priceToCoordinate(p); }catch(e){} if(y==null||!isFinite(y)) return;
+        ctx.save(); ctx.fillStyle='rgba(148,163,184,.06)'; ctx.fillRect(0,y-4,w,8);   // faint zone band (a "rectangle")
+        ctx.setLineDash([1.5,4]); ctx.lineWidth=1; ctx.strokeStyle='rgba(148,163,184,.42)'; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();
+        ctx.setLineDash([]); ctx.font='9px system-ui,sans-serif'; ctx.fillStyle='rgba(148,163,184,.6)'; ctx.fillText('S/R '+fcFmt(p), 5, y-3); ctx.restore(); }); }
+    drawFcArrows(ctx); fcReposButtons();
+  }
+  function fcReposButtons(){ if(fcInjectBtn && fcInjectBtn.classList.contains('show') && fcDraft){ var pe=anchorPx(fcDraft.anchors[fcDraft.anchors.length-1]); if(pe){ fcPlaceBtn(fcInjectBtn, pe); } }
+    if(fcSaveBtn && fcSaveBtn.classList.contains('show') && fcPendingEditId){ var d=null; try{ (drawMgr.getAllDrawings()||[]).forEach(function(x){ if(x.id===fcPendingEditId) d=x; }); }catch(e){} if(d&&d.anchors&&d.anchors.length){ var pp=anchorPx(d.anchors[d.anchors.length-1]); if(pp) fcPlaceBtn(fcSaveBtn, pp); } } }
+  function fcPlaceBtn(btn, pe){ var host=document.getElementById('wk-chart'); var W=host.clientWidth,H=host.clientHeight, bw=btn.offsetWidth||96, bh=btn.offsetHeight||28;
+    btn.style.left=Math.max(6, Math.min(W-bw-6, pe.x+12))+'px'; btn.style.top=Math.max(6, Math.min(H-bh-6, pe.y-bh-8))+'px'; }
+
+  // ── inject button + dialog ──
+  function fcEnsureInject(){ if(fcInjectBtn) return; var host=document.getElementById('wk-chart'); if(!host) return;
+    fcInjectBtn=document.createElement('button'); fcInjectBtn.className='wk-fcbtn wk-fcinject'; fcInjectBtn.id='wk-fcinject';
+    fcInjectBtn.innerHTML='<span class="wk-fcbtn-ic">🚀</span><span>inject fc</span>';
+    fcInjectBtn.onclick=function(e){ e.stopPropagation(); fcOpenDialog(); }; host.appendChild(fcInjectBtn); }
+  function fcShowInject(endA){ fcEnsureInject(); if(!fcInjectBtn) return; var pe=anchorPx(endA)||{x:(document.getElementById('wk-chart').clientWidth-120),y:40}; fcInjectBtn.classList.add('show'); fcPlaceBtn(fcInjectBtn, pe); }
+  function fcHideInject(){ if(fcInjectBtn) fcInjectBtn.classList.remove('show'); }
+  function fcEnsureSave(){ if(fcSaveBtn) return; var host=document.getElementById('wk-chart'); if(!host) return;
+    fcSaveBtn=document.createElement('button'); fcSaveBtn.className='wk-fcbtn wk-fcsave'; fcSaveBtn.id='wk-fcsave';
+    fcSaveBtn.innerHTML='<span class="wk-fcbtn-ic">✓</span><span>save fc</span>';
+    fcSaveBtn.onclick=function(e){ e.stopPropagation(); fcSaveEdit(); }; host.appendChild(fcSaveBtn); }
+  function fcShowSave(id){ fcEnsureSave(); if(!fcSaveBtn) return; var d=null; try{ (drawMgr.getAllDrawings()||[]).forEach(function(x){ if(x.id===id) d=x; }); }catch(e){}
+    var pe=(d&&d.anchors&&d.anchors.length)?anchorPx(d.anchors[d.anchors.length-1]):null; fcSaveBtn.querySelector('span:last-child').textContent='save "'+(fcIdToName[id]||'fc')+'"'; fcSaveBtn.classList.add('show'); if(pe) fcPlaceBtn(fcSaveBtn, pe); }
+  function fcHideSave(){ if(fcSaveBtn) fcSaveBtn.classList.remove('show'); fcPendingEditId=null; }
+  function fcBuildDialog(){ if(fcDlg) return; var host=document.getElementById('wk-chart'); if(!host) return;
+    fcDlg=document.createElement('div'); fcDlg.className='wk-fcdlg'; fcDlg.id='wk-fcdlg';
+    fcDlg.innerHTML='<div class="wk-fcdlg-card"><div class="wk-fcdlg-h">Inject forecast</div>'
+      +'<label class="wk-fcdlg-lbl" for="wk-fcdlg-in">Forecast tag:</label>'
+      +'<input id="wk-fcdlg-in" class="wk-fcdlg-in" type="text" maxlength="28" autocomplete="off" placeholder="name this forecast" />'
+      +'<div class="wk-fcdlg-row"><button class="wk-fcdlg-cancel" id="wk-fcdlg-cancel">Cancel</button><button class="wk-fcdlg-ok" id="wk-fcdlg-ok">Inject</button></div></div>';
+    host.appendChild(fcDlg);
+    fcDlg.addEventListener('click', function(e){ if(e.target===fcDlg) fcCloseDialog(); });
+    fcDlg.querySelector('#wk-fcdlg-cancel').onclick=function(e){ e.stopPropagation(); fcCloseDialog(); };
+    fcDlg.querySelector('#wk-fcdlg-ok').onclick=function(e){ e.stopPropagation(); var v=fcDlg.querySelector('#wk-fcdlg-in').value.trim(); if(!v){ fcDlg.querySelector('#wk-fcdlg-in').focus(); return; } fcInject(v); fcCloseDialog(); };
+    fcDlg.querySelector('#wk-fcdlg-in').addEventListener('keydown', function(e){ e.stopPropagation(); if(e.key==='Enter'){ fcDlg.querySelector('#wk-fcdlg-ok').click(); } else if(e.key==='Escape'){ fcCloseDialog(); } }); }
+  function fcOpenDialog(){ if(!fcDraft) return; fcBuildDialog(); if(!fcDlg) return; fcDlg.classList.add('on'); var i=fcDlg.querySelector('#wk-fcdlg-in'); i.value=''; setTimeout(function(){ i.focus(); },60); }
+  function fcCloseDialog(){ if(fcDlg) fcDlg.classList.remove('on'); }
+
+  // ── scenario registration (line + hybrid) from a stored forecast record ──
+  function fcScenIds(name){ var base='ufc:'+name; return {line:base+':line', hybrid:base+':hybrid'}; }
+  function fcRegisterScenarios(rec){ var ids=fcScenIds(rec.name);
+    SCENARIOS=SCENARIOS.filter(function(s){ return s.id!==ids.line && s.id!==ids.hybrid; });
+    SCENARIOS.push({id:ids.line,   name:rec.name+' (line)',   label:'My forecast · line',          group:'myfc', kind:'line',   dot:'#f59e0b', color:'245,158,11', soon:false});
+    SCENARIOS.push({id:ids.hybrid, name:rec.name+' (hybrid)', label:'My forecast · hybrid candles', group:'myfc', kind:'candle', dot:'#f59e0b', color:'245,158,11', soon:false});
+    SCEN_BUILDERS[ids.line]=function(){ return ufcLine(rec); };
+    SCEN_BUILDERS[ids.hybrid]=function(){ return ufcHybrid(rec); }; }
+  function fcFindForecast(name){ for(var i=0;i<userForecasts.length;i++){ if(userForecasts[i].name===name) return userForecasts[i]; } return null; }
+  function fcUpsertForecast(rec){ var ex=fcFindForecast(rec.name); if(ex){ ex.anchors=rec.anchors; ex.drawingId=rec.drawingId; ex.seed=rec.seed; } else userForecasts.push(rec); }
+  function saveUserForecasts(){ try{ localStorage.setItem(nsKey('wk_user_forecasts'), JSON.stringify(userForecasts)); }catch(e){} }
+  function loadUserForecasts(){ try{ var raw=localStorage.getItem(nsKey('wk_user_forecasts')); if(!raw && WK_USER==='default') raw=localStorage.getItem('wk_user_forecasts');
+    userForecasts=raw?(JSON.parse(raw)||[]):[]; }catch(e){ userForecasts=[]; }
+    userForecasts.forEach(function(rec){ fcRegisterScenarios(rec); if(rec.drawingId){ fcIdToName[rec.drawingId]=rec.name; fcDrawIds[rec.drawingId]=true; } }); }
+  function fcInject(name){ if(!fcDraft) return; var anchors=(fcDraft.anchors||[]).slice(), drawingId=fcDraft.id;
+    var existing=fcFindForecast(name);
+    if(existing && existing.drawingId && existing.drawingId!==drawingId){ try{ drawMgr.removeDrawing(existing.drawingId); }catch(e){} delete fcDrawIds[existing.drawingId]; delete fcIdToName[existing.drawingId]; }
+    var rec={ name:name, anchors:anchors, drawingId:drawingId, seed:fcHash(name)||0x1234, created:new Date().toISOString().slice(0,10) };
+    fcUpsertForecast(rec); fcRegisterScenarios(rec); fcIdToName[drawingId]=name; fcDrawIds[drawingId]=true;
+    saveUserForecasts(); try{ buildRkList(); }catch(e){}
+    fcHideInject(); fcDraft=null; try{ redrawFcOverlays(); }catch(e){}
+    notify('Injected "'+name+'" — line + hybrid in the rocket menu'); }
+  function fcSaveEdit(){ if(!fcPendingEditId) return; var name=fcIdToName[fcPendingEditId]; if(!name){ fcHideSave(); return; }
+    var d=null; try{ (drawMgr.getAllDrawings()||[]).forEach(function(x){ if(x.id===fcPendingEditId) d=x; }); }catch(e){}
+    if(!d){ fcHideSave(); return; } var anchors=(d.anchors||[]).map(function(a){ return {time:a.time, price:a.price}; });
+    var rec=fcFindForecast(name); if(!rec){ fcHideSave(); return; } rec.anchors=anchors;
+    fcRegisterScenarios(rec); saveUserForecasts(); try{ buildRkList(); }catch(e){}
+    var ids=fcScenIds(name); if(activeScenario===ids.line || activeScenario===ids.hybrid){ var cur=activeScenario; try{ runScenario(cur); }catch(e){} }   // re-run if on screen
+    fcHideSave(); notify('Updated "'+name+'" from the edited path');
+    /* FC-PATTERNS hook: pivot → pattern (flags/wedges/corrections) popup will attach here in the next prompt. */ }
+
+  // ── builders: line (faithful) + hybrid candles (S/R-respecting) from the drawn anchors ──
+  function ufcWP(rec){ var a=(rec.anchors||[]).map(function(p){ return {t:fcTimeStr(p.time), price:p.price}; }).filter(function(p){ return p.t && p.price>0; });
+    a.sort(function(x,y){ return x.t<y.t?-1:(x.t>y.t?1:0); }); var ded=[]; a.forEach(function(p){ if(!ded.length || p.t!==ded[ded.length-1].t) ded.push(p); }); return ded; }
+  function ufcLine(rec){ var wp=ufcWP(rec); if(wp.length<2) return null; return interpWP(wp).map(function(p){ return {time:p.time, value:p.value, close:p.value}; }); }
+  function fcSRLevels(){ var out=[126000,64000,21000];   // fixed anchors (owner: BOTH sources)
+    try{ if(ANCHOR && ANCHOR.extremes){ ANCHOR.extremes.forEach(function(e){ if(e && e.price>0) out.push(e.price); }); } }catch(e){}   // auto-detected cycle highs/lows (never fabricated)
+    out.sort(function(a,b){ return a-b; }); var ded=[]; out.forEach(function(v){ if(!ded.length || Math.abs(v-ded[ded.length-1])/v>0.03) ded.push(v); }); return ded; }
+  function fcNearestSR(v, arr){ var best=null,bd=Infinity; arr.forEach(function(x){ var d=Math.abs(x-v); if(d<bd){ bd=d; best=x; } }); return best; }
+  function ufcHybrid(rec){ var wp=ufcWP(rec); if(wp.length<2) return null; var macro=interpWP(wp); var b=scenBase(); if(!b) return null; var src=b.src;
+    var rwin=Math.min(365, src.length-1), rr=[]; for(var k=src.length-rwin;k<src.length;k++){ var s=src[k]; if(s.h>0&&s.l>0&&s.c>0) rr.push((s.h-s.l)/s.c); }
+    var avgRange=rr.length?(rr.reduce(function(a,c){return a+c;},0)/rr.length):0.04;
+    var srAll=fcSRLevels(), rnd=mulberry32(rec.seed||0x1234), N=macro.length, out=[], prevClose=macro[0].value;
+    for(var t=0;t<N;t++){ var m=macro[t].value; var near=fcNearestSR(m, srAll), mag=0, extra=0, fbreak=0;
+      if(near){ var dist=Math.abs(m-near)/near; if(dist<0.08){ var pull=(1-dist/0.08); mag=(near-m)*0.5*pull; extra=avgRange*1.2*pull; if(rnd()<0.08*pull) fbreak=(rnd()<0.5?-1:1)*avgRange*1.9*near*pull; } }   // magnet toward the level + wider tests + occasional false break → consolidation, never a clean V
+      var noise=(rnd()-0.5)*2*(avgRange*0.9+extra), close=(m+mag)*Math.exp(noise); if(close<=0) close=prevClose*0.95;
+      var open=prevClose, rng=close*(avgRange*(0.5+rnd())+extra*0.5);
+      var hi=Math.max(open,close)+rng*0.6+Math.max(0,fbreak), lo=Math.min(open,close)-rng*0.6+Math.min(0,fbreak); if(lo<=0) lo=Math.min(open,close)*0.9;
+      var alpha=Math.max(0.1, 0.9-0.78*(t/N)), col='rgba(245,158,11,'+alpha.toFixed(3)+')';
+      out.push({time:macro[t].time, open:open, high:hi, low:lo, close:close, color:col, wickColor:col, borderColor:col}); prevClose=close; }
+    return out; }
+
+  function initFcCore(){ ensureFcOverlay(); loadUserForecasts(); try{ redrawFcOverlays(); }catch(e){}
+    try{ window.__fcState=function(){
+      function drawingOf(id){ var d=null; try{ (drawMgr.getAllDrawings()||[]).forEach(function(x){ if(x.id===id) d=x; }); }catch(e){} return d; }
+      var firstId=(userForecasts[0]&&userForecasts[0].drawingId)||(fcDraft&&fcDraft.id);
+      var d0=firstId?drawingOf(firstId):null;
+      var d0prices=d0&&d0.anchors?d0.anchors.map(function(a){ return Math.round(a.price); }):null;
+      var d0px=d0&&d0.anchors?d0.anchors.map(function(a){ return anchorPx(a); }):null;
+      return { forecasts:userForecasts.map(function(r){ return {name:r.name, pts:(r.anchors||[]).length, drawingId:r.drawingId, prices:(function(){ var dd=drawingOf(r.drawingId); return dd&&dd.anchors?dd.anchors.map(function(a){return Math.round(a.price);}):null; })()}; }),
+      firstDrawingId:firstId, d0prices:d0prices, d0px:d0px,
+      scenIds:SCENARIOS.filter(function(s){return s.group==='myfc';}).map(function(s){return s.id;}),
+      drawTool:drawTool, draft:fcDraft?{id:fcDraft.id, pts:fcDraft.anchors.length}:null, injectShown:!!(fcInjectBtn&&fcInjectBtn.classList.contains('show')),
+      saveShown:!!(fcSaveBtn&&fcSaveBtn.classList.contains('show')), srVisible:fcSRVisible(), srInRange:fcSRVisible()?fcSRInRange().length:0,
+      dualSoon:(SCENARIOS.filter(function(s){return s.id==='dual-horizon';})[0]||{}).soon, dualLast:(SCENARIOS[SCENARIOS.length-1]||{}).id }; }; }catch(e){} }
+
   var _measCtx=null;   // shared canvas for shrink-to-fit text measurement
   function measureTagPx(s,size){ if(!_measCtx) _measCtx=document.createElement('canvas').getContext('2d'); _measCtx.font='700 '+size+'px -apple-system,system-ui,sans-serif'; return _measCtx.measureText(s).width; }
   function positionLiveTag(){ if(!liveTag) liveTag=document.getElementById('wk-livetag'); if(!liveTag) return;
