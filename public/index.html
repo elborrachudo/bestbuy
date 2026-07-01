@@ -3147,7 +3147,7 @@
     var present=0, added=[];
     syms.forEach(function(sym){ var tk=tokenForSym(sym); if(!tk) return; var data=scoreSeriesData(tk.id); if(!data.length) return; present++;
       var col=ASSET_COLORS[sym]||'#5eead4';
-      if(!scoreSeries[sym]){ var s; try{ s=chart.addSeries(L.LineSeries,{color:(doAnim?scoreAlpha(col,0):col),lineWidth:2,priceScaleId:SCORE_SCALE,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false},0); }catch(e){ return; }
+      if(!scoreSeries[sym]){ var s; try{ s=chart.addSeries(L.LineSeries,{color:(doAnim?scoreAlpha(col,0):col),lineWidth:1,lineStyle:((L.LineStyle&&L.LineStyle.Dotted)||1),priceScaleId:SCORE_SCALE,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false},0); }catch(e){ return; }
         try{ chart.priceScale(SCORE_SCALE).applyOptions({visible:false,scaleMargins:{top:0.1,bottom:0.1}}); }catch(e){}   // own INVISIBLE 0–100 scale
         scoreSeries[sym]={series:s,color:col}; added.push(sym); }
       try{ scoreSeries[sym].series.setData(data); }catch(e){} });
