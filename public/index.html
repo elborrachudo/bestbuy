@@ -461,6 +461,16 @@
   .wk-ov-chev{font-size:9px;line-height:1;flex:0 0 auto;transition:transform .15s ease;}
   .wk-ov-group.collapsed .wk-ov-chev{transform:rotate(-90deg);}   /* ▾ open → ▸ collapsed */
   .wk-ov-group.collapsed .wk-ov-body{display:none;}
+  /* Phase VI(b): Score toggle (bottom of the "+" menu) + pillar cluster (reuse Screen A engine) */
+  .wk-ov-scorewrap{border-top:1px solid #16323b;margin-top:5px;padding-top:4px;}
+  .wk-ov-score{font-size:11.5px;color:#cfe7ec;padding:7px 9px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .wk-ov-score:hover{background:rgba(45,212,191,.10);}
+  .wk-ov-score.on{background:rgba(45,212,191,.16);}
+  .wk-ov-score.on .wk-ov-chk{background:#5eead4;border-color:#5eead4;}
+  .wk-ov-pillars{display:flex;align-items:center;gap:6px;padding:2px 9px 6px;}
+  .wk-ov-pilllbl{font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:#6f9aa2;margin-right:2px;}
+  .wk-ov-pill{width:26px;height:24px;border:1px solid #1a3a44;background:#0e242c;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:13px;padding:0;transition:color .15s,border-color .15s,opacity .15s;opacity:.5;}
+  .wk-ov-pill.on{opacity:1;border-color:#2f6d63;background:rgba(45,212,191,.08);}
   /* Accumulation / Distribution toggles */
   .wk-ad-wrap{position:relative;display:inline-flex;}
   .wk-ad-menu{width:184px;right:auto;left:0;}
@@ -1946,6 +1956,16 @@
   document.getElementById('report-back').onclick=function(e){ if(e.target===this) closeReport(); };
   document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeReport(); });
 
+  // Phase VI(b): expose the SCORING ENGINE for Screen B to reuse (same `state` object → shared
+  // pillars; blendRow/percentile identical → chart score == dashboard score). Not a fork.
+  try{ window.WAKA_SCORE = {
+    state: state, PILLAR_DEFS: PILLAR_DEFS, PILLAR_W: PILLAR_W,
+    blendRow: blendRow, tokenSortedScores: tokenSortedScores, percentileOf: percentileOf,
+    // when Screen B toggles a pillar it mutates the shared state.pillars, then calls this so
+    // Screen A's own views stay consistent (harmless while A is hidden).
+    onExternalPillarChange: function(){ try{ renderPillars(); renderChart(); renderRankList(); }catch(e){} }
+  }; }catch(e){}
+
   load();
 })();
 </script>
@@ -3076,10 +3096,67 @@
     try{ chart.priceScale(scaleId).applyOptions({visible:false,scaleMargins:{top:0.08,bottom:0.08}}); }catch(e){}   // own INVISIBLE scale → doesn't distort the base price axis ("new price scale")
     overlays[id]={series:s,color:color,scaleId:scaleId};
     fetchOverlayData(id, function(pts){ try{ s.setData(pts); }catch(e){} });
-    saveOvState(); refreshOvUI(); }
-  function removeOverlay(id){ var o=overlays[id]; if(!o) return; try{ chart.removeSeries(o.series); }catch(e){} delete overlays[id]; saveOvState(); refreshOvUI(); }
+    saveOvState(); refreshOvUI(); if(scoreOn && id.indexOf('asset:')===0) refreshScoreLines(true); }
+  function removeOverlay(id){ var o=overlays[id]; if(!o) return; try{ chart.removeSeries(o.series); }catch(e){} delete overlays[id]; saveOvState(); refreshOvUI(); if(scoreOn && id.indexOf('asset:')===0) refreshScoreLines(false); }
   function setOverlayColor(id, color){ var o=overlays[id]; if(!o) return; o.color=color; try{ o.series.applyOptions({color:color}); }catch(e){} saveOvState(); refreshOvUI(); }
   function toggleOverlay(id){ if(overlays[id]) removeOverlay(id); else addOverlay(id); }
+
+  // ── Phase VI(b): SCORE overlay — reuses Screen A's engine (window.WAKA_SCORE). One master toggle
+  //   at the bottom of the "+" menu draws a percentile (0–100) line — SAME metric as the dashboard
+  //   chart (blendRow → tokenSortedScores → percentileOf) — for every CHARTED asset that maps to a
+  //   tracked token WITH readings. Non-scored assets draw nothing (honest-empty). Own invisible
+  //   scale → never distorts the price axis. Animates in/out over 0.5s. ────────────────────────────
+  var scoreOn=false, scoreSeries={}, SCORE_SCALE='wk_score', _scoreRetry=0, _scoreHintShown=false;
+  function loadScoreOn(){ try{ return localStorage.getItem('wk_score_on')==='1'; }catch(e){ return false; } }
+  function saveScoreOn(v){ try{ localStorage.setItem('wk_score_on', v?'1':'0'); }catch(e){} }
+  function scoreEngine(){ return window.WAKA_SCORE||null; }
+  function chartedAssetSyms(){ var out=[ASSET]; Object.keys(overlays).forEach(function(id){ if(id.indexOf('asset:')===0) out.push(id.slice(6)); });
+    return out.filter(function(v,i,a){ return a.indexOf(v)===i; }); }
+  function tokenForSym(sym){ var e=scoreEngine(); if(!e||!e.state||!e.state.tokens) return null;
+    for(var i=0;i<e.state.tokens.length;i++){ if(e.state.tokens[i].symbol===sym) return e.state.tokens[i]; } return null; }
+  // percentile series for a token (one point/day, matches Screen A's chart line exactly)
+  function scoreSeriesData(tid){ var e=scoreEngine(); if(!e) return []; var rows=(e.state.readingsByToken||{})[tid]||[]; if(!rows.length) return [];
+    var sorted=e.tokenSortedScores(tid), byDay={};
+    rows.forEach(function(r){ var abs=e.blendRow(r); if(abs==null) return; var pct=e.percentileOf(sorted, abs); if(pct==null) return;
+      byDay[new Date(r.fetched_at).toISOString().slice(0,10)]=Math.round(pct*10)/10; });
+    return Object.keys(byDay).sort().map(function(d){ return {time:d, value:byDay[d]}; }); }
+  function scoreAlpha(hex,a){ var n=parseInt(String(hex).replace('#',''),16); return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
+  function scoreHint(on){ if(on && !_scoreHintShown){ _scoreHintShown=true; try{ notify('Score on — no score for current assets'); }catch(e){} } if(!on) _scoreHintShown=false; }
+  function refreshScoreLines(doAnim){ if(!chart) return;
+    var syms=chartedAssetSyms();
+    // drop lines for assets no longer charted (or when score is off / intraday)
+    var keep=(scoreOn && !isIntra());
+    Object.keys(scoreSeries).forEach(function(sym){ if(!keep || syms.indexOf(sym)<0){ try{ chart.removeSeries(scoreSeries[sym].series); }catch(e){} delete scoreSeries[sym]; } });
+    if(!keep){ scoreHint(false); return; }
+    var present=0, added=[];
+    syms.forEach(function(sym){ var tk=tokenForSym(sym); if(!tk) return; var data=scoreSeriesData(tk.id); if(!data.length) return; present++;
+      var col=ASSET_COLORS[sym]||'#5eead4';
+      if(!scoreSeries[sym]){ var s; try{ s=chart.addSeries(L.LineSeries,{color:(doAnim?scoreAlpha(col,0):col),lineWidth:2,priceScaleId:SCORE_SCALE,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false},0); }catch(e){ return; }
+        try{ chart.priceScale(SCORE_SCALE).applyOptions({visible:false,scaleMargins:{top:0.1,bottom:0.1}}); }catch(e){}   // own INVISIBLE 0–100 scale
+        scoreSeries[sym]={series:s,color:col}; added.push(sym); }
+      try{ scoreSeries[sym].series.setData(data); }catch(e){} });
+    if(doAnim && added.length){ animate('scoreFade', ANIM_MS, function(e){ added.forEach(function(sym){ if(scoreSeries[sym]){ try{ scoreSeries[sym].series.applyOptions({color:scoreAlpha(scoreSeries[sym].color,e)}); }catch(_){}} }); },
+      function(){ added.forEach(function(sym){ if(scoreSeries[sym]){ try{ scoreSeries[sym].series.applyOptions({color:scoreSeries[sym].color}); }catch(_){}} }); }); }
+    // honest-empty vs engine-not-loaded-yet: retry a few times while data is still fetching
+    var e2=scoreEngine();
+    if(present===0){ if(e2&&e2.state&&e2.state.tokens&&e2.state.tokens.length){ scoreHint(true); } else if(_scoreRetry<6){ _scoreRetry++; setTimeout(function(){ if(scoreOn) refreshScoreLines(false); }, 700); } }
+    else { scoreHint(false); _scoreRetry=0; } }
+  function setScore(on){ scoreOn=on; saveScoreOn(on); _scoreRetry=0;
+    if(on){ refreshScoreLines(true); }
+    else { var keys=Object.keys(scoreSeries);
+      if(keys.length){ animate('scoreFade', ANIM_MS, function(e){ keys.forEach(function(sym){ if(scoreSeries[sym]){ try{ scoreSeries[sym].series.applyOptions({color:scoreAlpha(scoreSeries[sym].color,1-e)}); }catch(_){}} }); },
+        function(){ keys.forEach(function(sym){ if(scoreSeries[sym]){ try{ chart.removeSeries(scoreSeries[sym].series); }catch(_){}} delete scoreSeries[sym]; }); }); }
+      scoreHint(false); }
+    refreshOvUI(); rebuildOvIfOpen(); }
+  function onPillarToggle(key){ var e=scoreEngine(); if(!e||!e.state||!e.state.pillars) return;
+    e.state.pillars[key]=!e.state.pillars[key];                       // SHARED state (not a fork)
+    try{ if(e.onExternalPillarChange) e.onExternalPillarChange(); }catch(_){}   // keep Screen A consistent
+    if(scoreOn) refreshScoreLines(false);                             // recompute percentile → lines shift
+    rebuildOvIfOpen(); }
+  function rebuildOvIfOpen(){ var m=document.getElementById('wk-ovMenu'); var s=document.getElementById('wk-ovSrch');
+    if(m&&m.classList.contains('open')) buildOvList(s?s.value:''); }
+  function restoreScore(){ scoreOn=loadScoreOn(); if(scoreOn) refreshScoreLines(true); }
+  try{ window.__scoreState=function(){ return { on:scoreOn, syms:Object.keys(scoreSeries) }; }; }catch(e){}   // read-only test/debug snapshot
 
   // load a coin's daily series (market_history), compute MAs over it, join BTC's mayer/pct/phase by
   // date (the cycle indicators + phases stay BTC-relative — the thesis), cache it.
@@ -3111,6 +3188,7 @@
       updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators(); rebuildMaLayers();
       setRangeDays(coin==='BTC'?90:0);   // coin → fit its full history; BTC → 90D default
       refreshAssetUI(); positionLiveTag(); positionTitles();
+      if(scoreOn) refreshScoreLines(true);   // Phase VI(b): score follows the main asset
     }); }
 
   // ── menu rendering + search ───────────────────────────────────────────────────────────────────
@@ -3155,7 +3233,23 @@
     var aRows=[]; ASSET_LIST.forEach(function(a){ var id='asset:'+a.sym, label=a.sym; if(filter && label.toLowerCase().indexOf(filter)<0) return; aRows.push(ovRow(id,label,ovDefColor(id))); });
     group('assets','Assets (own scale)', aRows);
     var sRows=[]; OV_SERIES.forEach(function(s){ if(filter && s.label.toLowerCase().indexOf(filter)<0) return; sRows.push(ovRow(s.id,s.label,s.color)); });
-    group('series','Series (own axis)', sRows); }
+    group('series','Series (own axis)', sRows);
+    // Phase VI(b): Score master toggle at the very bottom + pillar cluster (shared scoring engine).
+    if(!filter){ var foot=document.createElement('div'); foot.className='wk-ov-scorewrap';
+      var sr=document.createElement('div'); sr.className='wk-ov-score'+(scoreOn?' on':''); sr.id='wk-ovScore';
+      sr.innerHTML='<span class="wk-ov-chk">'+(scoreOn?'✓':'')+'</span><span class="wk-ov-nm">Score (0–100 percentile)</span>';
+      sr.onclick=function(){ setScore(!scoreOn); };
+      foot.appendChild(sr);
+      var e=scoreEngine();
+      if(e && e.PILLAR_DEFS){ var pc=document.createElement('div'); pc.className='wk-ov-pillars';
+        var lbl=document.createElement('span'); lbl.className='wk-ov-pilllbl'; lbl.textContent='Pillars'; pc.appendChild(lbl);
+        e.PILLAR_DEFS.forEach(function(p){ var on=!!e.state.pillars[p.key];
+          var b=document.createElement('button'); b.className='wk-ov-pill'+(on?' on':''); b.dataset.pk=p.key; b.title=p.key.charAt(0).toUpperCase()+p.key.slice(1);
+          b.innerHTML='<i class="ti '+p.icon+'"></i>'; b.style.color=on?p.on:p.off;
+          b.onclick=function(ev){ ev.stopPropagation(); onPillarToggle(p.key); };
+          pc.appendChild(b); });
+        foot.appendChild(pc); }
+      host.appendChild(foot); } }
 
   function initAssetSelector(){
     var aBtn=document.getElementById('wk-assetBtn'), aMenu=document.getElementById('wk-assetMenu'), aSrch=document.getElementById('wk-assetSrch');
@@ -3170,6 +3264,7 @@
     document.addEventListener('click', function(){ if(aMenu) aMenu.classList.remove('open'); if(oMenu) oMenu.classList.remove('open'); });
     // restore persisted overlays (asset restore happens in render once data is ready)
     var ov=loadOvState(); Object.keys(ov).forEach(function(id){ addOverlay(id, ov[id].color); });
+    restoreScore();   // Phase VI(b): restore persisted Score toggle (retries until engine data is ready)
     refreshOvUI();
   }
 
