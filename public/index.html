@@ -465,8 +465,13 @@
   .wk-rk-num{width:18px;height:18px;border-radius:50%;background:#08161b;border:1px solid #2f6d63;font-size:10px;display:inline-flex;align-items:center;justify-content:center;color:#7fd9c9;flex:0 0 auto;}
   .wk-rk-soon{margin-left:auto;font-size:9px;text-transform:uppercase;letter-spacing:.05em;color:#6f9aa2;border:1px solid #2a4a52;border-radius:999px;padding:1px 6px;}
   /* rocket menu — same "+"-style fit: wide enough for one-line full labels, collapsible groups */
-  #wk-rocketMenu.wk-rocket-menu{width:300px;max-width:calc(100vw - 16px);}   /* ID beats .wk-rocket-menu(236px); long labels never wrap/cut; clamped on mobile */
-  .wk-rk-nm{flex:1;white-space:nowrap;}
+  #wk-rocketMenu.wk-rocket-menu{width:334px;max-width:calc(100vw - 16px);}   /* ID beats .wk-rocket-menu(236px); one line per row incl. toggle chips; clamped on mobile */
+  .wk-rk-nm{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  /* FIX 2: per-scenario squiggle/hybrid toggle chips */
+  .wk-rk-toggles{margin-left:auto;display:inline-flex;gap:4px;flex:0 0 auto;}
+  .wk-rk-chip{font-size:9.5px;text-transform:uppercase;letter-spacing:.02em;color:#7fa6ad;border:1px solid #2a4a52;background:transparent;border-radius:999px;padding:2px 7px;cursor:pointer;line-height:1.35;font-family:inherit;}
+  .wk-rk-chip:hover{border-color:#3a6b74;color:#cfe7ec;}
+  .wk-rk-chip.on{background:rgba(94,234,212,.2);border-color:#2f8b7d;color:#5eead4;font-weight:600;}
   .wk-rk-dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 1px rgba(0,0,0,.35) inset;}
   #wk-rkList .wk-ov-group{margin-top:2px;}
   #wk-rkList .wk-ov-body{padding-top:1px;}
@@ -2425,8 +2430,8 @@
     var n=ACTIVE.length, i0=0, i1=n-1; if(lr){ i0=Math.max(0,Math.floor(lr.from)); i1=Math.min(n-1,Math.ceil(lr.to)); }
     var mn=Infinity, mx=-Infinity;
     for(var i=i0;i<=i1;i++){ var d=ACTIVE[i]; if(!d) continue; var lo=(d.low!=null?d.low:d.close), hi=(d.high!=null?d.high:d.close); if(lo!=null&&lo<mn)mn=lo; if(hi!=null&&hi>mx)mx=hi; }
-    if(scenSeries && scenData && scenData.length){ var w=null; try{ w=visibleEpochRange(); }catch(e){}
-      scenData.forEach(function(p){ var e=toEpoch(p.time); if(w==null || (e>=w.from && e<=w.to)){ var lo=(p.low!=null?p.low:p.close), hi=(p.high!=null?p.high:p.close); if(lo!=null&&lo<mn)mn=lo; if(hi!=null&&hi>mx)mx=hi; } }); }
+    if(anyLayer()){ var w=null; try{ w=visibleEpochRange(); }catch(e){}   // union EVERY active projection layer
+      Object.keys(scenLayers).forEach(function(key){ (scenLayers[key].data||[]).forEach(function(p){ var e=toEpoch(p.time); if(w==null || (e>=w.from && e<=w.to)){ var lo=(p.low!=null?p.low:(p.value!=null?p.value:p.close)), hi=(p.high!=null?p.high:(p.value!=null?p.value:p.close)); if(lo!=null&&lo<mn)mn=lo; if(hi!=null&&hi>mx)mx=hi; } }); }); }
     var dr=visibleDrawingRange(); if(dr){ if(dr.minValue<mn)mn=dr.minValue; if(dr.maxValue>mx)mx=dr.maxValue; }
     if(mn===Infinity||mx===-Infinity||!(mx>mn)) return null; if(!(mn>0)) mn=Math.max(1e-9, mx*1e-6);   // LOG needs positive
     return {min:mn, max:mx}; }
@@ -3395,7 +3400,7 @@
   function applyAsset(coin){ if(!chart) return; var menu=document.getElementById('wk-assetMenu'); if(menu) menu.classList.remove('open');
     if(coin===ASSET){ return; }
     loadAssetDaily(coin, function(){
-      try{ clearScenario(); }catch(e){}   // a projection is BTC/1D-specific — drop it on asset change
+      try{ clearScenLayers(true); }catch(e){}   // projections are BTC/1D-specific — hide them but KEEP the toggle state so they return on the way back
       ASSET=coin; try{ sessionStorage.setItem('wk_asset', coin); }catch(e){}
       var lab=document.getElementById('wk-assetLabel'); if(lab) lab.textContent=coin;
       var area2=document.getElementById('wk-assetBtn'); if(area2) area2.title=coin;
@@ -3410,6 +3415,7 @@
       setRangeDays(coin==='BTC'?90:0);   // coin → fit its full history; BTC → 90D default
       refreshAssetUI(); positionLiveTag(); positionTitles();
       if(scoreOn) refreshScoreLines(true);   // Phase VI(b): score follows the main asset
+      if(coin==='BTC' && CSIZE==='1D'){ try{ restoreScenLayers(); }catch(e){} }   // back on BTC/1D → re-render persisted projection layers
     }); }
 
   // ── menu rendering + search ───────────────────────────────────────────────────────────────────
@@ -3497,18 +3503,22 @@
     {id:'stretch', n:3, name:'Cycle Stretch-Fit', group:'engine', soon:true},
     {id:'meanrev', n:4, name:'Mean-Reversion (200W/Mayer)', group:'engine', soon:true},
     {id:'quantile', n:5, name:'Quantile Scenario Bands', group:'engine', soon:true},
-    // — Group A · CredibleCrypto (as drawn) — clean schematic LINES faithful to his hand-drawn view —
-    {id:'cc-bull', name:'Bullish — vertical, top ~2026', label:'CredibleCrypto (as drawn) · line', group:'credible', kind:'line', dot:'#22c55e', color:'34,197,94', soon:false},
-    {id:'cc-bal',  name:'Balanced — dip 64k, top ~2028',  label:'CredibleCrypto (as drawn) · line', group:'credible', kind:'line', dot:'#3b82f6', color:'59,130,246', soon:false},
-    {id:'cc-bear', name:'Bearish — deep 21k, top ~2030',  label:'CredibleCrypto (as drawn) · line', group:'credible', kind:'line', dot:'#f43f5e', color:'244,63,94', soon:false},
-    // — Group B · Hybrid (realistic, data-anchored) — synthetic DAILY CANDLES, algorithmic (NOT his view) —
-    {id:'hy-bull', name:'Bullish (hybrid)',  label:'Hybrid (realistic) · daily candles', group:'hybrid', kind:'candle', dot:'#22c55e', color:'34,197,94', soon:false},
-    {id:'hy-bal',  name:'Balanced (hybrid)', label:'Hybrid (realistic) · daily candles', group:'hybrid', kind:'candle', dot:'#3b82f6', color:'59,130,246', soon:false},
-    {id:'hy-bear', name:'Bearish (hybrid)',  label:'Hybrid (realistic) · daily candles', group:'hybrid', kind:'candle', dot:'#f43f5e', color:'244,63,94', soon:false},
+    // — CredibleCrypto (as drawn) — ONE row per scenario with independent [squiggle]/[hybrid] toggles —
+    {id:'cc-bull', name:'Bullish · vertical ~2026', label:'CredibleCrypto (as drawn)', group:'credible', layers:true, dot:'#22c55e', color:'34,197,94', soon:false},
+    {id:'cc-bal',  name:'Balanced · 64k → ~2028',   label:'CredibleCrypto (as drawn)', group:'credible', layers:true, dot:'#3b82f6', color:'59,130,246', soon:false},
+    {id:'cc-bear', name:'Bearish · 21k → ~2030',    label:'CredibleCrypto (as drawn)', group:'credible', layers:true, dot:'#f43f5e', color:'244,63,94', soon:false},
     // — Dual-Horizon: disabled (moved to the end, greyed) — builder kept in SCEN_BUILDERS, revisit later —
     {id:'dual-horizon', n:1, name:'Dual-Horizon Heuristic', label:'Trend + vol bootstrap', group:'engine', soon:true}];
   var HORIZON={ tf:'1D', endDate:'2036-07-01' };   // 1D → summer 2036 (only active horizon for now)
-  var scenSeries=null, activeScenario=null, scenAnim=null, scenData=null, scenKK=null;   // scenKK = candles drawn so far (for the reverse close)
+  // FIX 2 — multi-layer projection manager. Each scenario has two independent overlay layers
+  // (squiggle=line, hybrid=candles); several can be on at once; the on/off state persists.
+  var scenLayers={}, scenLastBase=null, scenLastLayer=null;   // key 'baseId|layer' -> {baseId,layer,series,data,kk,anim,kind,name}
+  var SCEN_LAYER_KEY='wk_scenario_layers';
+  function layerKey(b,l){ return b+'|'+l; }
+  function anyLayer(){ return Object.keys(scenLayers).length>0; }
+  function loadScenLayerState(){ try{ return JSON.parse(localStorage.getItem(nsKey(SCEN_LAYER_KEY))||'{}')||{}; }catch(e){ return {}; } }
+  function setScenLayerState(key,on){ var st=loadScenLayerState(); if(on) st[key]=true; else delete st[key]; try{ localStorage.setItem(nsKey(SCEN_LAYER_KEY), JSON.stringify(st)); }catch(e){} }
+  function isScenLayerOn(key){ return !!scenLayers[key] || !!loadScenLayerState()[key]; }
   function rocketUnlocked(){ try{ return sessionStorage.getItem('wk_rocket_ok')==='1'; }catch(e){ return false; } }
   function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; var t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
   function daysBetween(a,b){ return Math.round((Date.parse(b+'T00:00:00Z')-Date.parse(a+'T00:00:00Z'))/86400000); }
@@ -3556,7 +3566,7 @@
   // Group B ("hybrid"): realistic synthetic DAILY CANDLES to the SAME destinations/timing, with
   // intra-trend corrections, reaccumulation/base, and a volatile distribution top. Group B is my
   // algorithmic interpretation — NOT his view, NOT advice. Both reuse the Dual-Horizon micro machinery.
-  var CC={ TOP_LO:180000, TOP_HI:300000, TOP_MID:230000, P0:126000, P50:64000, P85:21000, FLOOR:3000 };
+  var CC={ TOP_LO:180000, TOP_HI:300000, TOP_MID:230000, P0:126414, P50:64676, P85:21458, FLOOR:3128 };   // exact fib levels he marked
   function scenBase(){ var src=(tierCache.daily||[]).filter(function(d){ return d.c>0; });
     if(src.length<400) return null; var lastDate=src[src.length-1].t, last=src[src.length-1].c; return {src:src, lastDate:lastDate, last:last}; }
   function seqWP(a){ for(var i=1;i<a.length;i++){ if(!(a[i].t>a[i-1].t)) a[i].t=addDaysStr(a[i-1].t,20); } return a; }   // enforce strictly-increasing dates
@@ -3565,62 +3575,66 @@
       var d0=daysBetween(A.t,B.t); if(d0<1)d0=1; var la=Math.log(A.price), lb=Math.log(B.price);
       for(var k=(i===0?0:1);k<=d0;k++){ var e=k/d0, s=e*e*(3-2*e); out.push({time:addDaysStr(A.t,k), value:Math.exp(la+(lb-la)*s)}); } }
     return out; }
-  // volatile distribution top: alternate hi/lo inside [TOP_LO,TOP_HI] over ~months (double / triple tops)
-  function distribWP(startT, months, rnd){ var pts=[], base=startT, seq=[CC.TOP_HI, CC.TOP_LO+15000, CC.TOP_HI-25000, CC.TOP_LO+30000, CC.TOP_MID], step=Math.max(20,Math.round(months*30/seq.length));
-    for(var i=0;i<seq.length;i++){ base=addDaysStr(base, step); var jit=rnd?(0.92+rnd()*0.16):1; pts.push({t:base, price:Math.round(seq[i]*jit)}); } return pts; }
-  function ccWaypoints(){ var b=scenBase(); if(!b) return null; var D=b.lastDate, last=b.last;
-    function fut(dabs,minD){ var c=addDaysStr(D,minD); return dabs>c?dabs:c; }   // later of an absolute target date and D+minDays → always projects forward
-    // shared milestone dates (destinations/timing identical across Group A and Group B)
-    var bullTop=fut('2026-12-01',300),
-        balDip=fut('2027-01-01',210), balLat=fut('2027-10-01',520), balTop=fut('2028-06-01',720),
-        bearBot=fut('2027-02-01',240), bearBase=fut('2029-03-01',980), bearTop=fut('2030-01-01',1300);
-    var A={}, B={};
-    // ---- Group A — clean schematic lines ----
-    A.bull=[{t:D,price:last},{t:bullTop,price:CC.TOP_MID}].concat(distribWP(bullTop,9));
-    A.bal =[{t:D,price:last},{t:balDip,price:CC.P50},{t:balLat,price:Math.round(CC.P50*1.05)},{t:balTop,price:CC.TOP_MID}].concat(distribWP(balTop,9));
-    A.bear=[{t:D,price:last},{t:bearBot,price:CC.P85},{t:bearBase,price:Math.round(CC.P85*1.4)},{t:bearTop,price:CC.TOP_MID}].concat(distribWP(bearTop,9));
-    // ---- Group B — same destinations + realistic corrections / base ----
-    B.bull=[{t:D,price:last},
-      {t:fut('2026-02-01',90),price:Math.round(last*1.5)},
-      {t:fut('2026-04-01',150),price:Math.round(last*1.5*0.68)},   // ~-32% pullback
-      {t:fut('2026-08-01',210),price:CC.TOP_LO},
-      {t:fut('2026-10-01',260),price:Math.round(CC.TOP_LO*0.72)},  // ~-28% pullback
-      {t:bullTop,price:CC.TOP_MID}].concat(distribWP(bullTop,10,mulberry32(0xB1B1)));
-    B.bal=[{t:D,price:last},
-      {t:fut('2026-09-01',150),price:Math.round(CC.P50*1.18)},
-      {t:balDip,price:CC.P50},                                     // reach 50% fib (~64k)
-      {t:fut('2027-06-01',380),price:Math.round(CC.P50*1.1)},      // multi-month lateral base
-      {t:balLat,price:Math.round(CC.P50*0.94)},
-      {t:balTop,price:CC.TOP_MID}].concat(distribWP(balTop,10,mulberry32(0xB2B2)));
-    B.bear=[{t:D,price:last},
-      {t:fut('2026-10-01',170),price:CC.P50},                      // step down through 50%
-      {t:bearBot,price:CC.P85},                                    // capitulation to ~21k (85% fib)
-      {t:fut('2027-11-01',430),price:Math.round(CC.P85*1.35)},     // long base
-      {t:fut('2028-09-01',700),price:Math.round(CC.P85*1.1)},
-      {t:bearBase,price:Math.round(CC.P85*1.7)},
-      {t:bearTop,price:CC.TOP_MID}].concat(distribWP(bearTop,10,mulberry32(0xB3B3)));
-    return {A:A, B:B, base:b}; }
-  function ccLine(which){ var w=ccWaypoints(); if(!w||!w.A[which]) return null;
-    return interpWP(w.A[which]).map(function(p){ return {time:p.time, value:p.value, close:p.value}; }); }   // close → picked up by the fit union
-  function ccCandles(which, colorRGB, seed){ var w=ccWaypoints(); if(!w||!w.B[which]) return null;
-    var macro=interpWP(w.B[which]), src=w.base.src;
-    var rwin=Math.min(365, src.length-1), rr=[]; for(var k=src.length-rwin;k<src.length;k++){ var s=src[k]; if(s.h>0&&s.l>0&&s.c>0) rr.push((s.h-s.l)/s.c); }
-    var avgRange=rr.length?(rr.reduce(function(a,b){return a+b;},0)/rr.length):0.04;
-    var rnd=mulberry32(seed), N=macro.length, out=[], prevClose=w.base.last;
-    for(var t=0;t<N;t++){ var m=macro[t].value, noise=(rnd()-0.5)*2*avgRange*0.9, close=m*Math.exp(noise); if(close<=0) close=prevClose*0.95;
-      var open=prevClose, rng=close*avgRange*(0.5+rnd()); var hi=Math.max(open,close)+rng*0.6, lo=Math.min(open,close)-rng*0.6; if(lo<=0) lo=Math.min(open,close)*0.9;
+  // volatile distribution top: oscillate around `mid` (the scenario's top), clamped to the 180-300k zone
+  function distribWP(startT, months, rnd, mid){ mid=mid||CC.TOP_MID; var seq=[mid*1.18, mid*0.9, mid*1.12, mid*0.85, mid], base=startT, step=Math.max(20,Math.round(months*30/seq.length)), pts=[];
+    for(var i=0;i<seq.length;i++){ base=addDaysStr(base, step); var jit=rnd?(0.94+rnd()*0.12):1; pts.push({t:base, price:Math.max(150000,Math.min(305000,Math.round(seq[i]*jit)))}); } return pts; }
+  // jagged/serrated segment between lo↔hi across [startT,endT] — for the balanced lateral base & the bearish base
+  function serrated(startT, endT, lo, hi, n, rnd){ var out=[], d0=daysBetween(startT,endT); if(d0<n)d0=n;
+    for(var i=1;i<=n;i++){ var t=addDaysStr(startT, Math.round(d0*i/n)), band=(i%2? hi:lo), jit=rnd?(0.9+rnd()*0.2):1; out.push({t:t, price:Math.round(band*jit)}); } return out; }
+  // FIX 1 — FAITHFUL to CredibleCrypto's drawn squiggles: each scenario has its OWN shape/levels/timing.
+  function ccWP(which){ var b=scenBase(); if(!b) return null; var D=b.lastDate, last=b.last;
+    function fut(dabs,minD){ var c=addDaysStr(D,minD); return dabs>c?dabs:c; }
+    if(which==='bull'){ var top=fut('2026-07-01',120);   // 🟢 near-vertical, IMMEDIATE, tops MID-2026 (short) — no correction
+      return [{t:D,price:last},{t:top,price:230000}].concat(distribWP(top,6,null,230000)); }
+    if(which==='bal'){ var dip=fut('2026-08-01',80), latEnd=fut('2027-11-01',560), top=fut('2028-05-01',730);   // 🔵 soft dip → serrated lateral 60-70k → steep LATE rise ~2028
+      var wp=[{t:D,price:last},{t:dip,price:CC.P50}];
+      wp=wp.concat(serrated(dip, latEnd, 60000, 70000, 8, mulberry32(0xBA1)));
+      wp.push({t:top,price:200000});
+      return wp.concat(distribWP(top,7,mulberry32(0xBA2),200000)); }
+    if(which==='bear'){ var bot=fut('2026-09-01',150), baseEnd=fut('2029-06-01',1120), top=fut('2030-03-01',1350);   // 🔴 deep to 21k → LONG jagged base 21-40k → latest, steepest rise ~2030
+      var wp=[{t:D,price:last},{t:bot,price:CC.P85}];
+      wp=wp.concat(serrated(bot, baseEnd, 21000, 40000, 12, mulberry32(0xBE1)));
+      wp.push({t:top,price:235000});
+      return wp.concat(distribWP(top,7,mulberry32(0xBE2),235000)); }
+    return null; }
+  function ccLine(which){ var wp=ccWP(which); if(!wp) return null;
+    return interpWP(wp).map(function(p){ return {time:p.time, value:p.value, close:p.value}; }); }   // squiggle = faithful clean line (close → picked up by the fit union)
+  // FIX 3 — historical-ANALOG hybrid: lay CONTIGUOUS blocks of real BTC daily log-returns along the macro
+  // path (trend/consolidation/vol-clustering, not IID noise). Reuses the buildDualHorizon bootstrap idea.
+  function analogCandles(macro, colorRGB, seed){ if(!macro||!macro.length) return null; var b=scenBase(); if(!b) return null; var src=b.src;
+    var closes=src.map(function(d){return d.c;}), R=[], HL=[];
+    for(var i=1;i<src.length;i++){ if(closes[i]>0&&closes[i-1]>0){ R.push(Math.log(closes[i]/closes[i-1])); var s=src[i]; HL.push((s.h>0&&s.l>0&&s.c>0)?(s.h-s.l)/s.c:0.04); } }
+    if(R.length<200) return null;
+    var srAll=fcSRLevels(), rnd=mulberry32(seed||0x1234), N=macro.length, out=[], prevClose=macro[0].value, dev=0, bi=0, blockLeft=0;
+    function newBlock(){ bi=Math.floor(rnd()*Math.max(1,R.length-95)); blockLeft=30+Math.floor(rnd()*60); }   // contiguous 30-90-day real segment
+    newBlock();
+    for(var t=0;t<N;t++){ if(blockLeft<=0 || bi>=R.length) newBlock();
+      var r=R[bi], hl=HL[bi]; bi++; blockLeft--;
+      dev=dev*0.975 + r; if(dev>0.5)dev=0.5; if(dev<-0.5)dev=-0.5;   // OU-like accumulation of REAL contiguous returns → impulses/corrections/bases, kept bounded
+      var m=macro[t].value, near=fcNearestSR(m, srAll), mag=0, extra=0, fbreak=0;
+      if(near){ var dist=Math.abs(m-near)/near; if(dist<0.08){ var pull=(1-dist/0.08); mag=(near-m)*0.5*pull; extra=hl*0.8*pull; if(rnd()<0.08*pull) fbreak=(rnd()<0.5?-1:1)*hl*1.9*near*pull; } }   // S/R magnet + tests + false break (never a clean V AT levels)
+      var close=(m*Math.exp(dev)+mag); if(close<=0) close=prevClose*0.95; close=close*0.7 + m*0.3;   // tether so texture rides the drawn macro, doesn't wander off
+      var open=prevClose, rng=close*(hl*(0.7+rnd()*0.6)+extra);
+      var hi=Math.max(open,close)+rng*0.55+Math.max(0,fbreak), lo=Math.min(open,close)-rng*0.55+Math.min(0,fbreak); if(lo<=0) lo=Math.min(open,close)*0.9;
       var alpha=Math.max(0.1, 0.9-0.78*(t/N)), col='rgba('+colorRGB+','+alpha.toFixed(3)+')';
       out.push({time:macro[t].time, open:open, high:hi, low:lo, close:close, color:col, wickColor:col, borderColor:col}); prevClose=close; }
     return out; }
+  function ccCandles(which, colorRGB, seed){ var wp=ccWP(which); if(!wp) return null; return analogCandles(interpWP(wp), colorRGB, seed); }
 
+  // Builders keyed by 'baseId|layer' — squiggle (clean line) + hybrid (analog candles) per scenario.
   var SCEN_BUILDERS={ 'dual-horizon': buildDualHorizon,
-    'cc-bull':function(){ return ccLine('bull'); }, 'cc-bal':function(){ return ccLine('bal'); }, 'cc-bear':function(){ return ccLine('bear'); },
-    'hy-bull':function(){ return ccCandles('bull','34,197,94',0x51A1); }, 'hy-bal':function(){ return ccCandles('bal','59,130,246',0x51A2); }, 'hy-bear':function(){ return ccCandles('bear','244,63,94',0x51A3); } };
+    'cc-bull|squiggle':function(){ return ccLine('bull'); }, 'cc-bull|hybrid':function(){ return ccCandles('bull','34,197,94',0x51A1); },
+    'cc-bal|squiggle':function(){ return ccLine('bal'); },   'cc-bal|hybrid':function(){ return ccCandles('bal','59,130,246',0x51A2); },
+    'cc-bear|squiggle':function(){ return ccLine('bear'); }, 'cc-bear|hybrid':function(){ return ccCandles('bear','244,63,94',0x51A3); } };
 
-  function clearScenario(){ if(scenAnim){ cancelAnimationFrame(scenAnim); scenAnim=null; }
-    try{ if(_anims && _anims['scenReverse']){ cancelAnimationFrame(_anims['scenReverse']); delete _anims['scenReverse']; } }catch(e){}   // stop an in-flight reverse close
-    if(scenSeries){ try{ chart.removeSeries(scenSeries); }catch(e){} scenSeries=null; } scenData=null; activeScenario=null; scenKK=null;
-    var p=document.getElementById('wk-scen'); if(p) p.classList.remove('show'); var rb=document.getElementById('wk-rocketBtn'); if(rb) rb.classList.remove('on'); refreshRkUI(); }
+  // Remove ALL layers immediately (no reverse). keepState=true leaves the persisted toggles intact
+  // (used on asset/timeframe change, since projections are BTC/1D-specific but should return on the way back).
+  function clearScenLayers(keepState){ Object.keys(scenLayers).forEach(function(key){ var r=scenLayers[key];
+      if(r.anim){ try{ cancelAnimationFrame(r.anim); }catch(e){} }
+      try{ if(_anims && _anims['scenRev_'+key]){ cancelAnimationFrame(_anims['scenRev_'+key]); delete _anims['scenRev_'+key]; } }catch(e){}
+      try{ chart.removeSeries(r.series); }catch(e){} delete scenLayers[key]; if(!keepState) setScenLayerState(key,false); });
+    var p=document.getElementById('wk-scen'); if(p) p.classList.remove('show'); var rb=document.getElementById('wk-rocketBtn'); if(rb) rb.classList.remove('on'); try{ refreshRkUI(); }catch(e){} }
+  function clearScenario(){ clearScenLayers(false); }   // back-compat alias
 
   // Esc close: reverse the open animation (candles retract right→left), then remove + fit to real data.
   // Only fires when a forecast is active AND no higher-priority menu/modal/drawing tool owns Esc.
@@ -3629,61 +3643,67 @@
     try{ if(drawTool) return true; }catch(e){}
     return false;
   }
-  function closeScenarioAnimated(){
-    if(!scenSeries || !scenData || !scenData.length){ clearScenario(); try{ fitRealContent(); }catch(e){} return; }
-    if(scenAnim){ cancelAnimationFrame(scenAnim); scenAnim=null; }
-    var data=scenData, nfull=data.length, startKK=(scenKK!=null && scenKK>0)?Math.min(scenKK,nfull):nfull;
-    var dur=Math.max(700, Math.round(3000*(startKK/nfull)));   // mirror the ~3s open, proportional to how far it drew
-    animate('scenReverse', dur, function(e){
-      var kk=Math.max(0, Math.round(startKK*(1-e)));           // easeOut(e): retract fast then settle (mirror of open)
-      scenKK=kk;
-      try{ if(scenSeries) scenSeries.setData(kk>0 ? data.slice(0,kk) : []); }catch(_){}
-    }, function(){
-      try{ if(scenSeries) chart.removeSeries(scenSeries); }catch(e){}
-      scenSeries=null; scenData=null; activeScenario=null; scenKK=null;
-      var p=document.getElementById('wk-scen'); if(p) p.classList.remove('show');
-      var rb=document.getElementById('wk-rocketBtn'); if(rb) rb.classList.remove('on');
-      try{ refreshRkUI(); }catch(e){}
-      try{ fitRealContent(); }catch(e){}                       // snap back to the real-data window (no leftover future whitespace)
-    });
+  function fitScenView(){ if(!anyLayer()) return; var mnT=null, mxT=null;
+    Object.keys(scenLayers).forEach(function(key){ var d=scenLayers[key].data; if(!d||!d.length) return; var f=d[0].time, l=d[d.length-1].time; if(mnT==null||f<mnT) mnT=f; if(mxT==null||l>mxT) mxT=l; });
+    try{ var realFrom=ACTIVE.length?ACTIVE[Math.max(0,ACTIVE.length-200)].time:mnT, lastReal=ACTIVE.length?ACTIVE[ACTIVE.length-1].time:mxT;
+      var vf=(mnT<realFrom)?mnT:realFrom, vt=(mxT>lastReal)?mxT:lastReal; chart.timeScale().setVisibleRange({from:vf, to:vt}); }catch(e){}
   }
+  function enableLayer(baseId, layer, opts){ opts=opts||{}; var sc=SCENARIOS.filter(function(s){return s.id===baseId;})[0]; if(!sc||sc.soon) return;
+    if(ASSET!=='BTC'){ applyAsset('BTC'); setTimeout(function(){ enableLayer(baseId,layer,opts); }, 460); return; }   // BTC-only
+    var key=layerKey(baseId,layer); if(scenLayers[key]) return;
+    var build=SCEN_BUILDERS[key]; if(!build){ notify('Coming soon'); return; }
+    var data=null; try{ data=build(); }catch(e){} if(!data||!data.length){ notify('Not enough history to project'); return; }
+    var kind=(layer==='hybrid')?'candle':'line', series;
+    if(kind==='line'){ series=chart.addSeries(L.LineSeries,{priceScaleId:'right',color:'rgba('+(sc.color||'245,158,11')+',0.95)',lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false},0); }
+    else { var cu='rgba('+(sc.color||'245,158,11')+',0.7)'; series=chart.addSeries(L.CandlestickSeries,{priceScaleId:'right',borderVisible:true,priceLineVisible:false,lastValueVisible:false,upColor:cu,downColor:cu},0); }
+    var rec={ baseId:baseId, layer:layer, series:series, data:data, kk:1, anim:null, kind:kind, name:sc.name };
+    scenLayers[key]=rec; scenLastBase=baseId; scenLastLayer=layer; setScenLayerState(key,true);
+    if(opts.fit!==false) fitScenView();
+    if(opts.animate===false){ try{ series.setData(data); }catch(e){} rec.kk=data.length; }
+    else { var T0=null, DUR=2600, nfull=data.length;
+      function frame(ts){ if(T0==null)T0=ts; var pr=Math.min(1,(ts-T0)/DUR), e=1-Math.pow(1-pr,3), kk=Math.max(1,Math.floor(e*nfull)); rec.kk=kk;
+        try{ series.setData(data.slice(0,kk)); }catch(_){}
+        if(pr<1) rec.anim=requestAnimationFrame(frame); else { rec.anim=null; rec.kk=nfull; try{ redrawFcOverlays(); }catch(e){} } }
+      rec.anim=requestAnimationFrame(frame); }
+    showScenPanelMulti(); var rb=document.getElementById('wk-rocketBtn'); if(rb) rb.classList.add('on'); try{ refreshRkUI(); }catch(e){} try{ redrawFcOverlays(); }catch(e){}
+  }
+  function disableLayer(baseId, layer, doReverse){ var key=layerKey(baseId,layer), rec=scenLayers[key]; if(!rec) return;
+    if(rec.anim){ try{ cancelAnimationFrame(rec.anim); }catch(e){} rec.anim=null; }
+    function fin(){ try{ chart.removeSeries(rec.series); }catch(e){} delete scenLayers[key]; setScenLayerState(key,false);
+      if(!anyLayer()){ var p=document.getElementById('wk-scen'); if(p) p.classList.remove('show'); var rb=document.getElementById('wk-rocketBtn'); if(rb) rb.classList.remove('on'); try{ fitRealContent(); }catch(e){} }
+      else showScenPanelMulti(); try{ refreshRkUI(); }catch(e){} try{ redrawFcOverlays(); }catch(e){} }
+    if(doReverse && rec.data && rec.data.length){ var data=rec.data, nfull=data.length, startKK=(rec.kk!=null&&rec.kk>0)?Math.min(rec.kk,nfull):nfull, dur=Math.max(500,Math.round(2200*(startKK/nfull)));
+      animate('scenRev_'+key, dur, function(e){ var kk=Math.max(0,Math.round(startKK*(1-e))); rec.kk=kk; try{ rec.series.setData(kk>0?data.slice(0,kk):[]); }catch(_){}; }, fin);
+    } else fin();
+  }
+  function toggleLayer(baseId, layer){ var key=layerKey(baseId,layer); if(scenLayers[key]) disableLayer(baseId,layer,true); else enableLayer(baseId,layer,{}); }
+  function closeAllScenLayers(){ var keys=Object.keys(scenLayers); if(!keys.length){ try{ fitRealContent(); }catch(e){} return; }
+    keys.forEach(function(key){ var r=scenLayers[key]; disableLayer(r.baseId, r.layer, true); }); }
+  // Restore persisted layers (BTC/1D only) — the toggles "stay as set" across reload / asset round-trips.
+  function restoreScenLayers(){ if(ASSET!=='BTC') return; var st=loadScenLayerState(); var keys=Object.keys(st); if(!keys.length) return;
+    keys.forEach(function(key){ if(scenLayers[key]) return; var parts=key.split('|'); if(parts.length<2) return; var baseId=parts.slice(0,-1).join('|'), layer=parts[parts.length-1];
+      if(!SCEN_BUILDERS[key]) return;   // builder must exist (user forecasts register theirs on load)
+      enableLayer(baseId, layer, {animate:false, fit:false}); });
+    if(anyLayer()) fitScenView(); }
+  // back-compat: some call sites still say runScenario(id) → enable that scenario's squiggle
+  function runScenario(id){ var sc=SCENARIOS.filter(function(s){return s.id===id;})[0]; if(!sc) return; enableLayer(id, 'squiggle', {}); }
+  function closeScenarioAnimated(){ closeAllScenLayers(); }
+
   document.addEventListener('keydown', function(e){
     if(e.key!=='Escape') return;
-    if(!scenSeries && !activeScenario) return;                  // no forecast active
+    if(!anyLayer()) return;                                      // no projection active
     if(scenBlockingOpen()) return;                              // a menu/modal/tool owns Esc first
-    e.stopPropagation(); closeScenarioAnimated();
+    e.stopPropagation(); closeAllScenLayers();
   });
   try{ window.__scenState=function(){ var vr=null; try{ vr=chart&&chart.timeScale().getVisibleRange(); }catch(e){}
-    var mn=null,mx=null,kind=null; if(scenData&&scenData.length){ mn=Infinity;mx=-Infinity; var sc=SCENARIOS.filter(function(s){return s.id===activeScenario;})[0]; kind=sc?sc.kind||'candle':null;
-      scenData.forEach(function(p){ var lo=(p.low!=null?p.low:(p.value!=null?p.value:p.close)), hi=(p.high!=null?p.high:(p.value!=null?p.value:p.close)); if(lo!=null&&lo<mn)mn=lo; if(hi!=null&&hi>mx)mx=hi; }); }
-    return { active:!!scenSeries, kk:scenKK, activeScenario:activeScenario, kind:kind, scenMin:mn===Infinity?null:mn, scenMax:mx===-Infinity?null:mx,
+    var mn=Infinity,mx=-Infinity, keys=Object.keys(scenLayers);
+    keys.forEach(function(k){ (scenLayers[k].data||[]).forEach(function(p){ var lo=(p.low!=null?p.low:(p.value!=null?p.value:p.close)), hi=(p.high!=null?p.high:(p.value!=null?p.value:p.close)); if(lo!=null&&lo<mn)mn=lo; if(hi!=null&&hi>mx)mx=hi; }); });
+    var lastKey=scenLastBase?layerKey(scenLastBase,scenLastLayer):null, lastRec=lastKey?scenLayers[lastKey]:null;
+    return { active:anyLayer(), layers:keys, layerState:loadScenLayerState(), kind:lastRec?lastRec.kind:null, kk:lastRec?lastRec.kk:null,
+      scenMin:mn===Infinity?null:mn, scenMax:mx===-Infinity?null:mx,
       panel:!!(document.getElementById('wk-scen')&&document.getElementById('wk-scen').classList.contains('show')),
       rocketOn:!!(document.getElementById('wk-rocketBtn')&&document.getElementById('wk-rocketBtn').classList.contains('on')),
-      visibleTo:vr?vr.to:null, lastReal:ACTIVE.length?ACTIVE[ACTIVE.length-1].time:null, dataLen:scenData?scenData.length:0 }; }; }catch(e){}
-
-  function runScenario(id){ var sc=SCENARIOS.filter(function(s){return s.id===id;})[0]; if(!sc||sc.soon) return;
-    var build=SCEN_BUILDERS[id]; if(!build){ notify('Scenario coming soon'); return; }
-    var needSwitch=(ASSET!=='BTC'); if(needSwitch) applyAsset('BTC');
-    setTimeout(function(){
-      clearScenario();
-      var data=build(); if(!data||!data.length){ notify('Not enough history to project'); return; }
-      activeScenario=id; scenData=data;
-      if(sc.kind==='line'){ scenSeries=chart.addSeries(L.LineSeries,{priceScaleId:'right',color:'rgba('+(sc.color||'45,212,191')+',0.95)',lineWidth:2,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false},0); }
-      else { var cu='rgba('+(sc.color||'45,212,191')+',0.7)'; scenSeries=chart.addSeries(L.CandlestickSeries,{priceScaleId:'right',borderVisible:true,priceLineVisible:false,lastValueVisible:false,upColor:cu,downColor:cu},0); }
-      try{ var dFrom=data[0].time, dTo=data[data.length-1].time, realFrom=ACTIVE.length?ACTIVE[Math.max(0,ACTIVE.length-200)].time:dFrom, lastReal=ACTIVE.length?ACTIVE[ACTIVE.length-1].time:dTo;
-        var vf=(dFrom<realFrom)?dFrom:realFrom, vt=(dTo>lastReal)?dTo:lastReal;   // union of the real window + the scenario's own span → never from>to (user paths can lie anywhere in time)
-        chart.timeScale().setVisibleRange({from:vf, to:vt}); }catch(e){}
-      var T0=null, DUR=3000, nfull=data.length;        // animate in ~3s, left→right, single batched series
-      function frame(ts){ if(T0==null) T0=ts; var pr=Math.min(1,(ts-T0)/DUR); var e=1-Math.pow(1-pr,3); var kk=Math.max(1,Math.floor(e*nfull)); scenKK=kk;
-        try{ scenSeries.setData(data.slice(0,kk)); }catch(_){}
-        if(pr<1) scenAnim=requestAnimationFrame(frame); else { scenAnim=null; scenKK=nfull; } }
-      scenAnim=requestAnimationFrame(frame);
-      showScenPanel(sc);
-      var rb=document.getElementById('wk-rocketBtn'); if(rb) rb.classList.add('on');
-      var menu=document.getElementById('wk-rocketMenu'); if(menu) menu.classList.remove('open');
-      refreshRkUI();
-    }, needSwitch?440:0);
-  }
+      visibleTo:vr?vr.to:null, lastReal:ACTIVE.length?ACTIVE[ACTIVE.length-1].time:null, dataLen:keys.length?scenLayers[keys[0]].data.length:0 }; }; }catch(e){}
 
   // ── draggable explainer panel (collapsible, position persisted) ──────────────────────────────
   function buildScenPanel(){ var p=document.getElementById('wk-scen'); if(p) return p; var host=document.getElementById('wk-chart'); if(!host) return null;
@@ -3692,7 +3712,7 @@
       +'<div class="wk-scen-body"><div class="wk-scen-lbl" id="wk-scen-lbl"></div><div class="wk-scen-sim">Scenario / simulation — not a prediction. Uncertainty grows with distance (candles fade toward 2036).</div><button class="wk-scen-dl" id="wk-scen-dl">⤓ Download .md report</button></div>';
     host.appendChild(p);
     p.querySelector('#wk-scen-cl').onclick=function(e){ e.stopPropagation(); p.classList.toggle('collapsed'); this.textContent=p.classList.contains('collapsed')?'▸':'▾'; };
-    p.querySelector('#wk-scen-dl').onclick=function(e){ e.stopPropagation(); downloadScenReport(activeScenario); };
+    p.querySelector('#wk-scen-dl').onclick=function(e){ e.stopPropagation(); downloadScenReport(scenLastBase); };
     var h=p.querySelector('#wk-scen-h'); var dragging=false,sx=0,sy=0,sl=0,st=0;
     function ensureLT(){ if(p.style.left && p.style.left!=='auto') return; var r=p.getBoundingClientRect(), pr=host.getBoundingClientRect(); p.style.left=(r.left-pr.left)+'px'; p.style.top=(r.top-pr.top)+'px'; p.style.right='auto'; }
     function down(e){ if(e.target.closest('button')) return; ensureLT(); dragging=true; var q=e.touches?e.touches[0]:e; sx=q.clientX; sy=q.clientY; sl=parseFloat(p.style.left)||0; st=parseFloat(p.style.top)||0; e.preventDefault(); }
@@ -3701,15 +3721,21 @@
     h.addEventListener('mousedown',down); window.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
     h.addEventListener('touchstart',down,{passive:false}); window.addEventListener('touchmove',move,{passive:false}); window.addEventListener('touchend',up);
     return p; }
-  function showScenPanel(sc){ var p=buildScenPanel(); if(!p) return; p.querySelector('#wk-scen-name').textContent=sc.name; p.querySelector('#wk-scen-lbl').textContent=sc.label||'';
+  // panel reflects ALL active layers (name of the most-recent + count); download = most-recent base's report
+  function showScenPanelMulti(){ var p=buildScenPanel(); if(!p) return; var keys=Object.keys(scenLayers); if(!keys.length){ p.classList.remove('show'); return; }
+    var sc=SCENARIOS.filter(function(s){return s.id===scenLastBase;})[0]||{name:scenLastBase||'Scenario'};
+    var others=keys.length-1; p.querySelector('#wk-scen-name').textContent=sc.name+(others>0?(' +'+others):'');
+    var actives=keys.map(function(k){ var r=scenLayers[k]; return r.name+' · '+r.layer; });
+    p.querySelector('#wk-scen-lbl').textContent=actives.join('  ·  ');
     try{ var s=JSON.parse(localStorage.getItem('wk_scenpanel_pos')||'null'); if(s&&typeof s.left==='number'){ p.style.left=s.left+'px'; p.style.top=s.top+'px'; p.style.right='auto'; } }catch(e){}
     p.classList.remove('collapsed'); var cl=p.querySelector('#wk-scen-cl'); if(cl) cl.textContent='▾'; p.classList.add('show'); }
+  function showScenPanel(sc){ showScenPanelMulti(); }   // back-compat
 
   function scenReportMd(id){ var sc=SCENARIOS.filter(function(s){return s.id===id;})[0]||{name:id};
     if(id==='dual-horizon'){ return ''
       +'# WAKAWAKA Scenario — Dual-Horizon Heuristic\n\n'
       +'**Type:** scenario / simulation — NOT a prediction.\n\n'
-      +'**Timeframe / horizon:** 1D candles, projected from the current price to **'+HORIZON.endDate+'** (~'+(scenData?scenData.length:3650)+' daily candles).\n\n'
+      +'**Timeframe / horizon:** 1D candles, projected from the current price to **'+HORIZON.endDate+'** (~3650 daily candles).\n\n'
       +'## Algorithm (client-side, no ML / no training)\n'
       +'A lightweight in-browser emulation of a dual-horizon idea (macro trend + micro deviations):\n\n'
       +'- **Macro layer (trend):** drift = damped, capped mean of recent daily log-returns (~4y), decayed over the horizon (half-life ≈ 60% of it) so the far future flattens; each step is pulled gently (~0.4%/day) toward a slow **200-week-MA** anchor so it cannot run away.\n'
@@ -3727,25 +3753,18 @@
       +'- No exogenous inputs (macro/liquidity/news); volatility is stationary-bootstrapped while real regimes shift.\n'
       +'- The true distribution is far wider than any single drawn path; opacity decay only hints at this.\n';
     }
-    if(id.indexOf('cc-')===0 || id.indexOf('hy-')===0){
-      var isLine=(id.indexOf('cc-')===0), which=id.slice(3);
-      var groupName=isLine?'Group A — CredibleCrypto (as drawn)':'Group B — Hybrid (realistic, data-anchored)';
-      var honesty=isLine
-        ? 'This is **CredibleCrypto’s view as drawn** — a schematic, hand-drawn-style path. It is his scenario, reproduced faithfully. NOT a prediction, NOT financial advice.'
-        : 'This is an **algorithmic / hybrid interpretation** (my realistic reading of his view against BTC history) — synthetic daily candles. It is **NOT CredibleCrypto’s drawing** and **NOT financial advice**.';
-      var path={ bull:'**Bullish** — near-vertical rise from the current price straight into the top zone by ~2026, with no significant correction'
-                     + (isLine?'' : '; the hybrid adds 1–2 realistic pullbacks (~25–35%) on the way up'),
-                 bal:'**Balanced** — a dip / reaccumulation to the ~50% fib (~64k, = the 2021 top ≈ old ATH turned support), lateral through 2025–2027'
-                     + (isLine?', then an impulse to the top ~2028' : ' as a multi-month lateral base, then an impulse to the top ~2028'),
-                 bear:'**Bearish** — a deep correction to the ~85% fib (~21k, = the 2017 top ≈ deep structural support)'
-                     + (isLine?', a long base, then an impulse to the top ~2029–2030' : ', capitulation then a LONG base (12–18 months, like 2018–2020 / 2022–2023), then markup to the top ~2029–2030') }[which];
+    if(id.indexOf('cc-')===0){
+      var which=id.slice(3);
+      var path={ bull:'**Bullish** — near-vertical, IMMEDIATE rise into the top zone by **MID-2026**, short, no significant correction',
+                 bal:'**Balanced** — a soft dip to the ~50% fib (~64,676), a **serrated lateral base** ~60–70k through 2026–2027, then a very vertical **LATE** rise to ~200k by **~2028**',
+                 bear:'**Bearish** — a deep drop to the ~85% fib (~21,458), a **LONG, jagged, serrated base** 21–40k across 2026–2029, then the latest, steepest rise to ~235k by **~2030**' }[which];
       return ''
         +'# WAKAWAKA Scenario — '+sc.name+'\n\n'
-        +'**'+groupName+'**\n\n'
-        +'**Type:** '+(isLine?'schematic line (faithful to his hand-drawn view)':'synthetic daily candles (algorithmic hybrid)')+' — scenario / simulation, NOT a prediction.\n\n'
-        +'> ⚠️ **Honesty note.** '+honesty+'\n\n'
-        +'## This path\n- '+path+'.\n- The **top is plotted as a volatile RANGE** (distribution, double / triple tops), not a single peak.\n'
-        +(isLine?'':'- Volatility and candle **opacity decay with distance** into the future (near-term solid → far-future faded).\n')+'\n'
+        +'**CredibleCrypto (as drawn)** — one scenario, two layers you toggle independently: **squiggle** (his faithful clean line) and **hybrid** (historical-analog daily candles).\n\n'
+        +'**Type:** scenario / simulation, NOT a prediction.\n\n'
+        +'> ⚠️ **Honesty note.** The **squiggle** is CredibleCrypto’s view reproduced faithfully to his drawn shape/levels/timing. The **hybrid** is an **algorithmic interpretation** — synthetic candles built by laying contiguous blocks of REAL BTC daily returns along that path (trend/consolidation/vol-clustering, S/R reactions). It is **NOT his drawing** and **NOT financial advice / not a prediction**.\n\n'
+        +'## This path (faithful to his squiggle)\n- '+path+'.\n- The **top is a volatile RANGE** (distribution, double / triple tops), not a single peak.\n'
+        +'- Hybrid: volatility and candle **opacity decay with distance**; near an S/R level the candles consolidate, retest, and occasionally false-break — never a clean V.\n\n'
         +'## Anchor levels used (owner-confirmed, cross-checked with real BTC structure)\n'
         +'| Level | Price | Meaning |\n|---|---|---|\n'
         +'| Top / distribution zone | **180,000–300,000** (centre ~230,000) | volatile range, not a line |\n'
@@ -3758,8 +3777,7 @@
         +'## Honest caveats\n'
         +'- A **scenario, not a forecast** — one plausible path under fixed assumptions.\n'
         +'- BTC-specific; only offered for BTC. Anchored to the exact owner-confirmed levels above.\n'
-        +(isLine?'- Group A is schematic on purpose (a few control points, smoothly interpolated) — it mirrors his drawing, it is not a model.\n'
-                :'- Group B reuses the Dual-Horizon micro machinery (seeded PRNG, bootstrapped daily range, opacity decay); the macro path passes through the anchor pivots at the anchor times.\n')
+        +'- The squiggle is schematic (control points, smoothly interpolated) — it mirrors his drawing, it is not a model. The hybrid rides that same macro but with real-return texture.\n'
         +'- The true distribution of outcomes is far wider than any single drawn path.\n';
     }
     if(id.indexOf('ufc:')===0){ var isHy=/:hybrid$/.test(id), nm=id.replace(/^ufc:/,'').replace(/:(line|hybrid)$/,'');
@@ -3783,15 +3801,23 @@
     var a=document.createElement('a'); a.href=url; a.download='wakawaka-scenario-'+id+'.md'; document.body.appendChild(a); a.click(); setTimeout(function(){ try{ document.body.removeChild(a); }catch(e){} URL.revokeObjectURL(url); },120); }
 
   // ── rocket button + PIN 0223 + dropdown ───────────────────────────────────────────────────────
-  function refreshRkUI(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-rkList .wk-rk-item'),function(it){ it.classList.toggle('on', it.dataset.id===activeScenario); }); }
+  function refreshRkUI(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-rkList .wk-rk-item'),function(it){ var id=it.dataset.id;
+    var chips=it.querySelectorAll('.wk-rk-chip'); if(chips.length){ Array.prototype.forEach.call(chips,function(c){ c.classList.toggle('on', !!scenLayers[layerKey(id,c.getAttribute('data-layer'))]); }); }
+    it.classList.toggle('on', !!scenLayers[layerKey(id,'squiggle')] || !!scenLayers[layerKey(id,'hybrid')]); }); }
   var RK_GRP_KEY='wk_rocket_groups';
   function loadRkGroups(){ try{ return JSON.parse(localStorage.getItem(RK_GRP_KEY)||'{}')||{}; }catch(e){ return {}; } }
   function saveRkGroups(st){ try{ localStorage.setItem(RK_GRP_KEY, JSON.stringify(st)); }catch(e){} }
-  function rkItem(s){ var it=document.createElement('div'); it.className='wk-rk-item'+(s.soon?' soon':'')+(s.id===activeScenario?' on':''); it.dataset.id=s.id;
+  function rkItem(s){ var it=document.createElement('div'); it.className='wk-rk-item'+(s.soon?' soon':''); it.dataset.id=s.id;
     var lead=s.dot?('<span class="wk-rk-dot" style="background:'+s.dot+'"></span>'):('<span class="wk-rk-num">'+(s.n||'')+'</span>');
-    it.innerHTML=lead+'<span class="wk-rk-nm">'+s.name+'</span>'+(s.soon?'<span class="wk-rk-soon">soon</span>':'');
-    if(!s.soon) it.onclick=function(){ runScenario(s.id); };
-    return it; }
+    if(s.soon){ it.innerHTML=lead+'<span class="wk-rk-nm">'+s.name+'</span><span class="wk-rk-soon">soon</span>'; return it; }
+    if(s.layers){   // FIX 2: one row, two independent persistent toggles
+      var sq=isScenLayerOn(layerKey(s.id,'squiggle')), hy=isScenLayerOn(layerKey(s.id,'hybrid'));
+      it.innerHTML=lead+'<span class="wk-rk-nm">'+s.name+'</span>'
+        +'<span class="wk-rk-toggles"><button class="wk-rk-chip'+(sq?' on':'')+'" data-layer="squiggle">squiggle</button><button class="wk-rk-chip'+(hy?' on':'')+'" data-layer="hybrid">hybrid</button></span>';
+      Array.prototype.forEach.call(it.querySelectorAll('.wk-rk-chip'),function(chip){ chip.onclick=function(ev){ ev.stopPropagation(); toggleLayer(s.id, chip.getAttribute('data-layer')); }; });
+      if(!!scenLayers[layerKey(s.id,'squiggle')]||!!scenLayers[layerKey(s.id,'hybrid')]) it.classList.add('on');
+      return it; }
+    it.innerHTML=lead+'<span class="wk-rk-nm">'+s.name+'</span>'; it.onclick=function(){ enableLayer(s.id,'squiggle',{}); }; return it; }
   // Rocket menu as three collapsible groups (same "+"-menu chrome), persisted in wk_rocket_groups.
   function buildRkList(){ var host=document.getElementById('wk-rkList'); if(!host) return; host.innerHTML='';
     var grpState=loadRkGroups();
@@ -3807,7 +3833,8 @@
     group('engine','Heuristic engine', byGroup('engine'));
     group('credible','CredibleCrypto (as drawn)', byGroup('credible'));
     group('hybrid','Hybrid (realistic)', byGroup('hybrid')); }
-  function openRocketMenu(){ buildRkList(); var menu=document.getElementById('wk-rocketMenu'); if(!menu) return;
+  function openRocketMenu(){ if(!rocketUnlocked()){ openRkPin(); return; }   // hard gate: the dropdown can never open while locked (belt-and-suspenders for the PIN)
+    buildRkList(); var menu=document.getElementById('wk-rocketMenu'); if(!menu) return;
     var am=document.getElementById('wk-assetMenu'); if(am) am.classList.remove('open'); var om=document.getElementById('wk-ovMenu'); if(om) om.classList.remove('open'); menu.classList.toggle('open'); }
   function buildRkPin(){ var host=document.getElementById('wk-chart'); if(!host || document.getElementById('wk-rkpin')) return;
     var m=document.createElement('div'); m.className='wk-rkpin'; m.id='wk-rkpin';
@@ -3817,15 +3844,17 @@
     var pins=[].slice.call(m.querySelectorAll('.wk-rkpin-pin'));
     function check(){ var code=pins.map(function(p){return p.value;}).join('');
       if(code.length===4){ if(code==='0223'){ try{ sessionStorage.setItem('wk_rocket_ok','1'); }catch(e){} m.classList.remove('on'); openRocketMenu(); }
-        else { pins.forEach(function(p){ p.classList.add('err'); }); setTimeout(function(){ pins.forEach(function(p){ p.classList.remove('err'); p.value=''; }); if(pins[0]) pins[0].focus(); },450); } } }
+        else { pins.forEach(function(p){ p.classList.add('err'); }); setTimeout(function(){ pins.forEach(function(p){ p.classList.remove('err'); p.value=''; }); m.classList.remove('on'); },450); } } }   // wrong PIN → brief red flash, then the screen closes (owner: fail → disappears)
     pins.forEach(function(p,i){ p.addEventListener('input',function(){ p.value=p.value.replace(/[^0-9]/g,''); if(p.value&&i<3) pins[i+1].focus(); check(); });
       p.addEventListener('keydown',function(e){ if(e.key==='Backspace'&&!p.value&&i>0) pins[i-1].focus(); }); });
     m.querySelector('#wk-rkpin-x').onclick=function(){ m.classList.remove('on'); }; }
   function openRkPin(){ buildRkPin(); var m=document.getElementById('wk-rkpin'); if(!m) return; var pins=[].slice.call(m.querySelectorAll('.wk-rkpin-pin')); pins.forEach(function(p){ p.value=''; }); m.classList.add('on'); setTimeout(function(){ if(pins[0]) pins[0].focus(); },60); }
   function initRocket(){ var rb=document.getElementById('wk-rocketBtn'); if(!rb) return;
-    rb.onclick=function(e){ e.stopPropagation(); if(rocketUnlocked()) openRocketMenu(); else openRkPin(); };
+    rb.onclick=function(e){ e.stopPropagation(); if(rocketUnlocked()) openRocketMenu(); else openRkPin(); };   // locked → PIN screen; unlocked → dropdown
     var menu=document.getElementById('wk-rocketMenu'); if(menu) menu.addEventListener('click',function(e){ e.stopPropagation(); });
-    document.addEventListener('click',function(){ var mm=document.getElementById('wk-rocketMenu'); if(mm) mm.classList.remove('open'); }); }
+    document.addEventListener('click',function(){ var mm=document.getElementById('wk-rocketMenu'); if(mm) mm.classList.remove('open'); });
+    document.addEventListener('keydown',function(e){ if(e.key!=='Escape') return; var m=document.getElementById('wk-rkpin'); if(m && m.classList.contains('on')){ m.classList.remove('on'); e.stopPropagation(); } });   // Esc closes the PIN screen
+  }
 
   // ── Fase L: live BTC price (CoinGecko, client-side, 5s, fault-tolerant, display-only) ──────────
   function fetchLive(){ if(!bodyEl.classList.contains('wk-b')) return;   // only poll while Screen B is showing
@@ -4222,9 +4251,11 @@
   function fcArrowHead(ctx, from, to, color){ var ang=Math.atan2(to.y-from.y, to.x-from.x), L=12, W=Math.PI/7;
     ctx.save(); ctx.fillStyle=color; ctx.beginPath(); ctx.moveTo(to.x,to.y);
     ctx.lineTo(to.x-L*Math.cos(ang-W), to.y-L*Math.sin(ang-W)); ctx.lineTo(to.x-L*Math.cos(ang+W), to.y-L*Math.sin(ang+W)); ctx.closePath(); ctx.fill(); ctx.restore(); }
-  function fcSRVisible(){ return !!(activeScenario && /^ufc:.*:hybrid$/.test(activeScenario)); }
-  function fcSRInRange(){ var lv=fcSRLevels(); if(!scenData||!scenData.length) return []; var mn=Infinity,mx=-Infinity;
-    scenData.forEach(function(p){ var lo=(p.low!=null?p.low:(p.value!=null?p.value:p.close)), hi=(p.high!=null?p.high:(p.value!=null?p.value:p.close)); if(lo!=null&&lo<mn)mn=lo; if(hi!=null&&hi>mx)mx=hi; });
+  // S/R zones show whenever ANY hybrid layer is active (CC or user forecast)
+  function activeHybridData(){ var ds=[]; Object.keys(scenLayers).forEach(function(k){ if(/\|hybrid$/.test(k)) ds.push(scenLayers[k].data); }); return ds; }
+  function fcSRVisible(){ return activeHybridData().length>0; }
+  function fcSRInRange(){ var lv=fcSRLevels(), ds=activeHybridData(); if(!ds.length) return []; var mn=Infinity,mx=-Infinity;
+    ds.forEach(function(data){ (data||[]).forEach(function(p){ var lo=(p.low!=null?p.low:(p.value!=null?p.value:p.close)), hi=(p.high!=null?p.high:(p.value!=null?p.value:p.close)); if(lo!=null&&lo<mn)mn=lo; if(hi!=null&&hi>mx)mx=hi; }); });
     if(mn===Infinity) return []; return lv.filter(function(v){ return v>=mn*0.9 && v<=mx*1.08; }); }
   function drawFcArrows(ctx){ if(!drawMgr) return; var ids=Object.keys(fcDrawIds); if(!ids.length) return;
     var all=[]; try{ all=drawMgr.getAllDrawings()||[]; }catch(e){}
@@ -4275,14 +4306,13 @@
   function fcOpenDialog(){ if(!fcDraft) return; fcBuildDialog(); if(!fcDlg) return; fcDlg.classList.add('on'); var i=fcDlg.querySelector('#wk-fcdlg-in'); i.value=''; setTimeout(function(){ i.focus(); },60); }
   function fcCloseDialog(){ if(fcDlg) fcDlg.classList.remove('on'); }
 
-  // ── scenario registration (line + hybrid) from a stored forecast record ──
-  function fcScenIds(name){ var base='ufc:'+name; return {line:base+':line', hybrid:base+':hybrid'}; }
-  function fcRegisterScenarios(rec){ var ids=fcScenIds(rec.name);
-    SCENARIOS=SCENARIOS.filter(function(s){ return s.id!==ids.line && s.id!==ids.hybrid; });
-    SCENARIOS.push({id:ids.line,   name:rec.name+' (line)',   label:'My forecast · line',          group:'myfc', kind:'line',   dot:'#f59e0b', color:'245,158,11', soon:false});
-    SCENARIOS.push({id:ids.hybrid, name:rec.name+' (hybrid)', label:'My forecast · hybrid candles', group:'myfc', kind:'candle', dot:'#f59e0b', color:'245,158,11', soon:false});
-    SCEN_BUILDERS[ids.line]=function(){ return ufcLine(rec); };
-    SCEN_BUILDERS[ids.hybrid]=function(){ return ufcHybrid(rec); }; }
+  // ── scenario registration — ONE row per forecast with squiggle/hybrid toggles (same pattern as CC) ──
+  function fcBaseId(name){ return 'ufc:'+name; }
+  function fcRegisterScenarios(rec){ var base=fcBaseId(rec.name);
+    SCENARIOS=SCENARIOS.filter(function(s){ return s.id!==base; });
+    SCENARIOS.push({id:base, name:rec.name, label:'My forecast', group:'myfc', layers:true, dot:'#f59e0b', color:'245,158,11', soon:false});
+    SCEN_BUILDERS[layerKey(base,'squiggle')]=function(){ return ufcLine(rec); };
+    SCEN_BUILDERS[layerKey(base,'hybrid')]=function(){ return ufcHybrid(rec); }; }
   function fcFindForecast(name){ for(var i=0;i<userForecasts.length;i++){ if(userForecasts[i].name===name) return userForecasts[i]; } return null; }
   function fcUpsertForecast(rec){ var ex=fcFindForecast(rec.name); if(ex){ ex.anchors=rec.anchors; ex.drawingId=rec.drawingId; ex.seed=rec.seed; } else userForecasts.push(rec); }
   function saveUserForecasts(){ try{ localStorage.setItem(nsKey('wk_user_forecasts'), JSON.stringify(userForecasts)); }catch(e){} }
@@ -4302,7 +4332,8 @@
     if(!d){ fcHideSave(); return; } var anchors=(d.anchors||[]).map(function(a){ return {time:a.time, price:a.price}; });
     var rec=fcFindForecast(name); if(!rec){ fcHideSave(); return; } rec.anchors=anchors;
     fcRegisterScenarios(rec); saveUserForecasts(); try{ buildRkList(); }catch(e){}
-    var ids=fcScenIds(name); if(activeScenario===ids.line || activeScenario===ids.hybrid){ var cur=activeScenario; try{ runScenario(cur); }catch(e){} }   // re-run if on screen
+    var base=fcBaseId(name);   // re-render whichever layers were on, from the edited path
+    ['squiggle','hybrid'].forEach(function(layer){ var key=layerKey(base,layer); if(scenLayers[key]){ disableLayer(base,layer,false); enableLayer(base,layer,{animate:false}); } });
     fcHideSave(); notify('Updated "'+name+'" from the edited path');
     /* FC-PATTERNS hook: pivot → pattern (flags/wedges/corrections) popup will attach here in the next prompt. */ }
 
@@ -4310,24 +4341,14 @@
   function ufcWP(rec){ var a=(rec.anchors||[]).map(function(p){ return {t:fcTimeStr(p.time), price:p.price}; }).filter(function(p){ return p.t && p.price>0; });
     a.sort(function(x,y){ return x.t<y.t?-1:(x.t>y.t?1:0); }); var ded=[]; a.forEach(function(p){ if(!ded.length || p.t!==ded[ded.length-1].t) ded.push(p); }); return ded; }
   function ufcLine(rec){ var wp=ufcWP(rec); if(wp.length<2) return null; return interpWP(wp).map(function(p){ return {time:p.time, value:p.value, close:p.value}; }); }
-  function fcSRLevels(){ var out=[126000,64000,21000];   // fixed anchors (owner: BOTH sources)
+  function fcSRLevels(){ var out=[CC.P0,CC.P50,CC.P85];   // fixed anchors (owner: BOTH sources) — exact fib levels
     try{ if(ANCHOR && ANCHOR.extremes){ ANCHOR.extremes.forEach(function(e){ if(e && e.price>0) out.push(e.price); }); } }catch(e){}   // auto-detected cycle highs/lows (never fabricated)
     out.sort(function(a,b){ return a-b; }); var ded=[]; out.forEach(function(v){ if(!ded.length || Math.abs(v-ded[ded.length-1])/v>0.03) ded.push(v); }); return ded; }
   function fcNearestSR(v, arr){ var best=null,bd=Infinity; arr.forEach(function(x){ var d=Math.abs(x-v); if(d<bd){ bd=d; best=x; } }); return best; }
-  function ufcHybrid(rec){ var wp=ufcWP(rec); if(wp.length<2) return null; var macro=interpWP(wp); var b=scenBase(); if(!b) return null; var src=b.src;
-    var rwin=Math.min(365, src.length-1), rr=[]; for(var k=src.length-rwin;k<src.length;k++){ var s=src[k]; if(s.h>0&&s.l>0&&s.c>0) rr.push((s.h-s.l)/s.c); }
-    var avgRange=rr.length?(rr.reduce(function(a,c){return a+c;},0)/rr.length):0.04;
-    var srAll=fcSRLevels(), rnd=mulberry32(rec.seed||0x1234), N=macro.length, out=[], prevClose=macro[0].value;
-    for(var t=0;t<N;t++){ var m=macro[t].value; var near=fcNearestSR(m, srAll), mag=0, extra=0, fbreak=0;
-      if(near){ var dist=Math.abs(m-near)/near; if(dist<0.08){ var pull=(1-dist/0.08); mag=(near-m)*0.5*pull; extra=avgRange*1.2*pull; if(rnd()<0.08*pull) fbreak=(rnd()<0.5?-1:1)*avgRange*1.9*near*pull; } }   // magnet toward the level + wider tests + occasional false break → consolidation, never a clean V
-      var noise=(rnd()-0.5)*2*(avgRange*0.9+extra), close=(m+mag)*Math.exp(noise); if(close<=0) close=prevClose*0.95;
-      var open=prevClose, rng=close*(avgRange*(0.5+rnd())+extra*0.5);
-      var hi=Math.max(open,close)+rng*0.6+Math.max(0,fbreak), lo=Math.min(open,close)-rng*0.6+Math.min(0,fbreak); if(lo<=0) lo=Math.min(open,close)*0.9;
-      var alpha=Math.max(0.1, 0.9-0.78*(t/N)), col='rgba(245,158,11,'+alpha.toFixed(3)+')';
-      out.push({time:macro[t].time, open:open, high:hi, low:lo, close:close, color:col, wickColor:col, borderColor:col}); prevClose=close; }
-    return out; }
+  function ufcHybrid(rec){ var wp=ufcWP(rec); if(wp.length<2) return null;
+    return analogCandles(interpWP(wp), '245,158,11', rec.seed||0x1234); }   // FIX 3: same historical-analog method as CC (block bootstrap + S/R)
 
-  function initFcCore(){ ensureFcOverlay(); loadUserForecasts(); try{ redrawFcOverlays(); }catch(e){}
+  function initFcCore(){ ensureFcOverlay(); loadUserForecasts(); try{ redrawFcOverlays(); }catch(e){} try{ restoreScenLayers(); }catch(e){}   // re-render persisted scenario layers (CC + user) on load
     try{ window.__fcState=function(){
       function drawingOf(id){ var d=null; try{ (drawMgr.getAllDrawings()||[]).forEach(function(x){ if(x.id===id) d=x; }); }catch(e){} return d; }
       var firstId=(userForecasts[0]&&userForecasts[0].drawingId)||(fcDraft&&fcDraft.id);
@@ -4405,7 +4426,7 @@
       // intraday tier unavailable (network) → silent fallback to 1D (no toast); never an empty chart
       if(spec.kind==='intra' && (!cands || !cands.length)){ if(pid) wkLoading.done(pid); if(size!=='1D') applyCandleSize('1D', {keepRange:true}); return; }
       CSIZE=size; try{ sessionStorage.setItem('wk_csize', size); }catch(e){}
-      try{ clearScenario(); }catch(e){}   // projection is 1D-specific — drop it on timeframe change
+      try{ clearScenLayers(true); }catch(e){}   // projections are 1D-specific — hide but KEEP toggle state; restored when 1D returns
       ACTIVE=buildActive(size); CLOSE=ACTIVE.map(function(d){ return d.close; });
       try{ computeAccDist(); }catch(e){}
       var intra=spec.kind==='intra';
@@ -4428,6 +4449,7 @@
         } else { animateToFull(); }   // (a) wide/outside → animate to the window
       }
       else { setRangeDays(CS_WIN[size]); }
+      if(size==='1D' && ASSET==='BTC'){ try{ restoreScenLayers(); }catch(e){} }   // back on 1D → re-render persisted projection layers
       if(pid) wkLoading.done(pid);   // Fase P: switch complete
     });
   }
