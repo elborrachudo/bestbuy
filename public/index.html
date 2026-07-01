@@ -706,6 +706,7 @@
   .wk-modetog{position:absolute;left:8px;bottom:8px;z-index:6;display:flex;flex-direction:column;gap:2px;background:rgba(8,23,28,.85);border:1px solid #1a3a44;border-radius:999px;padding:3px;}
   .wk-mode-b{width:28px;height:24px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:#4f7780;cursor:pointer;border-radius:999px;padding:0;}
   .wk-mode-b.on{background:rgba(45,212,191,.22);color:#5eead4;}
+  .wk-mode-b.wk-mode-off{opacity:.32;pointer-events:none;}   /* candles unavailable for line-only token assets */
   /* live BTC price tag on the right axis (Fase L) — teal bg, black text, slightly larger, always green */
   .wk-livetag{position:absolute;right:0;z-index:7;background:#2dd4bf;color:#04201c;font-weight:700;line-height:1;padding:3px 0;border-radius:3px 0 0 3px;pointer-events:none;transform:translateY(-50%);white-space:nowrap;text-align:center;display:none;font-variant-numeric:tabular-nums;box-shadow:0 1px 4px rgba(0,0,0,.4);box-sizing:border-box;overflow:hidden;}
   /* "go to latest" arrow — shown only when the newest candle is scrolled off-screen; clear of the price axis + live tag */
@@ -2094,7 +2095,7 @@
   ];
   var HALV_COLOR='#C8A415';
   var inited=false, chart=null, L=null, area=null, candle=null, ma=null, halvPrim=null, halvAttached=false, phasePrim=null, manipPrim=null, manipAttached=false;
-  var DATA=null, byTime={}, isLog=true, mode='line';
+  var DATA=null, byTime={}, isLog=true, mode='line', userMode='line';   // userMode = the user's pick; effective mode is forced to 'line' for OHLC-less token assets
   var livePrice=null, live24h=null, liveTimer=null, liveTag=null, livePrim=null;   // Fase L/T: live BTC price + 24h change (5s, display-only)
   var CLOSE=[], oscReg={};   // CLOSE: active close series · oscReg: id -> {series:[…],pane,priceLines:[…],kind}
   var ASSET='BTC', assetDaily={}, overlays={};   // multi-asset: base asset (BTC default), per-coin daily cache, overlay-series registry
@@ -3239,11 +3240,30 @@
   // ── Multi-asset selector + overlays (Screen B) ────────────────────────────────────────────────
   // Asset list (depth = first date that exists; honest start, no invention before it). BTC keeps its
   // deeper btc_history series; the other 9 come from market_history (1D only).
+  // Phase VI(c): the 9 tracked tokens (in tracked_tokens / score_readings but NOT market_history) join the
+  // asset universe as PRICE-LINE-ONLY assets (line built from readings; no OHLC — honest short history).
+  var TOKEN_LINE_SYMS=['AERO','CAKE','CRV','CVX','HYPE','LINK','ONDO','TRAC','VIRTUAL'];
   var ASSET_LIST=[
     {sym:'BTC',dep:'2011'},{sym:'ETH',dep:'2017'},{sym:'ADA',dep:'2017'},{sym:'BNB',dep:'2017'},
     {sym:'DOGE',dep:'2017'},{sym:'XRP',dep:'2017'},{sym:'LTC',dep:'2017'},{sym:'SOL',dep:'2020'},
-    {sym:'DOT',dep:'2020'},{sym:'AVAX',dep:'2020'}];
+    {sym:'DOT',dep:'2020'},{sym:'AVAX',dep:'2020'}]
+    .concat(TOKEN_LINE_SYMS.map(function(s){ return {sym:s, dep:'', lineOnly:true}; }))
+    .sort(function(a,b){ return a.sym<b.sym?-1:(a.sym>b.sym?1:0); });   // ALPHABETICAL — BTC is NOT pinned (owner)
   var ASSET_COLORS={BTC:'#f7931a',ETH:'#627eea',ADA:'#3468d1',AVAX:'#e84142',BNB:'#f3ba2f',DOGE:'#c2a633',DOT:'#e6007a',LTC:'#5c6bc0',SOL:'#14f195',XRP:'#7fbbe0'};
+  function isLineOnly(sym){ for(var i=0;i<ASSET_LIST.length;i++){ if(ASSET_LIST[i].sym===sym) return !!ASSET_LIST[i].lineOnly; } return false; }
+  // colour: the 10 Kaggle assets use ASSET_COLORS; the 9 tokens reuse their tracked_tokens colour when loaded
+  function assetColor(sym){ if(ASSET_COLORS[sym]) return ASSET_COLORS[sym]; var e=window.WAKA_SCORE; if(e&&e.state){ var t=(e.state.tokens||[]).filter(function(x){return x.symbol===sym;})[0]; if(t&&t.color) return t.color; } return '#5eead4'; }
+  // a token's PRICE line from score_readings (reuses WAKA_SCORE — no new fetch/endpoint). One point/day.
+  function tokenLinePoints(sym){ var e=window.WAKA_SCORE; if(!e||!e.state) return []; var t=(e.state.tokens||[]).filter(function(x){return x.symbol===sym;})[0]; if(!t) return [];
+    var rows=(e.state.readingsByToken||{})[t.id]||[], byDay={};
+    rows.forEach(function(r){ if(r.price==null||!isFinite(+r.price)) return; byDay[new Date(r.fetched_at).toISOString().slice(0,10)]=+r.price; });   // last reading of each day
+    return Object.keys(byDay).sort().map(function(d){ return {time:d, value:byDay[d]}; }); }
+  function tokenFirstDate(sym){ var p=tokenLinePoints(sym); return p.length?p[0].time:null; }
+  try{ window.__assetState=function(){ return { order:ASSET_LIST.map(function(a){return a.sym;}), count:ASSET_LIST.length, active:ASSET, lineOnly:isLineOnly(ASSET),
+    mode:mode, userMode:userMode, activeLen:(typeof ACTIVE!=='undefined'&&ACTIVE)?ACTIVE.length:0,
+    candleVisible:(function(){ try{ return !!(candle&&candle.options().visible); }catch(e){ return null; } })(),
+    firstDate:isLineOnly(ASSET)?tokenFirstDate(ASSET):null,
+    tokenCounts:(function(){ var o={}; TOKEN_LINE_SYMS.forEach(function(s){ o[s]=tokenLinePoints(s).length; }); return o; })() }; }; }catch(e){}
   // overlay catalogue: 10 assets (price, own hidden scale) + 9 own-axis series.
   var OV_SERIES=[
     {id:'btcd',label:'BTC.D — dominance',color:'#f7931a'},
@@ -3256,11 +3276,12 @@
     {id:'mayer',label:'Mayer Multiple',color:'#22d3ee'},
     {id:'mcap',label:'Total market cap',color:'#34d399'}];
   function ovLabel(id){ var s=OV_SERIES.filter(function(x){return x.id===id;})[0]; if(s) return s.label; return id; }
-  function ovDefColor(id){ if(id.indexOf('asset:')===0){ return ASSET_COLORS[id.slice(6)]||'#5eead4'; } var s=OV_SERIES.filter(function(x){return x.id===id;})[0]; return s?s.color:'#5eead4'; }
+  function ovDefColor(id){ if(id.indexOf('asset:')===0){ return assetColor(id.slice(6)); } var s=OV_SERIES.filter(function(x){return x.id===id;})[0]; return s?s.color:'#5eead4'; }
 
   // fetch a {time,value} line for an overlay id (asset:<COIN> price, or a series id), cached.
   var ovDataCache={};
   function fetchOverlayData(id, cb){ if(ovDataCache[id]){ cb(ovDataCache[id]); return; }
+    if(id.indexOf('asset:')===0 && isLineOnly(id.slice(6))){ var pts=tokenLinePoints(id.slice(6)); if(pts.length) ovDataCache[id]=pts; cb(pts); return; }   // token overlay = price-line from readings (no OHLC endpoint)
     var url = (id.indexOf('asset:')===0) ? ('/api/btc-candles?tier=daily&coin='+id.slice(6)) : ('/api/btc-candles?series='+id);
     fetch(url).then(function(r){return r.json();}).then(function(j){
       var pts=[];
@@ -3314,7 +3335,7 @@
     if(!keep){ scoreHint(false); return; }
     var present=0, added=[];
     syms.forEach(function(sym){ var tk=tokenForSym(sym); if(!tk) return; var data=scoreSeriesData(tk.id); if(!data.length) return; present++;
-      var col=ASSET_COLORS[sym]||'#5eead4';
+      var col=assetColor(sym);
       if(!scoreSeries[sym]){ var s; try{ s=chart.addSeries(L.LineSeries,{color:(doAnim?scoreAlpha(col,0):col),lineWidth:1,lineStyle:((L.LineStyle&&L.LineStyle.Dotted)||1),priceScaleId:SCORE_SCALE,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false},0); }catch(e){ return; }
         try{ chart.priceScale(SCORE_SCALE).applyOptions({visible:false,scaleMargins:{top:0.1,bottom:0.1}}); }catch(e){}   // own INVISIBLE 0–100 scale
         scoreSeries[sym]={series:s,color:col}; added.push(sym); }
@@ -3372,7 +3393,7 @@
       var pct=e.percentileOf(e.tokenSortedScores(tk.id), blend);
       var dcls='n', darr='–', dtxt='';
       if(prev){ var pb=e.blendRow(prev); if(pb!=null){ var dd=blend-pb; dcls=dd>0.05?'g':(dd<-0.05?'r':'n'); darr=dd>0.05?'▲':(dd<-0.05?'▼':'–'); dtxt=(dd>=0?'+':'')+dd.toFixed(1); } }
-      var col=ASSET_COLORS[sym]||'#5eead4';
+      var col=assetColor(sym);
       function pill(k){ var v=latest['score_'+k]; return '<span style="color:'+PILL_COL[k]+'">'+(v==null?'—':Number(v).toFixed(1))+'</span>'; }
       rowsHtml+='<div class="wk-scp-row"><span class="wk-scp-dot" style="background:'+col+'"></span><span class="wk-scp-sym">'+sym+'</span>'
         +'<span class="wk-scp-score"><b>'+blend.toFixed(1)+'</b><small>/10</small> · '+(pct==null?'—':Math.round(pct))+'<small>pct</small></span>'
@@ -3386,7 +3407,13 @@
 
   // load a coin's daily series (market_history), compute MAs over it, join BTC's mayer/pct/phase by
   // date (the cycle indicators + phases stay BTC-relative — the thesis), cache it.
+  // token PRICE-line daily series from readings (no OHLC → o=h=l=c=price). Retries while WAKA_SCORE loads.
+  function buildTokenDaily(coin, cb, tries){ tries=tries||0; var pts=tokenLinePoints(coin);
+    if(!pts.length && tries<10){ setTimeout(function(){ buildTokenDaily(coin, cb, tries+1); }, 500); return; }   // readings still loading → wait, never invent
+    assetDaily[coin]=pts.map(function(p){ var v=p.value; return {t:p.time,o:v,h:v,l:v,c:v,v:0, ma50d:null,ma200d:null,ma50w:null,ma200w:null, p:(byTime[p.time]||{}).p, mayer:null, pct:null}; });
+    cb(); }
   function loadAssetDaily(coin, cb){ if(coin==='BTC'||assetDaily[coin]){ cb(); return; }
+    if(isLineOnly(coin)){ buildTokenDaily(coin, cb); return; }   // the 9 tokens: line from readings, not market_history
     fetch('/api/btc-candles?tier=daily&coin='+coin).then(function(r){return r.json();}).then(function(j){
       var dc=(j&&j.ok&&j.candles)?j.candles:[];
       var closes=dc.map(function(d){return d.c;});
@@ -3410,7 +3437,7 @@
       var csBtn=document.getElementById('wk-csBtn'); if(csBtn) csBtn.classList.toggle('wk-cs-off', coin!=='BTC');
       ACTIVE=buildActive(CSIZE); CLOSE=ACTIVE.map(function(d){return d.close;});
       computeAccDist();
-      setSeriesData(); applyLive();
+      setSeriesData(); applyLive(); applyEffectiveMode();   // tokens → forced line (no OHLC); other assets → user's mode
       updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators(); rebuildMaLayers();
       setRangeDays(coin==='BTC'?90:0);   // coin → fit its full history; BTC → 90D default
       refreshAssetUI(); positionLiveTag(); positionTitles();
@@ -3424,7 +3451,8 @@
   function buildAssetList(filter){ var host=document.getElementById('wk-assetList'); if(!host) return; host.innerHTML=''; filter=(filter||'').trim().toUpperCase();
     ASSET_LIST.filter(function(a){ return !filter || a.sym.indexOf(filter)>=0; }).forEach(function(a){
       var it=document.createElement('div'); it.className='wk-asset-item'+(a.sym===ASSET?' on':''); it.dataset.sym=a.sym;
-      it.innerHTML='<span class="wk-ai-sym" style="color:'+(ASSET_COLORS[a.sym]||'#cfe7ec')+'">'+a.sym+'</span><span class="wk-ai-dep">since '+a.dep+'</span>';
+      var dep = a.lineOnly ? ('line · '+((tokenFirstDate(a.sym)||'').slice(0,7)||'readings')) : ('since '+a.dep);   // tokens: "line · YYYY-MM" (first reading), honest short history
+      it.innerHTML='<span class="wk-ai-sym" style="color:'+assetColor(a.sym)+'">'+a.sym+'</span><span class="wk-ai-dep">'+dep+'</span>';
       it.onclick=function(){ applyAsset(a.sym); }; host.appendChild(it); }); }
   function refreshOvUI(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-ovList .wk-ov-item'),function(it){ var id=it.dataset.id; var on=!!overlays[id];
       it.classList.toggle('on', on); var chk=it.querySelector('.wk-ov-chk'); if(chk) chk.textContent=on?'✓':''; var col=it.querySelector('.wk-ov-col'); if(col){ col.style.background=(overlays[id]?overlays[id].color:ovDefColor(id)); } });
@@ -4547,15 +4575,16 @@
   }
 
   function initialMode(){ var m='line'; try{ m=sessionStorage.getItem('wk_mode')||'line'; }catch(e){} return m==='candle'?'candle':'line'; }
-  function setMode(m){
-    mode=(m==='candle')?'candle':'line';
+  function setMode(m){ userMode=(m==='candle')?'candle':'line'; try{ sessionStorage.setItem('wk_mode', userMode); }catch(e){} applyEffectiveMode(); }
+  // effective mode = the user's pick, but FORCED to line for the 9 OHLC-less token assets (never fake candles)
+  function applyEffectiveMode(){ mode = isLineOnly(ASSET) ? 'line' : userMode;
     // area stays visible (carries the phase primitive + markers); transparent in candle mode
     if(area) area.applyOptions(mode==='candle'
       ? {lineColor:'rgba(0,0,0,0)',topColor:'rgba(0,0,0,0)',bottomColor:'rgba(0,0,0,0)'}
       : {lineColor:'#a78bfa',topColor:'rgba(167,139,250,.18)',bottomColor:'rgba(167,139,250,0)'});
     if(candle) candle.applyOptions({visible:mode==='candle'});
     Array.prototype.forEach.call(document.querySelectorAll('.wk-mode-b[data-mode]'),function(bn){ bn.classList.toggle('on', bn.dataset.mode===mode); });
-    try{ sessionStorage.setItem('wk_mode', mode); }catch(e){}
+    var cb=document.querySelector('.wk-mode-b[data-mode="candle"]'); if(cb){ var lo=isLineOnly(ASSET); cb.classList.toggle('wk-mode-off', lo); cb.title=lo?'Candles — unavailable (line only, no OHLC)':'Candles'; }
   }
 
   function toggleInd(k,on){
