@@ -678,6 +678,13 @@
   .wk-mode-b.on{background:rgba(45,212,191,.22);color:#5eead4;}
   /* live BTC price tag on the right axis (Fase L) — teal bg, black text, slightly larger, always green */
   .wk-livetag{position:absolute;right:0;z-index:7;background:#2dd4bf;color:#04201c;font-weight:700;line-height:1;padding:3px 0;border-radius:3px 0 0 3px;pointer-events:none;transform:translateY(-50%);white-space:nowrap;text-align:center;display:none;font-variant-numeric:tabular-nums;box-shadow:0 1px 4px rgba(0,0,0,.4);box-sizing:border-box;overflow:hidden;}
+  /* "go to latest" arrow — shown only when the newest candle is scrolled off-screen; clear of the price axis + live tag */
+  .wk-goend{position:absolute;right:64px;top:50%;transform:translate(0,-50%);z-index:8;display:none;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:1px solid rgba(45,212,191,.5);border-radius:50%;background:rgba(8,23,28,.72);color:#5eead4;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.45);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);opacity:.82;transition:opacity .15s ease,background .15s ease,border-color .15s ease;-webkit-tap-highlight-color:transparent;}
+  .wk-goend svg{width:18px;height:18px;display:block;}
+  .wk-goend.show{display:inline-flex;animation:wkGoBob 1.4s ease-in-out infinite;}
+  .wk-goend:hover{opacity:1;background:rgba(45,212,191,.2);border-color:rgba(45,212,191,.8);}
+  @keyframes wkGoBob{0%,100%{transform:translate(0,-50%);}50%{transform:translate(4px,-50%);}}
+  @media (prefers-reduced-motion:reduce){ .wk-goend.show{animation:none;} }
   /* manipulation v2 comparison box — dark translucent, white text, 2px white left bar; draggable + persisted */
   .wk-manipbox{position:absolute;z-index:8;display:none;opacity:0;transition:opacity .5s ease;background:rgba(10,22,20,.82);color:#eef5f3;border-left:2px solid #fff;border-radius:2px;padding:9px 12px 10px;width:184px;box-shadow:0 6px 24px rgba(0,0,0,.5);font-variant-numeric:tabular-nums;-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;}
   .wk-manipbox.on{opacity:1;}
@@ -866,7 +873,7 @@
              lightweight-charts-drawing lib. 6 parent groups (Linhas/Rectangle/Fib/Previsão/Text/Brush)
              + cursor + trash. Submenus (flyouts) open to the right. -->
         <div class="wk-drawbar" id="wk-drawbar" aria-label="Drawing tools"></div>
-        <div id="wk-chart"><div class="wk-loading" id="wk-loading">loading BTC series 2011→today…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div><div class="wk-livetag" id="wk-livetag"></div><canvas class="wk-cycleoverlay" id="wk-cycleoverlay"></canvas><canvas class="wk-heatstrip" id="wk-heatstrip"></canvas>
+        <div id="wk-chart"><div class="wk-loading" id="wk-loading">loading BTC series 2011→today…</div><div class="wk-legend" id="wk-legend"></div><div class="wk-titles" id="wk-titles"></div><div class="wk-toast" id="wk-toast"></div><div class="wk-livetag" id="wk-livetag"></div><button class="wk-goend" id="wk-goend" title="Go to latest" aria-label="Go to latest"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13"/><path d="M13 6l6 6-6 6"/></svg></button><canvas class="wk-cycleoverlay" id="wk-cycleoverlay"></canvas><canvas class="wk-heatstrip" id="wk-heatstrip"></canvas>
         <div class="wk-modetog" id="wk-modetog">
           <button class="wk-mode-b wk-rulertog" id="wk-rulertog" title="Ruler / measure" aria-label="Ruler"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="8" rx="1"/><path d="M7 8v3M11 8v4M15 8v3M19 8v4"/></svg></button>
           <div class="wk-mode-sep"></div>
@@ -2428,6 +2435,29 @@
       if(Math.abs(vel)>0.004){ _pan.raf=requestAnimationFrame(frame); } else { _pan.raf=null; } }
     _pan.raf=requestAnimationFrame(frame); }
 
+  // ── "go to latest" arrow: appears when the newest real candle is scrolled off the right edge ──
+  // Reuses scrollPosition()/scrollToPosition() + the same rAF easing family as the momentum pan.
+  // The series carries a large future-whitespace tail, so "the end" is the last REAL candle
+  // (logical index ACTIVE.length-1), NOT scroll position 0. We measure how far that candle sits
+  // past the right edge via the visible logical range and animate scrollPosition by that delta.
+  var goEndBtn=null, _goRaf=null;
+  var GOEND_THRESH=2;   // bars past the right edge before we show the arrow (prevents flicker near the end)
+  function barsPastEnd(){ if(!chart||!ACTIVE.length) return -999; try{ var lr=chart.timeScale().getVisibleLogicalRange(); if(!lr) return -999; return (ACTIVE.length-1)-lr.to; }catch(e){ return -999; } }
+  function updateGoEnd(){ if(!goEndBtn) goEndBtn=document.getElementById('wk-goend'); if(!goEndBtn) return;
+    goEndBtn.classList.toggle('show', barsPastEnd() > GOEND_THRESH); }
+  try{ window.__goProbe=function(){ var b=document.getElementById('wk-goend'); var sp=null; try{ sp=chart.timeScale().scrollPosition(); }catch(e){} return {shown:!!(b&&b.classList.contains('show')), bpe:barsPastEnd(), scrollPos:sp, len:ACTIVE.length}; }; }catch(e){}   // read-only test hook
+  function goToEnd(){ if(!chart||!ACTIVE.length) return; if(_goRaf){ cancelAnimationFrame(_goRaf); _goRaf=null; }
+    cancelMomentum();   // stop any inertia from a fling so it can't fight the glide
+    var ts=chart.timeScale(); var startPos; try{ startPos=ts.scrollPosition(); }catch(e){ return; }
+    if(Math.abs(startPos)<0.5){ try{ ts.scrollToPosition(0,false); }catch(_){} updateGoEnd(); return; }   // already at the end
+    var dur=Math.max(320, Math.min(900, 60*Math.sqrt(Math.abs(startPos))));   // eased duration scaled to distance
+    var t0=performance.now();
+    function frame(now){ var e=Math.min(1,(now-t0)/dur), k=1-Math.pow(1-e,3);   // easeOutCubic → glide scrollPosition to 0 (newest candle at the right edge)
+      try{ ts.scrollToPosition(startPos*(1-k), false); }catch(_){} positionLiveTag();
+      if(e<1){ _goRaf=requestAnimationFrame(frame); }
+      else { _goRaf=null; try{ ts.scrollToPosition(0, false); }catch(_){} updateGoEnd(); } }
+    _goRaf=requestAnimationFrame(frame); }
+
   // ── intraday (a)/(b) helpers — replace the old "warn + fallback 1D" ────────────────────────
   function toEpoch(t){ if(t==null) return null; if(typeof t==='number') return t; if(typeof t==='object'&&t.year) return Math.floor(Date.UTC(t.year,t.month-1,t.day)/1000); return Math.floor(Date.parse(t+'T00:00:00Z')/1000); }
   function visibleEpochRange(){ if(!chart) return null; try{ var r=chart.timeScale().getVisibleRange(); if(!r) return null; return {from:toEpoch(r.from), to:toEpoch(r.to)}; }catch(e){ return null; } }
@@ -2571,7 +2601,10 @@
     livePrice = ACTIVE.length ? ACTIVE[ACTIVE.length-1].close : null;   // seed from last close → no empty gap
     positionLiveTag(); updateQuote();
     chart.subscribeCrosshairMove(function(){ positionLiveTag(); });
-    try{ chart.timeScale().subscribeVisibleLogicalRangeChange(function(){ positionLiveTag(); }); }catch(e){}
+    try{ chart.timeScale().subscribeVisibleLogicalRangeChange(function(){ positionLiveTag(); updateGoEnd(); }); }catch(e){}
+    goEndBtn=document.getElementById('wk-goend');
+    if(goEndBtn && !goEndBtn._wired){ goEndBtn._wired=true; goEndBtn.addEventListener('click', function(ev){ ev.preventDefault(); ev.stopPropagation(); goToEnd(); }); }
+    updateGoEnd();
     if(!liveTimer){ fetchLive(); liveTimer=setInterval(fetchLive, 5000); }
 
     wireDrawing();   // Fase VII: attach the drawing manager + build the toolbar (no-op if the CDN didn't load)
@@ -2613,7 +2646,7 @@
   function relayout(){ if(!chart) return; var n=Object.keys(oscReg).length; var el=document.getElementById('wk-chart');
     var avail=availH(), minTotal=OSC_MIN*(PRICE_STRETCH+n);
     el.style.height=(n>0 ? Math.max(avail, minTotal) : avail)+'px';   // snap to screen; grow→scroll only if min won't fit
-    applyStretch(); positionTitles(); positionLiveTag(); try{ requestAnimationFrame(function(){ positionTitles(); positionLiveTag(); }); }catch(e){} }
+    applyStretch(); positionTitles(); positionLiveTag(); updateGoEnd(); try{ requestAnimationFrame(function(){ positionTitles(); positionLiveTag(); updateGoEnd(); }); }catch(e){} }
   function lin(s){ try{ s.priceScale().applyOptions({mode:0,borderColor:'#1f2430',scaleMargins:{top:0.16,bottom:0.1}}); }catch(e){} }   // oscillator panes are LINEAR (chart log mode breaks MACD negatives)
   function addOsc(id){ if(oscReg[id]||!OSC[id]) return; var paneIdx=chart.panes().length; var built=OSC[id].build(paneIdx, oscCfg[id]); lin(built.series[0]);
     oscReg[id]={series:built.series, pane:chart.panes()[paneIdx], priceLines:built.priceLines, kind:id}; relayout(); }
@@ -3908,7 +3941,7 @@
     // active tool's required-anchor count is reached, the drawing is created. Listening on the container's
     // 'click' (which the browser suppresses after a drag) means panning never accidentally places anchors.
     var chEl=document.getElementById('wk-chart'); var seq=0, lastTouchPlace=0;
-    function onUI(targetEl){ return targetEl && targetEl.closest && targetEl.closest('.wk-drawbar,.wk-modetog,.wk-legend,.wk-livetag,.wk-titles'); }
+    function onUI(targetEl){ return targetEl && targetEl.closest && targetEl.closest('.wk-drawbar,.wk-modetog,.wk-legend,.wk-livetag,.wk-titles,.wk-goend'); }
     function toPx(clientX, clientY){ var rect=chEl.getBoundingClientRect(); return {px:clientX-rect.left, py:clientY-rect.top}; }
     function placeAnchorAt(clientX, clientY, targetEl){ if(!drawTool) return; if(onUI(targetEl)) return;
       var c=toPx(clientX,clientY);
