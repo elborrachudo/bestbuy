@@ -154,7 +154,7 @@ const money = (x) => (x < 0 ? '-$' : '$') + Math.abs(x).toFixed(2);
 const pp = (x) => (x >= 0 ? '+' : '') + x.toFixed(1) + '%';
 
 // ── 1) FULL HISTORY — gross → net erosion ─────────────────────────────────────────
-const out = { generatedFromRows: N, span: [dates[0], dates[N - 1]], unit: UNIT, full: [], bull: [] };
+const out = { generatedFromRows: N, span: [dates[0], dates[N - 1]], unit: UNIT, full: [], bull: [], bear: [] };
 console.log('════════════════════════════════════════════════════════════════════');
 console.log('WAKAWAKA signal backtest — BTC daily', dates[0], '→', dates[N - 1], `(${N} days)`);
 console.log('UNIT per 1.0x BUY = $' + UNIT, '· costs charged both sides + on liquidation');
@@ -199,6 +199,30 @@ for (const b of BULLS) {
     (pp(r.alphaVsLumpPP)).padStart(11), '|',
     (r.maxDD.toFixed(0) + '%').padStart(5), '|',
     (r.timeInMkt.toFixed(0) + '%').padStart(5));
+}
+
+// ── 3) BEAR REGIMES — does it protect? (the prior "positive alpha in bear" claim) ─
+const BEARS = [
+  { name: '2014–2015 bear', from: '2014-01-01', to: '2015-08-31' },
+  { name: '2018 bear',      from: '2018-01-01', to: '2018-12-31' },
+  { name: '2022 bear',      from: '2021-12-01', to: '2022-12-31' },
+];
+console.log('\n### 3. BEAR REGIMES — net (low fee) strategy vs buy-and-hold (risk-reducer test)\n');
+console.log('window          | trades  | strat ret | LUMP B&H | strat maxDD | hold maxDD | in-mkt | alpha vs LUMP');
+console.log('----------------|---------|-----------|----------|-------------|------------|--------|--------------');
+for (const b of BEARS) {
+  const a = idxOf(b.from, 1), z = idxOf(b.to, -1);
+  const r = simulate(a, z, NET_LOW);
+  out.bear.push({ window: b.name, from: dates[a], to: dates[z], ...stripSignals(r) });
+  console.log(
+    b.name.padEnd(15), '|',
+    String(`${r.nBuy}B/${r.nSell}S`).padStart(7), '|',
+    pp(r.stratRet).padStart(9), '|',
+    pp(r.lumpRet).padStart(8), '|',
+    (r.maxDD.toFixed(0) + '%').padStart(11), '|',
+    (r.holdMaxDD.toFixed(0) + '%').padStart(10), '|',
+    (r.timeInMkt.toFixed(0) + '%').padStart(6), '|',
+    (pp(r.alphaVsLumpPP)).padStart(12));
 }
 
 // full-history buy/sell ledger (for the report appendix) at net-low
