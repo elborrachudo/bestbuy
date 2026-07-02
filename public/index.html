@@ -3692,22 +3692,25 @@
       out.push({time:days[t], open:open, high:hi, low:lo, close:close, color:col, wickColor:col, borderColor:col}); prevClose=close; }
     return out; }
   // FAITHFUL CredibleCrypto plan — smooth macro skeleton (levels+timeline) + the pivot phase windows.
-  function ccPlan(which){ var b=scenBase(); if(!b) return null; var D=b.lastDate, last=b.last;
-    function fut(dabs,minD){ var c=addDaysStr(D,minD); return dabs>c?dabs:c; }
-    if(which==='bull'){ var top=fut('2026-07-01',120), topEnd=addDaysStr(top,180);   // 🟢 near-vertical, tops MID-2026
-      return { macro:[{t:D,price:last},{t:top,price:230000},{t:topEnd,price:225000}],
-        phases:[{type:'distribution', from:top, to:topEnd, lo:180000, hi:300000}] }; }
-    if(which==='bal'){ var dip=fut('2026-08-01',80), latEnd=fut('2027-11-01',560), top=fut('2028-05-01',730), topEnd=addDaysStr(top,200);   // 🔵 dip → reaccumulation base → steep late 2028
-      return { macro:[{t:D,price:last},{t:dip,price:CC.P50},{t:latEnd,price:66000},{t:top,price:200000},{t:topEnd,price:195000}],
-        phases:[{type:'accumulation', from:dip, to:latEnd, lo:58000, hi:72000},{type:'distribution', from:top, to:topEnd, lo:170000, hi:250000}] }; }
-    if(which==='bear'){ var bot=fut('2026-09-01',150), baseEnd=fut('2029-06-01',1120), top=fut('2030-03-01',1350), topEnd=addDaysStr(top,200);   // 🔴 deep to 21k → LONG base → steepest ~2030
-      return { macro:[{t:D,price:last},{t:bot,price:CC.P85},{t:baseEnd,price:33000},{t:top,price:235000},{t:topEnd,price:228000}],
-        phases:[{type:'accumulation', from:bot, to:baseEnd, lo:20000, hi:42000},{type:'distribution', from:top, to:topEnd, lo:190000, hi:300000}] }; }
-    return null; }
-  function ccLine(which){ var p=ccPlan(which); if(!p) return null;
-    return interpWP(p.macro).map(function(x){ return {time:x.time, value:x.value, close:x.value}; }); }   // squiggle = faithful smooth path (no serrated/distrib artifacts)
+  // ── CC-TRACE: the EXACT traces digitized (pixel-colour) from CredibleCrypto's chart image, calibrated to
+  // his fib labels + year axis. Used VERBATIM — no smoothing, no re-timing, no snapping. The jaggedness IS
+  // the drawing. green=bull, blue=balanced, red=bearish. (counts: green 38, blue 51, red 52.)
+  var CC_TRACED={"green":[["2026-03-09",73017],["2026-03-14",73249],["2026-03-19",78598],["2026-03-24",79528],["2026-03-29",90224],["2026-04-03",96037],["2026-04-08",97898],["2026-04-13",102083],["2026-04-18",101618],["2026-04-23",100223],["2026-04-28",99060],["2026-05-03",97665],["2026-05-08",96502],["2026-05-12",95572],["2026-05-18",96270],["2026-05-22",108129],["2026-05-27",112082],["2026-06-01",121383],["2026-06-06",136265],["2026-06-11",138358],["2026-06-16",138590],["2026-06-21",137428],["2026-06-26",136730],["2026-07-01",135335],["2026-07-06",134405],["2026-07-11",133010],["2026-07-16",132312],["2026-07-20",131847],["2026-07-25",139753],["2026-07-30",142776],["2026-08-04",157193],["2026-08-09",169749],["2026-08-14",181608],["2026-08-19",195328],["2026-08-24",202536],["2026-08-29",211837],["2026-09-03",213465],["2026-09-03",213465]],"blue":[["2026-01-29",76505],["2026-02-13",75342],["2026-02-27",73947],["2026-04-03",67901],["2026-04-18",68599],["2026-05-03",67669],["2026-06-01",61390],["2026-06-16",59995],["2026-07-01",59763],["2026-07-16",57902],["2026-07-30",55345],["2026-08-14",53252],["2026-08-29",53949],["2026-09-13",54647],["2026-09-28",56275],["2026-10-12",58832],["2026-10-27",56507],["2026-11-11",56275],["2026-11-26",55345],["2026-12-10",55810],["2026-12-25",56507],["2027-01-09",57205],["2027-01-24",57437],["2027-02-08",55345],["2027-02-23",54647],["2027-03-10",53484],["2027-03-24",53252],["2027-04-08",51857],["2027-04-23",49299],["2027-05-08",45578],["2027-05-22",43253],["2027-06-06",40230],["2027-06-21",39998],["2027-07-06",41858],["2027-07-21",43020],["2027-08-04",43718],["2027-08-19",45811],["2027-09-03",50461],["2027-09-18",53717],["2027-10-02",55577],["2027-10-17",54182],["2027-11-01",53019],["2027-11-16",52322],["2027-12-01",52322],["2027-12-16",52554],["2027-12-31",56042],["2028-01-14",58600],["2028-01-29",61390],["2028-02-13",96037],["2028-02-28",96037],["2028-03-13",178120]],"red":[["2026-05-17",62320],["2026-06-21",52787],["2026-07-25",43485],["2026-08-29",37207],["2026-10-03",36510],["2026-11-06",39998],["2026-12-11",36742],["2027-01-14",30696],["2027-02-18",28836],["2027-03-24",29534],["2027-04-28",30696],["2027-06-01",26046],["2027-07-06",20930],["2027-08-09",17907],["2027-09-13",21395],["2027-10-17",23488],["2027-11-21",16047],["2027-12-25",10931],["2028-01-29",9769],["2028-03-04",12559],["2028-04-07",17442],["2028-05-12",18372],["2028-06-20",10931],["2028-07-25",10001],["2028-08-28",16512],["2028-10-02",16977],["2028-11-05",16512],["2028-12-10",21395],["2029-01-14",21163],["2029-02-18",13954],["2029-03-24",16279],["2029-04-28",22325],["2029-06-01",22093],["2029-07-06",27441],["2029-08-09",28836],["2029-09-13",23953],["2029-10-18",29534],["2029-11-21",35114],["2029-12-26",40463],["2030-01-29",37672],["2030-03-05",40928],["2030-04-08",42090],["2030-05-13",43020],["2030-06-16",54414],["2030-07-21",68134],["2030-08-24",83248],["2030-09-28",99990],["2030-11-01",119058],["2030-12-06",143706],["2031-01-09",176725],["2031-02-13",234393],["2031-02-18",234393]]};
+  var CC_TRACE_KEY={bull:'green', bal:'blue', bear:'red'};
+  function ccTrace(which){ var arr=CC_TRACED[CC_TRACE_KEY[which]]||[]; var out=[];
+    for(var i=0;i<arr.length;i++){ var t=arr[i][0], p=arr[i][1]; if(out.length && out[out.length-1].t===t){ out[out.length-1]={t:t,price:p}; continue; } out.push({t:t, price:p}); }   // drop duplicate-timestamp points (LWC needs unique times); order preserved
+    return out; }
+  // detect the pivot phases in a trace/path for the hybrid: long low-zone windows → accumulation base
+  function detectPhases(wp){ if(!wp||wp.length<4) return []; var pr=wp.map(function(p){return p.price;}), mn=Math.min.apply(null,pr), mx=Math.max.apply(null,pr);
+    if(!(mx>mn)) return []; var loThresh=Math.exp(Math.log(mn)+(Math.log(mx)-Math.log(mn))*0.45), phases=[], i=0, N=wp.length;
+    while(i<N){ if(wp[i].price<=loThresh){ var j=i; while(j+1<N && wp[j+1].price<=loThresh) j++;
+        if(daysBetween(wp[i].t,wp[j].t)>=180){ var seg=pr.slice(i,j+1), lo=Math.min.apply(null,seg)*0.9, hi=Math.max.apply(null,seg)*1.15; phases.push({type:'accumulation', from:wp[i].t, to:wp[j].t, lo:lo, hi:hi}); } i=j+1; } else i++; } return phases; }
+  // plan for the HYBRID: macro = HIS exact trace (analyst's path); phases detected on it → real-phase texture
+  function ccPlan(which){ var wp=ccTrace(which); if(wp.length<2) return null; return { macro:wp.slice(), phases:detectPhases(wp) }; }
+  // squiggle = the EXACT trace, verbatim (linear between points, no interpolation/smoothing)
+  function ccLine(which){ var wp=ccTrace(which); if(wp.length<2) return null; return wp.map(function(p){ return {time:p.t, value:p.price, close:p.price}; }); }
   function ccCandles(which, colorRGB, seed){ var p=ccPlan(which); if(!p) return null; return analogHybrid(p, colorRGB, seed, 'cc-'+which); }
-  try{ window.__analogPicks=function(){ return ANALOG_PICKS; }; }catch(e){}
+  try{ window.__analogPicks=function(){ return ANALOG_PICKS; }; window.__ccTrace=function(w){ return ccTrace(w); }; }catch(e){}
 
   // Builders keyed by 'baseId|layer' — squiggle (clean line) + hybrid (analog candles) per scenario.
   var SCEN_BUILDERS={ 'dual-horizon': buildDualHorizon,
