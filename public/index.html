@@ -390,8 +390,7 @@
   .wk-asset-item{font-size:13px;color:#cfe7ec;padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;}
   .wk-asset-item:hover{background:rgba(45,212,191,.12);}
   .wk-asset-item.on{background:rgba(45,212,191,.20);color:#5eead4;font-weight:600;}
-  .wk-asset-item .wk-ai-sym{font-weight:700;}
-  .wk-asset-item .wk-ai-dep{margin-left:auto;font-size:10px;color:#6f9aa2;font-weight:400;}
+  .wk-asset-item .wk-ai-sym{font-weight:700;white-space:nowrap;}
   .wk-ov-item{font-size:12px;color:#cfe7ec;padding:7px 9px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;}
   .wk-ov-item:hover{background:rgba(45,212,191,.10);}
   .wk-ov-item.on{background:rgba(45,212,191,.16);}
@@ -403,6 +402,11 @@
   /* Fase VI-b: "+" overlay dropdown — one line per item (no wrap / no truncation) + collapsible groups.
      Layout/CSS + collapse only; overlay data/scales/colours/order untouched. */
   #wk-ovMenu.wk-ov-menu{width:266px;max-width:calc(100vw - 16px);}   /* ID selector beats the shared .wk-per-menu(92px); wider so long labels fit on one line; clamped on mobile */
+  /* Asset/ticker menu: width adapts to the widest ticker name (ID beats the shared .wk-per-menu 92px).
+     sizeAssetMenu() sets min-width from the FULL ASSET_LIST so it stays stable while filtering; never a horizontal scrollbar. */
+  #wk-assetMenu.wk-asset-menu{width:auto;min-width:96px;max-width:calc(100vw - 16px);overflow-x:hidden;}
+  #wk-assetMenu .wk-asset-item{white-space:nowrap;}
+  #wk-assetMenu .wk-srch input{width:0;}   /* the search input must not drive the width (flex:1 + min-width:0 fill the ticker-defined width) */
   .wk-ov-item{font-size:11.5px;}                            /* slightly smaller so everything fits legibly */
   .wk-ov-nm{white-space:nowrap;}                            /* never wrap or cut mid-word */
   .wk-ov-head{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;-webkit-user-select:none;white-space:nowrap;}
@@ -3316,6 +3320,12 @@
   try{ window.__timeRange=function(){ try{ return chart.timeScale().getVisibleRange(); }catch(e){ return null; } };
     window.__coordOf=function(t){ try{ return chart.timeScale().timeToCoordinate(t); }catch(e){ return null; } };
     window.__pxOf=function(p){ try{ return area.priceToCoordinate(p); }catch(e){ return null; } };
+    // dev-only (future-proof check; never persists a fake ticker): push a long ticker + rebuild, then
+    // __dropdownRestore() puts ASSET_LIST back exactly.
+    var _ddSnap=null;
+    window.__dropdownPush=function(sym){ _ddSnap=ASSET_LIST.slice(); ASSET_LIST.push({sym:sym,dep:''}); ASSET_LIST.sort(function(a,b){return a.sym<b.sym?-1:(a.sym>b.sym?1:0);}); buildAssetList('');
+      var menu=document.getElementById('wk-assetMenu'); return {width:menu.offsetWidth, hasLong:[].some.call(menu.querySelectorAll('.wk-ai-sym'),function(s){return s.textContent===sym;})}; };
+    window.__dropdownRestore=function(){ if(_ddSnap){ ASSET_LIST.length=0; _ddSnap.forEach(function(x){ASSET_LIST.push(x);}); _ddSnap=null; buildAssetList(''); } return ASSET_LIST.length; };
     window.__alignTest=function(id){ return new Promise(function(res){ try{ fetchOverlayData(id,function(pts){ var a=alignOverlay(id,pts)||[]; res({ raw:pts.length, aligned:a.length, first:a.length?a[0].time:null, last:a.length?a[a.length-1].time:null, allMonthStart:a.every(function(p){return typeof p.time==='string'&&/-01$/.test(p.time);}) }); }); }catch(e){ res({error:String(e)}); } }); }; }catch(e){}
   // overlay catalogue: 10 assets (price, own hidden scale) + 9 own-axis series.
   var OV_SERIES=[
@@ -3544,14 +3554,21 @@
   // ── menu rendering + search ───────────────────────────────────────────────────────────────────
   function refreshAssetUI(){ var lab=document.getElementById('wk-assetLabel'); if(lab) lab.textContent=ASSET;
     Array.prototype.forEach.call(document.querySelectorAll('#wk-assetList .wk-asset-item'),function(it){ it.classList.toggle('on', it.dataset.sym===ASSET); }); }
+  // Size the asset menu's min-width from the WIDEST ticker name in the FULL list (canvas text metrics,
+  // menu need not be visible) → width adapts to ticker length AND stays stable while the user filters
+  // (a filtered subset is never wider than the full-list max). Recompute when ASSET_LIST changes.
+  function sizeAssetMenu(){ var menu=document.getElementById('wk-assetMenu'); if(!menu) return;
+    var cv=sizeAssetMenu._cv||(sizeAssetMenu._cv=document.createElement('canvas')); var ctx=cv.getContext('2d');
+    ctx.font='700 13px -apple-system,system-ui,sans-serif'; var w=0;
+    ASSET_LIST.forEach(function(a){ var m=ctx.measureText(a.sym).width; if(m>w) w=m; });
+    var px=Math.ceil(w) + 20/*item padding*/ + 12/*menu padding*/ + 16/*scrollbar allowance*/ + 6/*breathing*/;
+    menu.style.minWidth=Math.max(96,px)+'px'; }
   function buildAssetList(filter){ var host=document.getElementById('wk-assetList'); if(!host) return; host.innerHTML=''; filter=(filter||'').trim().toUpperCase();
     ASSET_LIST.filter(function(a){ return !filter || a.sym.indexOf(filter)>=0; }).forEach(function(a){
       var it=document.createElement('div'); it.className='wk-asset-item'+(a.sym===ASSET?' on':''); it.dataset.sym=a.sym;
-      var dep = a.monthly ? ('line · since '+a.dep+' · monthly')   // XAUUSD: gold, monthly line since 1833
-              : a.lineOnly ? ('line · '+((tokenFirstDate(a.sym)||'').slice(0,7)||'readings'))   // tokens: "line · YYYY-MM" (first reading), honest short history
-              : ('since '+a.dep);
-      it.innerHTML='<span class="wk-ai-sym" style="color:'+assetColor(a.sym)+'">'+a.sym+'</span><span class="wk-ai-dep">'+dep+'</span>';
-      it.onclick=function(){ applyAsset(a.sym); }; host.appendChild(it); }); }
+      it.innerHTML='<span class="wk-ai-sym" style="color:'+assetColor(a.sym)+'">'+a.sym+'</span>';   // ticker name only (no date subtitle) — owner request 2026-10-15
+      it.onclick=function(){ applyAsset(a.sym); }; host.appendChild(it); });
+    sizeAssetMenu(); }
   function refreshOvUI(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-ovList .wk-ov-item'),function(it){ var id=it.dataset.id; var on=!!overlays[id];
       it.classList.toggle('on', on); var chk=it.querySelector('.wk-ov-chk'); if(chk) chk.textContent=on?'✓':''; var col=it.querySelector('.wk-ov-col'); if(col){ col.style.background=(overlays[id]?overlays[id].color:ovDefColor(id)); } });
     var b=document.getElementById('wk-ovBtn'); if(b) b.classList.toggle('on', Object.keys(overlays).length>0); }
