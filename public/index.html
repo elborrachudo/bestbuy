@@ -2961,17 +2961,20 @@
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save();
         var xs=xc(ts,GS_START), xe=xc(ts,GS_END), xa=xc(ts,AV_END);
         var bx0=(xs==null)?0:xs, bx1=(xe==null)?W:xe;
-        if(bx1>bx0){ ctx.fillStyle='rgba(212,175,55,0.06)'; ctx.fillRect(bx0,0,bx1-bx0,H);
-          var ax1=(xa==null)?bx1:xa; if(ax1>bx0){ ctx.fillStyle='rgba(212,175,55,0.05)'; ctx.fillRect(bx0,0,ax1-bx0,H); } }
+        if(bx1>bx0){ ctx.fillStyle='rgba(212,175,55,0.10)'; ctx.fillRect(bx0,0,bx1-bx0,H);   // whole gold-standard era (1833→Aug 1971), discreet but visible — incl. 1960–1971
+          var ax1=(xa==null)?bx1:xa; if(ax1>bx0){ ctx.fillStyle='rgba(212,175,55,0.05)'; ctx.fillRect(bx0,0,ax1-bx0,H); }   // 1833–1959 marker, a touch darker
+          ctx.fillStyle='rgba(212,175,55,0.16)'; ctx.fillRect(bx1-1,0,1,H); }   // faint right edge at 1971 so the band reads as one era
         ctx.restore(); }); } };
     var fg={ draw:function(target){ if(!ch || ASSET!=='XAUUSD') return; var ts=ch.timeScale();
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save();
         var xs=xc(ts,GS_START), xe=xc(ts,GS_END); var bx0=(xs==null)?0:xs;
-        ctx.font='10px -apple-system,system-ui,sans-serif'; ctx.textBaseline='top';
-        if(bx0<W-6){ ctx.fillStyle='rgba(212,175,55,0.6)'; ctx.fillText('Gold standard · fixed official price', Math.max(4,bx0+6), 6);
-          ctx.fillStyle='rgba(212,175,55,0.42)'; ctx.fillText('annual average repeated monthly', Math.max(4,bx0+6), 20); }
-        if(xe!=null && xe>=0 && xe<=W){ ctx.save(); ctx.setLineDash([3,3]); ctx.lineWidth=1; ctx.strokeStyle='rgba(212,175,55,0.5)'; var xx=Math.round(xe)+0.5; ctx.beginPath(); ctx.moveTo(xx,0); ctx.lineTo(xx,H); ctx.stroke(); ctx.setLineDash([]);
-          ctx.fillStyle='rgba(212,175,55,0.68)'; ctx.fillText('End of gold standard (Aug 1971)', Math.min(W-166, xx+4), 36); ctx.restore(); }
+        ctx.font='10px -apple-system,system-ui,sans-serif';
+        // band labels at the BOTTOM of the band (above the source line) → never overlap the top-left legend / crosshair readout
+        if(bx0<W-6 && (xe==null || xe>6)){ ctx.textBaseline='bottom';
+          ctx.fillStyle='rgba(212,175,55,0.62)'; ctx.fillText('Gold standard · fixed official price', Math.max(4,bx0+6), H-32);
+          ctx.fillStyle='rgba(212,175,55,0.44)'; ctx.fillText('annual average repeated monthly', Math.max(4,bx0+6), H-18); }
+        if(xe!=null && xe>=0 && xe<=W){ ctx.save(); ctx.setLineDash([3,3]); ctx.lineWidth=1; ctx.strokeStyle='rgba(212,175,55,0.55)'; var xx=Math.round(xe)+0.5; ctx.beginPath(); ctx.moveTo(xx,0); ctx.lineTo(xx,H); ctx.stroke(); ctx.setLineDash([]);
+          ctx.textBaseline='top'; ctx.fillStyle='rgba(212,175,55,0.7)'; ctx.fillText('End of gold standard (Aug 1971)', Math.min(W-166, xx+4), 8); ctx.restore(); }   // near the 1971 line (not top-left)
         if(goldMeta.provMonth){ var px=xc(ts,goldMeta.provMonth), py=null, lastC=ACTIVE.length?ACTIVE[ACTIVE.length-1].close:null; try{ if(lastC!=null) py=area.priceToCoordinate(lastC); }catch(e){}
           if(px!=null && py!=null){ ctx.beginPath(); ctx.arc(px,py,4,0,2*Math.PI); ctx.fillStyle='rgba(10,27,33,0.92)'; ctx.fill(); ctx.lineWidth=1.3; ctx.strokeStyle='rgba(212,175,55,0.85)'; ctx.stroke(); } }
         ctx.fillStyle='rgba(127,166,173,0.6)'; ctx.font='9px -apple-system,system-ui,sans-serif'; ctx.textBaseline='bottom';
@@ -3372,7 +3375,9 @@
     var firstBarInMonth={}; for(var i=0;i<active.length;i++){ var t=active[i].time; if(typeof t!=='string') continue; var mk=t.slice(0,7); if(firstBarInMonth[mk]===undefined) firstBarInMonth[mk]=t; }
     var out=[]; monthlyPts.forEach(function(p){ if(p.value==null||!isFinite(p.value)) return; var m=(typeof p.time==='string')?p.time:''; if(m<first||m>last) return; var bt=firstBarInMonth[m.slice(0,7)]; if(bt===undefined||bt<first) return; out.push({time:bt, value:p.value}); });
     out.sort(function(a,b){ return a.time<b.time?-1:(a.time>b.time?1:0); }); var d=[]; for(var j=0;j<out.length;j++){ if(d.length&&d[d.length-1].time===out[j].time) d[d.length-1]=out[j]; else d.push(out[j]); } return d; }
-  function alignOverlay(id, pts){ if(!pts||!pts.length||!ACTIVE.length) return pts||[];
+  function isSelfOverlay(id){ return id==='asset:'+ASSET; }   // the main asset must never be overlaid on itself
+  function alignOverlay(id, pts){ if(isSelfOverlay(id)) return [];   // self-overlay → draw nothing (restored when the main asset changes)
+    if(!pts||!pts.length||!ACTIVE.length) return pts||[];
     var sym=(id.indexOf('asset:')===0)?id.slice(6):null;
     if(isMonthlyAsset(ASSET)) return bucketMonthlyAvg(pts, ACTIVE[0].time, ACTIVE[ACTIVE.length-1].time);   // (b)
     if(sym && isMonthlyAsset(sym)){ if(isIntra()) return []; return snapMonthlyToMain(pts, ACTIVE); }        // (a)
@@ -3600,7 +3605,8 @@
       rows.forEach(function(r){ body.appendChild(r); });
       g.appendChild(h); g.appendChild(body); host.appendChild(g);
     }
-    var aRows=[]; ASSET_LIST.forEach(function(a){ var id='asset:'+a.sym, label=a.sym; if(filter && label.toLowerCase().indexOf(filter)<0) return; aRows.push(ovRow(id,label,ovDefColor(id))); });
+    var aRows=[]; ASSET_LIST.forEach(function(a){ if(a.sym===ASSET) return;   // never list the main asset as an overlay on itself
+      var id='asset:'+a.sym, label=a.sym; if(filter && label.toLowerCase().indexOf(filter)<0) return; aRows.push(ovRow(id,label,ovDefColor(id))); });
     group('assets','Assets (own scale)', aRows);
     var sRows=[]; OV_SERIES.forEach(function(s){ if(filter && s.label.toLowerCase().indexOf(filter)<0) return; sRows.push(ovRow(s.id,s.label,s.color)); });
     group('series','Series (own axis)', sRows);

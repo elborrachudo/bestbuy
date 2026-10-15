@@ -15,7 +15,9 @@ import { getBtcDailySeries, classifyLatest } from '../lib/cycle.js';
 import { fetchGlobalM2Inputs, globalM2MetricsAsOf } from '../lib/globalm2.js';
 import { rollIntraday, closeDailyCandle } from '../lib/btcintraday.js';
 import { fetchMarketSnapshot, fetchFearGreed, computeDerivables } from '../lib/marketdaily.js';
-import { goldStep } from '../lib/gold.js';
+// NOTE: lib/gold.js is imported DYNAMICALLY inside the goldStep try/catch below — a top-level
+// import that fails to load would kill the whole cron (and the host-job try/catch cannot catch a
+// module-load error). Dynamic import keeps a gold problem fully isolated from the host job.
 
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL;
@@ -223,6 +225,7 @@ export default async function handler(req, res) {
   // must NEVER fail, delay or alter the host job above (critical invariant), so it is
   // wrapped in its own try/catch and only ever appends to the summary.
   try {
+    const { goldStep } = await import('../lib/gold.js');   // dynamic → a load error here cannot take down the host job
     const gold = await goldStep(base, serviceKey, {});
     summary.push({ gold });
   } catch (e) {
