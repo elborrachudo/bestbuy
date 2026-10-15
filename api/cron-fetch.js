@@ -15,6 +15,7 @@ import { getBtcDailySeries, classifyLatest } from '../lib/cycle.js';
 import { fetchGlobalM2Inputs, globalM2MetricsAsOf } from '../lib/globalm2.js';
 import { rollIntraday, closeDailyCandle } from '../lib/btcintraday.js';
 import { fetchMarketSnapshot, fetchFearGreed, computeDerivables } from '../lib/marketdaily.js';
+import { goldStep } from '../lib/gold.js';
 
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL;
@@ -216,6 +217,16 @@ export default async function handler(req, res) {
     } catch (e) {
       summary.push({ symbol: t.symbol, error: e.message });
     }
+  }
+
+  // ── XAUUSD (gold) — recorded AFTER all host writes, fully isolated. A gold failure
+  // must NEVER fail, delay or alter the host job above (critical invariant), so it is
+  // wrapped in its own try/catch and only ever appends to the summary.
+  try {
+    const gold = await goldStep(base, serviceKey, {});
+    summary.push({ gold });
+  } catch (e) {
+    summary.push({ gold_error: e.message });
   }
 
   res.status(200).json({ ok: true, fetched_at: fetchedAt, tokens: summary });

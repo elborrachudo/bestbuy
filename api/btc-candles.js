@@ -47,6 +47,20 @@ export default async function handler(req, res) {
       return;
     }
 
+    // ── XAUUSD (gold): monthly LINE from gold_monthly (o=h=l=c=price; it is a line, never
+    //    rendered as candles). Includes provisional flags + a meta block (source/licence). ─────
+    if (coin === 'XAUUSD') {
+      const rows = await sbSelectAll(base, key, 'gold_monthly?select=month,price,source,provisional,n_days&order=month.asc');
+      const candles = rows.map((r) => { const p = n(r.price); return { t: r.month, o: p, h: p, l: p, c: p, provisional: !!r.provisional, n_days: r.n_days == null ? null : Number(r.n_days) }; }).filter((d) => d.c != null);
+      const last = candles.length ? candles[candles.length - 1].t : null;
+      res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
+      res.status(200).json({ ok: true, tier: 'monthly', coin, count: candles.length,
+        first: candles.length ? candles[0].t : null, last,
+        meta: { source: 'World Gold Council / Timothy Green (1833–1959), World Bank Pink Sheet monthly avg (1960–)', licence: 'ODC-PDDL-1.0', updated: last },
+        candles });
+      return;
+    }
+
     // ── non-BTC asset: 1D candles from market_history ────────────────────────────────────────
     if (tier === 'daily' && coin !== 'BTC') {
       if (COINS.indexOf(coin) < 0) { res.status(400).json({ ok: false, error: `unknown coin '${coin}'` }); return; }
