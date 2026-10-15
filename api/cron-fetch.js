@@ -232,5 +232,15 @@ export default async function handler(req, res) {
     summary.push({ gold_error: e.message });
   }
 
+  // ── XCUUSD (copper) — AFTER gold, fully isolated in its own try/catch + dynamic import. A copper
+  // failure must never affect the host job OR the gold step.
+  try {
+    const { copperStep } = await import('../lib/copper.js');
+    const copper = await copperStep(base, serviceKey, {});
+    summary.push({ copper });
+  } catch (e) {
+    summary.push({ copper_error: e.message });
+  }
+
   res.status(200).json({ ok: true, fetched_at: fetchedAt, tokens: summary });
 }

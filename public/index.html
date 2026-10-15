@@ -2101,6 +2101,7 @@
   var HALV_COLOR='#C8A415';
   var inited=false, chart=null, L=null, area=null, candle=null, ma=null, halvPrim=null, halvAttached=false, phasePrim=null, manipPrim=null, manipAttached=false;
   var DATA=null, byTime={}, isLog=true, mode='line', userMode='line';   // userMode = the user's pick; effective mode is forced to 'line' for OHLC-less token assets
+  var monthlyCandleMode='candle';   // Phase COPPER: candle-monthly assets (XCUUSD) default to CANDLES; line still available (separate from BTC's userMode)
   var livePrice=null, live24h=null, liveTimer=null, liveTag=null, livePrim=null;   // Fase L/T: live BTC price + 24h change (5s, display-only)
   var CLOSE=[], oscReg={};   // CLOSE: active close series · oscReg: id -> {series:[…],pane,priceLines:[…],kind}
   var ASSET='BTC', assetDaily={}, overlays={};   // multi-asset: base asset (BTC default), per-coin daily cache, overlay-series registry
@@ -2167,6 +2168,7 @@
   // compact price labels (60k, 200k, 2M) → narrows the price-scale column (~0.7×)
   function wkFmtPrice(v){ if(v==null||!isFinite(v)) return '';
     if(typeof ASSET!=='undefined' && ASSET==='XAUUSD'){ return v<100 ? v.toFixed(2) : Math.round(v).toLocaleString('en-US'); }   // gold: 2 decimals under 100, else integer w/ thousands comma (legible 18.93 → 5,020)
+    if(typeof ASSET!=='undefined' && ASSET==='XCUUSD'){ return v.toFixed(3); }   // copper: USD per lb, 3 decimals (6.556)
     if(v>=1e6) return (v/1e6).toFixed(v>=1e7?0:1).replace(/\.0$/,'')+'M'; if(v>=1e3) return (v/1e3).toFixed(v>=1e5?0:1).replace(/\.0$/,'')+'k'; return ''+Math.round(v); }
 
   // ── client-side indicator math (BTC: not stored per-day) ──────────────────────
@@ -2615,6 +2617,7 @@
     try{ domPrim=makeDomPrimitive(); area.attachPrimitive(domPrim); domAttached=true; }catch(e){}   // Fase D: dominance markers (draw() no-ops until a metric is enabled)
     try{ livePrim=makeLivePrimitive(); area.attachPrimitive(livePrim); }catch(e){}   // live-price dotted line (draws at the live level each tick)
     try{ goldPrim=makeGoldPrimitive(); area.attachPrimitive(goldPrim); }catch(e){}   // Phase XAUUSD honesty annotations (draw() no-ops unless ASSET==='XAUUSD')
+    try{ copperPrim=makeCopperPrimitive(); area.attachPrimitive(copperPrim); }catch(e){}   // Phase COPPER annotations (draw() no-ops unless ASSET==='XCUUSD')
     try{ crossPrim=makeCrossPrimitive(); area.attachPrimitive(crossPrim); }catch(e){}   // MA crossover circles + glow
 
     setMode(initialMode());
@@ -2632,6 +2635,15 @@
         if(px==null){ leg.style.display='none'; return; }
         var prov=(goldMeta.provMonth && day===goldMeta.provMonth);
         leg.innerHTML='<b>'+label.slice(0,7)+'</b> · XAU <b>$'+wkFmtPrice(px)+'</b>'+(prov?(' · provisional · avg of '+(goldMeta.provN||'?')+' recorded days'):''); leg.style.display='block'; return;
+      }
+      if(ASSET==='XCUUSD'){   // copper readout: OHLC + USD/lb + quality note (gap / wick adjusted / thin / provisional)
+        var mq=monthlyQ[day]||{};
+        if(mq.q==='missing_source_corrupt'){ leg.innerHTML='<b>'+label.slice(0,7)+'</b> · XCUUSD · <b>source data corrupt — gap</b>'; leg.style.display='block'; return; }
+        var cc=null; try{ cc=param.seriesData&&param.seriesData.get(candle); }catch(e){}
+        if((!cc||cc.close==null) && px==null){ leg.style.display='none'; return; }
+        var notes=[]; if(mq.q==='ohlc_incoherent') notes.push('wick adjusted for display'); if(mq.q==='thin') notes.push('thin early data'); if(mq.prov) notes.push('provisional · approximate: built from '+(mq.nd||'?')+' daily snapshots');
+        var ohlc = cc ? ('O '+wkFmtPrice(cc.open)+' H '+wkFmtPrice(cc.high)+' L '+wkFmtPrice(cc.low)+' C '+wkFmtPrice(cc.close)) : ('$'+wkFmtPrice(px));
+        leg.innerHTML='<b>'+label.slice(0,7)+'</b> · XCUUSD '+ohlc+' · USD/lb'+(notes.length?(' · '+notes.join(' · ')):''); leg.style.display='block'; return;
       }
       var b=byTime[day]; if(px==null&&b) px=b.c;
       if(px==null){ leg.style.display='none'; return; }
@@ -2971,16 +2983,32 @@
         ctx.font='10px -apple-system,system-ui,sans-serif';
         // band labels at the BOTTOM of the band (above the source line) → never overlap the top-left legend / crosshair readout
         if(bx0<W-6 && (xe==null || xe>6)){ ctx.textBaseline='bottom';
-          ctx.fillStyle='rgba(212,175,55,0.62)'; ctx.fillText('Gold standard · fixed official price', Math.max(4,bx0+6), H-32);
-          ctx.fillStyle='rgba(212,175,55,0.44)'; ctx.fillText('annual average repeated monthly', Math.max(4,bx0+6), H-18); }
+          ctx.fillStyle='rgba(212,175,55,0.62)'; ctx.fillText('Gold standard · fixed official price', Math.max(74,bx0+6), H-32);   // ≥74px → clear of the bottom-left tool pill
+          ctx.fillStyle='rgba(212,175,55,0.44)'; ctx.fillText('annual average repeated monthly', Math.max(74,bx0+6), H-18); }
         if(xe!=null && xe>=0 && xe<=W){ ctx.save(); ctx.setLineDash([3,3]); ctx.lineWidth=1; ctx.strokeStyle='rgba(212,175,55,0.55)'; var xx=Math.round(xe)+0.5; ctx.beginPath(); ctx.moveTo(xx,0); ctx.lineTo(xx,H); ctx.stroke(); ctx.setLineDash([]);
           ctx.textBaseline='top'; ctx.fillStyle='rgba(212,175,55,0.7)'; ctx.fillText('End of gold standard (Aug 1971)', Math.min(W-166, xx+4), 8); ctx.restore(); }   // near the 1971 line (not top-left)
         if(goldMeta.provMonth){ var px=xc(ts,goldMeta.provMonth), py=null, lastC=ACTIVE.length?ACTIVE[ACTIVE.length-1].close:null; try{ if(lastC!=null) py=area.priceToCoordinate(lastC); }catch(e){}
           if(px!=null && py!=null){ ctx.beginPath(); ctx.arc(px,py,4,0,2*Math.PI); ctx.fillStyle='rgba(10,27,33,0.92)'; ctx.fill(); ctx.lineWidth=1.3; ctx.strokeStyle='rgba(212,175,55,0.85)'; ctx.stroke(); } }
         ctx.fillStyle='rgba(127,166,173,0.6)'; ctx.font='9px -apple-system,system-ui,sans-serif'; ctx.textBaseline='bottom';
-        ctx.fillText('Source: World Gold Council / Timothy Green (1833–1959), World Bank Pink Sheet monthly avg (1960–) · ODC-PDDL', 6, H-4);
+        ctx.fillText('Source: World Gold Council / Timothy Green (1833–1959), World Bank Pink Sheet monthly avg (1960–) · ODC-PDDL', 74, H-4);
         ctx.restore(); }); } };
     return { attached:function(p){ ch=p.chart; if(p.requestUpdate) primReqs.push(p.requestUpdate); }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'bottom'; }, renderer:function(){ return bg; } }, { zOrder:function(){ return 'top'; }, renderer:function(){ return fg; } } ]; } };
+  }
+  // Phase COPPER annotations (discreet, drawn ONLY for XCUUSD; overlay only → never affects autoscale/fit).
+  // The 1989-09 gap (dashed marker + label) and the source line. Labels start ≥70px from the left so they
+  // clear the bottom-left floating tool pill (the gold labels were hidden behind it).
+  var copperPrim=null;
+  function makeCopperPrimitive(){ var ch=null; var GAP='1989-09-01';
+    var r={ draw:function(target){ if(!ch || ASSET!=='XCUUSD') return; var ts=ch.timeScale();
+      target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save();
+        var gx; try{ gx=ts.timeToCoordinate(GAP); }catch(e){ gx=null; }
+        ctx.font='10px -apple-system,system-ui,sans-serif'; ctx.textBaseline='top';
+        if(gx!=null && gx>=0 && gx<=W){ ctx.save(); ctx.setLineDash([3,3]); ctx.lineWidth=1; ctx.strokeStyle='rgba(184,115,51,0.55)'; var xx=Math.round(gx)+0.5; ctx.beginPath(); ctx.moveTo(xx,0); ctx.lineTo(xx,H); ctx.stroke(); ctx.setLineDash([]);
+          ctx.fillStyle='rgba(184,115,51,0.74)'; ctx.fillText('1989-09: source data corrupt — gap', Math.max(74, Math.min(W-200, xx+4)), Math.round(H*0.30)); ctx.restore(); }
+        ctx.fillStyle='rgba(127,166,173,0.6)'; ctx.font='9px -apple-system,system-ui,sans-serif'; ctx.textBaseline='bottom';
+        ctx.fillText('Source: COMEX copper futures (continuous) via Investing.com · USD per lb · futures, not spot', 74, H-4);
+        ctx.restore(); }); } };
+    return { attached:function(p){ ch=p.chart; if(p.requestUpdate) primReqs.push(p.requestUpdate); }, updateAllViews:function(){}, paneViews:function(){ return [ { zOrder:function(){ return 'top'; }, renderer:function(){ return r; } } ]; } };
   }
   function makeManipPrimitive(){ var ch=null;
     var r={ draw:function(target){ if(!ch || goldLock || !layers.manip || isIntra() || layerAlpha.manip<=0.01) return; var ts=ch.timeScale(); var M=ANCHOR.manip; if(!M||!M.refHigh) return;
@@ -3276,8 +3304,8 @@
     if(grp==='H'){ return y+'-'+(m<=6?'01':'07')+'-01'; }
     if(grp==='2Y'){ return (y-(y%2))+'-01-01'; } return dstr; }
   function aggDay(cands, grp){ var out=[],cur=null,key=null,i; for(i=0;i<cands.length;i++){ var c=cands[i]; var k=dayKey(c.t,grp);
-    if(k!==key){ if(cur)out.push(cur); cur={time:k,open:c.o,high:c.h,low:c.l,close:c.c,value:c.c,p:c.p,mayer:c.mayer,pct:c.pct,ma50w:c.ma50w,ma200w:c.ma200w,ma50d:c.ma50d,ma200d:c.ma200d}; key=k; }
-    else { if(c.h>cur.high)cur.high=c.h; if(c.l<cur.low)cur.low=c.l; cur.close=c.c; cur.value=c.c; cur.p=c.p; cur.mayer=c.mayer; cur.pct=c.pct; cur.ma50w=c.ma50w; cur.ma200w=c.ma200w; cur.ma50d=c.ma50d; cur.ma200d=c.ma200d; } } if(cur)out.push(cur); return out; }
+    if(k!==key){ if(cur)out.push(cur); cur={time:k,open:c.o,high:c.h,low:c.l,close:c.c,value:c.c,p:c.p,mayer:c.mayer,pct:c.pct,ma50w:c.ma50w,ma200w:c.ma200w,ma50d:c.ma50d,ma200d:c.ma200d,q:c.q,prov:c.prov,nd:c.nd}; key=k; }
+    else { if(c.h>cur.high)cur.high=c.h; if(c.l<cur.low)cur.low=c.l; cur.close=c.c; cur.value=c.c; cur.p=c.p; cur.mayer=c.mayer; cur.pct=c.pct; cur.ma50w=c.ma50w; cur.ma200w=c.ma200w; cur.ma50d=c.ma50d; cur.ma200d=c.ma200d; cur.q=c.q; cur.prov=c.prov; cur.nd=c.nd; } } if(cur)out.push(cur); return out; }
   function buildActive(size){ var spec=CSPEC[size]||CSPEC['1D'];
     if(ASSET!=='BTC'){ var base=assetDaily[ASSET]||[]; return aggDay(base, spec.kind==='intra'?'D':spec.grp); }   // non-BTC: daily-family only, from market_history
     var cands=tierCache[spec.tier]||[]; return spec.kind==='intra' ? aggIntra(cands, spec.sec) : aggDay(cands, spec.grp); }
@@ -3293,10 +3321,11 @@
     {sym:'BTC',dep:'2011'},{sym:'ETH',dep:'2017'},{sym:'ADA',dep:'2017'},{sym:'BNB',dep:'2017'},
     {sym:'DOGE',dep:'2017'},{sym:'XRP',dep:'2017'},{sym:'LTC',dep:'2017'},{sym:'SOL',dep:'2020'},
     {sym:'DOT',dep:'2020'},{sym:'AVAX',dep:'2020'},
-    {sym:'XAUUSD',dep:'1833',lineOnly:true,monthly:true}]   // Phase XAUUSD: gold, monthly LINE from gold_monthly (1M only, BTC-relative indicators hidden)
+    {sym:'XAUUSD',dep:'1833',lineOnly:true,monthly:true},   // Phase XAUUSD: gold, monthly LINE from gold_monthly (1M only, BTC-relative indicators hidden)
+    {sym:'XCUUSD',dep:'1988',monthly:true}]                 // Phase COPPER: copper, monthly OHLC CANDLES from copper_monthly (1M only; NOT lineOnly)
     .concat(TOKEN_LINE_SYMS.map(function(s){ return {sym:s, dep:'', lineOnly:true}; }))
-    .sort(function(a,b){ return a.sym<b.sym?-1:(a.sym>b.sym?1:0); });   // ALPHABETICAL — BTC is NOT pinned (owner); XAUUSD sorts before XRP
-  var ASSET_COLORS={BTC:'#f7931a',ETH:'#627eea',ADA:'#3468d1',AVAX:'#e84142',BNB:'#f3ba2f',DOGE:'#c2a633',DOT:'#e6007a',LTC:'#5c6bc0',SOL:'#14f195',XRP:'#7fbbe0',XAUUSD:'#d4af37'};
+    .sort(function(a,b){ return a.sym<b.sym?-1:(a.sym>b.sym?1:0); });   // ALPHABETICAL — BTC is NOT pinned (owner); XAUUSD before XCUUSD before XRP
+  var ASSET_COLORS={BTC:'#f7931a',ETH:'#627eea',ADA:'#3468d1',AVAX:'#e84142',BNB:'#f3ba2f',DOGE:'#c2a633',DOT:'#e6007a',LTC:'#5c6bc0',SOL:'#14f195',XRP:'#7fbbe0',XAUUSD:'#d4af37',XCUUSD:'#b87333'};
   function isLineOnly(sym){ for(var i=0;i<ASSET_LIST.length;i++){ if(ASSET_LIST[i].sym===sym) return !!ASSET_LIST[i].lineOnly; } return false; }
   // XAUUSD is line-only too (forced line) but its DATA comes from gold_monthly via the API (1M), NOT the
   // readings-based token path. isMonthlyAsset() separates the two: forced-line is shared, the token data path is not.
@@ -3323,6 +3352,7 @@
   try{ window.__timeRange=function(){ try{ return chart.timeScale().getVisibleRange(); }catch(e){ return null; } };
     window.__coordOf=function(t){ try{ return chart.timeScale().timeToCoordinate(t); }catch(e){ return null; } };
     window.__pxOf=function(p){ try{ return area.priceToCoordinate(p); }catch(e){ return null; } };
+    window.__monthAt=function(t){ for(var i=0;i<ACTIVE.length;i++){ if(ACTIVE[i].time===t){ var d=ACTIVE[i]; return {open:d.open,high:d.high,low:d.low,close:d.close,q:d.q,prov:d.prov,nd:d.nd}; } } return null; };
     // dev-only (future-proof check; never persists a fake ticker): push a long ticker + rebuild, then
     // __dropdownRestore() puts ASSET_LIST back exactly.
     var _ddSnap=null;
@@ -3507,14 +3537,20 @@
   // XAUUSD monthly LINE from gold_monthly (via /api/btc-candles?coin=XAUUSD). o=h=l=c=price (a line,
   // never candles); no MAs, no BTC phase/mayer/pct join (none exist pre-2011 anyway → null). Records the
   // provisional month + source meta for the honesty annotations and the crosshair readout.
+  var monthlyQ={};   // per-month {q,prov,nd} for the crosshair tooltip (copper quality flags; gold is always 'ok')
   function buildMonthlyAsset(coin, cb){
     fetch('/api/btc-candles?tier=monthly&coin='+coin).then(function(r){return r.json();}).then(function(j){
-      var dc=(j&&j.ok&&j.candles)?j.candles:[];
-      assetDaily[coin]=dc.map(function(d){ var v=d.c; return {t:d.t,o:v,h:v,l:v,c:v,v:0, ma50d:null,ma200d:null,ma50w:null,ma200w:null, p:null,mayer:null,pct:null, provisional:!!d.provisional, n_days:d.n_days}; });
+      var dc=(j&&j.ok&&j.candles)?j.candles:[]; monthlyQ={};
+      assetDaily[coin]=dc.map(function(d){ var isGap=(d.c==null);   // the 1989-09 copper gap → null OHLC (rendered as whitespace)
+        monthlyQ[d.t]={ q:d.q||'ok', prov:!!d.provisional, nd:d.n_days };
+        return {t:d.t,
+          o:isGap?null:(d.o!=null?d.o:d.c), h:isGap?null:(d.h!=null?d.h:d.c), l:isGap?null:(d.l!=null?d.l:d.c), c:isGap?null:d.c, v:0,
+          ma50d:null,ma200d:null,ma50w:null,ma200w:null, p:null,mayer:null,pct:null,
+          provisional:!!d.provisional, prov:!!d.provisional, n_days:d.n_days, nd:d.n_days, q:d.q||'ok' }; });
       var prov=dc.filter(function(d){ return d.provisional; }); var last=prov.length?prov[prov.length-1]:null;
       goldMeta={ provMonth:last?last.t:null, provN:last?last.n_days:null, source:(j&&j.meta&&j.meta.source)||null, updated:(j&&j.meta&&j.meta.updated)||null };
       cb();
-    }).catch(function(){ assetDaily[coin]=[]; goldMeta={provMonth:null,provN:null,source:null,updated:null}; cb(); }); }
+    }).catch(function(){ assetDaily[coin]=[]; monthlyQ={}; goldMeta={provMonth:null,provN:null,source:null,updated:null}; cb(); }); }
   function loadAssetDaily(coin, cb){ if(coin==='BTC'||assetDaily[coin]){ cb(); return; }
     if(isMonthlyAsset(coin)){ buildMonthlyAsset(coin, cb); return; }   // XAUUSD: monthly line from gold_monthly (NOT the token/readings path)
     if(isLineOnly(coin)){ buildTokenDaily(coin, cb); return; }   // the 9 tokens: line from readings, not market_history
@@ -4646,8 +4682,15 @@
     return out; }
   // Single source of truth for pushing data into the price series: real candles + future whitespace.
   function setSeriesData(){ if(!area||!candle) return; var fut=buildFuture();
-    var aD=ACTIVE.map(function(d){ return {time:d.time,value:d.close}; });
-    var cD=ACTIVE.map(function(d){ return {time:d.time,open:d.open,high:d.high,low:d.low,close:d.close}; });
+    var dimRGB=(function(){ try{ return hexRgb(assetColor(ASSET)); }catch(e){ return '184,115,51'; } })();
+    var dimBody='rgba('+dimRGB+',0.28)', dimEdge='rgba('+dimRGB+',0.7)';   // provisional candle: dimmed/hollow look
+    var aD=ACTIVE.map(function(d){ return (d.close==null) ? {time:d.time} : {time:d.time,value:d.close}; });   // null close (copper gap) → whitespace
+    var cD=ACTIVE.map(function(d){ if(d.close==null) return {time:d.time};   // gap → whitespace (spacing kept, no candle)
+      var hi=d.high, lo=d.low;
+      if(d.q==='ohlc_incoherent'){ hi=Math.max(d.high,d.open,d.close); lo=Math.min(d.low,d.open,d.close); }   // render-only wick adjustment (stored values untouched)
+      var pt={time:d.time,open:d.open,high:hi,low:lo,close:d.close};
+      if(d.prov){ pt.color=dimBody; pt.borderColor=dimEdge; pt.wickColor=dimEdge; }   // dimmed/hollow provisional candle
+      return pt; });
     if(fut.length){ aD=aD.concat(fut); cD=cD.concat(fut); }
     try{ area.setData(aD); }catch(e){} try{ candle.setData(cD); }catch(e){} }
   // Fit the visible range to REAL data only (the future whitespace must NOT leak into fitContent views).
@@ -4659,7 +4702,7 @@
     }catch(e){ fitRealContent(); } }
 
   function applyCandleSize(size, opt){ var spec=CSPEC[size]; if(!spec) return; opt=opt||{};
-    if(isMonthlyAsset(ASSET)){ if(size!=='1M'){ notify('XAUUSD: monthly data only (1M)'); var mm=document.getElementById('wk-csMenu'); if(mm) mm.classList.remove('open'); return; } }   // XAUUSD = monthly only
+    if(isMonthlyAsset(ASSET)){ if(size!=='1M'){ notify(ASSET+': monthly data only (1M)'); var mm=document.getElementById('wk-csMenu'); if(mm) mm.classList.remove('open'); return; } }   // XAUUSD / XCUUSD = monthly only
     else if(ASSET!=='BTC' && size!=='1D'){ notify(ASSET+': daily candles only (1D)'); var m=document.getElementById('wk-csMenu'); if(m) m.classList.remove('open'); return; }   // other non-BTC = daily only
     var pre=visibleEpochRange();   // capture the current window (epoch) for the intraday (b) keep-in-place case
     // Fase P: show the bar only when the tier must actually be fetched (a cached switch is instant → no bar)
@@ -4715,11 +4758,14 @@
   }
 
   function initialMode(){ var m='line'; try{ m=sessionStorage.getItem('wk_mode')||'line'; }catch(e){} return m==='candle'?'candle':'line'; }
-  function setMode(m){ userMode=(m==='candle')?'candle':'line'; try{ sessionStorage.setItem('wk_mode', userMode); }catch(e){} applyEffectiveMode(); }
-  // effective mode = the user's pick, but FORCED to line for the 9 OHLC-less token assets (never fake candles)
-  function applyEffectiveMode(){ mode = isLineOnly(ASSET) ? 'line' : userMode;
+  function setMode(m){ m=(m==='candle')?'candle':'line';
+    if(isMonthlyAsset(ASSET) && !isLineOnly(ASSET)){ monthlyCandleMode=m; }   // copper: toggle its own candle/line, don't touch BTC's userMode
+    else { userMode=m; try{ sessionStorage.setItem('wk_mode', userMode); }catch(e){} }
+    applyEffectiveMode(); }
+  // effective mode: forced line for OHLC-less tokens + gold; candle-default for XCUUSD; else the user's BTC pick
+  function applyEffectiveMode(){ mode = isLineOnly(ASSET) ? 'line' : (isMonthlyAsset(ASSET) ? monthlyCandleMode : userMode);
     // XAUUSD renders in gold; everything else keeps the purple line
-    var lc=(ASSET==='XAUUSD')?'#d4af37':'#a78bfa', tc=(ASSET==='XAUUSD')?'rgba(212,175,55,.16)':'rgba(167,139,250,.18)', bc=(ASSET==='XAUUSD')?'rgba(212,175,55,0)':'rgba(167,139,250,0)';
+    var lc=(ASSET==='XAUUSD')?'#d4af37':(ASSET==='XCUUSD')?'#b87333':'#a78bfa', tc=(ASSET==='XAUUSD')?'rgba(212,175,55,.16)':(ASSET==='XCUUSD')?'rgba(184,115,51,.14)':'rgba(167,139,250,.18)', bc=(ASSET==='XAUUSD')?'rgba(212,175,55,0)':(ASSET==='XCUUSD')?'rgba(184,115,51,0)':'rgba(167,139,250,0)';
     // area stays visible (carries the phase primitive + markers); transparent in candle mode
     if(area) area.applyOptions(mode==='candle'
       ? {lineColor:'rgba(0,0,0,0)',topColor:'rgba(0,0,0,0)',bottomColor:'rgba(0,0,0,0)'}

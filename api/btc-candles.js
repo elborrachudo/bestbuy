@@ -61,6 +61,21 @@ export default async function handler(req, res) {
       return;
     }
 
+    // ── XCUUSD (copper): monthly OHLC candles from copper_monthly (COMEX copper futures, USD/lb).
+    //    Real exchange candles + the 1989-09 gap (all null) + provisional (snapshot-built) months,
+    //    with a quality flag per candle. The frontend applies wick adjustment / gap whitespace. ─────
+    if (coin === 'XCUUSD') {
+      const rows = await sbSelectAll(base, key, 'copper_monthly?select=month,open,high,low,close,provisional,n_days,quality_flag,source&order=month.asc');
+      const candles = rows.map((r) => ({ t: r.month, o: n(r.open), h: n(r.high), l: n(r.low), c: n(r.close), provisional: !!r.provisional, n_days: r.n_days == null ? null : Number(r.n_days), q: r.quality_flag || 'ok', src: r.source }));
+      const last = candles.length ? candles[candles.length - 1].t : null;
+      res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
+      res.status(200).json({ ok: true, tier: 'monthly', coin, count: candles.length,
+        first: candles.length ? candles[0].t : null, last,
+        meta: { source: 'COMEX copper futures (continuous) via Investing.com · USD/lb', updated: last },
+        candles });
+      return;
+    }
+
     // ── non-BTC asset: 1D candles from market_history ────────────────────────────────────────
     if (tier === 'daily' && coin !== 'BTC') {
       if (COINS.indexOf(coin) < 0) { res.status(400).json({ ok: false, error: `unknown coin '${coin}'` }); return; }
