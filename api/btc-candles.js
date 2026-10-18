@@ -61,10 +61,11 @@ export default async function handler(req, res) {
       return;
     }
 
-    // ── XCUUSD (copper): monthly OHLC candles from copper_monthly (COMEX copper futures, USD/lb).
+    // ── XCUUSD.P (copper futures): monthly OHLC candles from copper_monthly (COMEX copper futures, USD/lb).
     //    Real exchange candles + the 1989-09 gap (all null) + provisional (snapshot-built) months,
-    //    with a quality flag per candle. The frontend applies wick adjustment / gap whitespace. ─────
-    if (coin === 'XCUUSD') {
+    //    with a quality flag per candle. The frontend applies wick adjustment / gap whitespace.
+    //    (Renamed from XCUUSD on 2026-10-18; the bare symbol is NOT aliased — it is reserved for another asset.) ─────
+    if (coin === 'XCUUSD.P') {
       const rows = await sbSelectAll(base, key, 'copper_monthly?select=month,open,high,low,close,provisional,n_days,quality_flag,source&order=month.asc');
       const candles = rows.map((r) => ({ t: r.month, o: n(r.open), h: n(r.high), l: n(r.low), c: n(r.close), provisional: !!r.provisional, n_days: r.n_days == null ? null : Number(r.n_days), q: r.quality_flag || 'ok', src: r.source }));
       const last = candles.length ? candles[candles.length - 1].t : null;
@@ -75,6 +76,11 @@ export default async function handler(req, res) {
         candles });
       return;
     }
+
+    // ── unknown coin, ANY tier: a coin that is not BTC / a whitelisted 1D coin / a monthly asset handled
+    //    above is an error — never a misleading "unknown tier", and never silently BTC's data (tier=1h|1m
+    //    previously ignored `coin`). This is what makes a retired symbol (bare XCUUSD) a clean 400. ───────
+    if (coin !== 'BTC' && COINS.indexOf(coin) < 0) { res.status(400).json({ ok: false, error: `unknown coin '${coin}'` }); return; }
 
     // ── non-BTC asset: 1D candles from market_history ────────────────────────────────────────
     if (tier === 'daily' && coin !== 'BTC') {
