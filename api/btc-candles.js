@@ -15,6 +15,13 @@ const secs = (tsStr) => Math.floor(Date.parse(tsStr) / 1000);
 // columns (market_history@BTC), the present stable/others dominance (dominance_history), and
 // the Mayer multiple (market_daily). Coins are whitelisted (they go into the PostgREST filter).
 const COINS = ['BTC', 'ETH', 'ADA', 'AVAX', 'BNB', 'DOGE', 'DOT', 'LTC', 'SOL', 'XRP'];
+// Monthly commodity LINES served from commodity_monthly (symbol is whitelisted here — it goes into the PostgREST filter).
+const COMMODITIES = {
+  XAGUSD: { source: 'Silver: World Bank Pink Sheet monthly average (1960–) · USGS annual (1900–1959) · FRED London bar silver, annual (1833–1899) · USD per troy oz',
+            note: 'Pre-1960 months repeat the annual value. 1833–1899 is London bar silver, not a New York price. Published to 0.1 USD/oz (up to ~±5% rounding at 1960s levels). Not recorded daily.' },
+  XPTUSD: { source: 'Platinum: World Bank Pink Sheet monthly average (1960–) · USGS annual (1880–1959) · USD per troy oz',
+            note: 'Pre-1960 months repeat the annual value. Prices up to 1983 are administered producer prices. 1907 is not available in the source (gap). Not recorded daily.' },
+};
 const SERIES = {
   btcd:    { table: 'market_history', filter: 'coin=eq.BTC', col: 'btc_dominance_pct' },
   ethd:    { table: 'market_history', filter: 'coin=eq.BTC', col: 'eth_dominance_pct' },
@@ -73,6 +80,23 @@ export default async function handler(req, res) {
       res.status(200).json({ ok: true, tier: 'monthly', coin, count: candles.length,
         first: candles.length ? candles[0].t : null, last,
         meta: { source: 'COMEX copper futures (continuous) via Investing.com · USD/lb', updated: last },
+        candles });
+      return;
+    }
+
+    // ── XAGUSD / XPTUSD (silver / platinum): monthly LINES from commodity_monthly (o=h=l=c=price). No daily recorder —
+    //    the series ends at the last seeded month. Pre-1960 months are an ANNUAL value repeated (ar=true); a source hole
+    //    (platinum 1907) is returned as a null month with q='missing_source' — never carried forward or interpolated.
+    //    MUST stay ABOVE the unknown-coin guard below, otherwise these coins would be rejected. ─────────────────────────
+    if (Object.prototype.hasOwnProperty.call(COMMODITIES, coin)) {
+      const spec = COMMODITIES[coin];
+      const rows = await sbSelectAll(base, key, `commodity_monthly?symbol=eq.${coin}&select=month,price,annual_repeated,quality_flag&order=month.asc`);
+      const candles = rows.map((r) => { const p = n(r.price); return { t: r.month, o: p, h: p, l: p, c: p, ar: !!r.annual_repeated, q: r.quality_flag || 'ok' }; });
+      const last = candles.length ? candles[candles.length - 1].t : null;
+      res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600');
+      res.status(200).json({ ok: true, tier: 'monthly', coin, count: candles.length,
+        first: candles.length ? candles[0].t : null, last,
+        meta: { source: spec.source, note: spec.note, updated: last },
         candles });
       return;
     }
