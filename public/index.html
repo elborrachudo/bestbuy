@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="dark" />
-<title>Compro o quê?!</title>
+<title>Charting 1.0</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>📈</text></svg>" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css" />
 <style>
@@ -387,16 +387,37 @@
   .wk-srch{display:flex;align-items:center;gap:6px;padding:5px 8px;margin-bottom:5px;background:#08161b;border:1px solid #1a3a44;border-radius:9px;}
   .wk-srch svg{width:14px;height:14px;color:#6f9aa2;flex:0 0 auto;}
   .wk-srch input{flex:1;background:none;border:0;outline:none;color:#dbeee9;font-size:12px;min-width:0;}
-  .wk-asset-item{font-size:13px;color:#cfe7ec;padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;}
-  .wk-asset-item:hover{background:rgba(45,212,191,.12);}
-  .wk-asset-item.on{background:rgba(45,212,191,.20);color:#5eead4;font-weight:600;}
-  .wk-asset-item .wk-ai-sym{font-weight:700;white-space:nowrap;}
+  /* UX-U1: ticker rows = the "+" overlay rows (same metrics / hover), swatch on the right, single-choice highlight */
+  .wk-asset-item{font-size:11.5px;color:#cfe7ec;padding:7px 9px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .wk-asset-item:hover{background:rgba(45,212,191,.10);}
+  .wk-asset-item.on{background:rgba(45,212,191,.16);color:#5eead4;font-weight:600;}
+  .wk-asset-item .wk-ai-sym{flex:1;font-weight:inherit;white-space:nowrap;}
+  .wk-asset-item .wk-ai-sw{position:relative;width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.2);flex:0 0 auto;margin-left:auto;cursor:pointer;}
+  .wk-asset-item .wk-ai-sw::after{content:'';position:absolute;inset:-7px;}   /* larger touch target than the 16px chip */
+  .wk-as-head{cursor:default;}
+  .wk-as-head:hover{color:#6f9aa2;}
+  /* UX-U1: colour picker popup (click a line / long-press on iPhone / click a swatch) */
+  .wk-colorpop{position:fixed;z-index:999995;width:212px;max-width:calc(100vw - 16px);background:#0e242c;border:1px solid #1f4a55;border-radius:12px;padding:10px;box-shadow:0 16px 44px rgba(0,0,0,.6);display:none;color:#cfe7ec;}
+  .wk-colorpop.on{display:block;}
+  .wk-cp-h{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:600;margin-bottom:9px;}
+  .wk-cp-dot{width:12px;height:12px;border-radius:4px;border:1px solid rgba(255,255,255,.25);flex:0 0 auto;}
+  .wk-cp-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-bottom:9px;}
+  .wk-cp-sw{width:100%;aspect-ratio:1;min-height:24px;border-radius:7px;border:1px solid rgba(255,255,255,.18);padding:0;cursor:pointer;}
+  .wk-cp-sw.on{outline:2px solid #5eead4;outline-offset:1px;}
+  .wk-cp-row{display:flex;gap:6px;align-items:center;}
+  .wk-cp-hex{flex:0 0 76px;width:76px;background:#08161b;border:1px solid #2a4a52;border-radius:7px;color:#eaf6f3;font-size:12px;padding:6px 7px;outline:none;font-family:ui-monospace,Menlo,monospace;}
+  .wk-cp-reset{flex:1;font-size:11px;font-weight:600;padding:6px 8px;border-radius:7px;cursor:pointer;border:1px solid #2a4a52;background:transparent;color:#9fc4cb;white-space:nowrap;}
+  .wk-cp-reset:hover{color:#cfe7ec;border-color:#3a5a62;}
+  #wk-chart{-webkit-touch-callout:none;}
   .wk-ov-item{font-size:12px;color:#cfe7ec;padding:7px 9px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;}
   .wk-ov-item:hover{background:rgba(45,212,191,.10);}
   .wk-ov-item.on{background:rgba(45,212,191,.16);}
   .wk-ov-chk{width:15px;height:15px;border-radius:4px;border:1px solid #2f6d63;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#0a1b21;}
   .wk-ov-item.on .wk-ov-chk{background:#5eead4;border-color:#5eead4;}
   .wk-ov-col{width:16px;height:16px;border-radius:4px;border:1px solid rgba(255,255,255,.2);padding:0;flex:0 0 auto;cursor:pointer;background:none;margin-left:auto;}
+  .wk-ov-col::-webkit-color-swatch-wrapper{padding:0;}
+  .wk-ov-col::-webkit-color-swatch{border:0;border-radius:3px;}   /* UX-U1: borderless chip, same look as the ticker-list swatch */
+  .wk-ov-col::-moz-color-swatch{border:0;border-radius:3px;}
   .wk-ov-head{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#6f9aa2;padding:6px 9px 2px;}
   .wk-ov-nm{flex:1;}
   /* Fase VI-b: "+" overlay dropdown — one line per item (no wrap / no truncation) + collapsible groups.
@@ -754,6 +775,7 @@
   .wk-mb-sub{display:block;font-size:9px;color:#7e9591;font-weight:500;letter-spacing:.2px;}
   .wk-legend{position:absolute;top:8px;left:10px;z-index:5;font-size:11px;color:#a9c7cd;background:rgba(8,23,28,.78);border:1px solid #1a3a44;border-radius:7px;padding:5px 8px;pointer-events:none;line-height:1.5;display:none;}
   .wk-legend b{color:#fff;font-weight:600;}
+  .wk-lgdot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:baseline;}
   .wk-sub{font-size:11px;color:#7fa6ad;margin-top:8px;line-height:1.5;}
   .wk-attribution{font-size:9px;color:#4f7780;text-align:right;margin-top:5px;}
   .wk-attribution a{color:#4f7780;}
@@ -1755,7 +1777,7 @@
       ? 'HAS NOT STARTED YET — there are no live Activity records up to the date of this file.'
       : ('starts on ' + ptDate(X.toISOString()) + ' (' + X.toISOString().slice(0,10) + ').');
     var L=[
-      ['Compro o quê?! — data archive'],
+      ['Charting 1.0 — data archive'],
       [''],
       ['IMPORTANT — read before analysing:'],
       ['Fundamentals, Technicals and Price have ~1 YEAR of history (reconstructed).'],
@@ -2060,7 +2082,7 @@
     document.body.appendChild(sheet);
     document.getElementById('wk-mg-x').onclick=closeManage;
     back.onclick=closeManage;
-    document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeManage(); }); }
+    /* UX-U1: Escape → closeManage() is folded into the global handler (escClosePopups) */ }
   function openManage(){ buildManageModal(); renderManagePanel();
     document.getElementById('wk-mg').classList.add('open'); document.getElementById('wk-mg-back').classList.add('open'); }
   function closeManage(){ var s=document.getElementById('wk-mg'), b=document.getElementById('wk-mg-back');
@@ -2619,7 +2641,7 @@
     ACTIVE=buildActive('1D'); CLOSE=ACTIVE.map(function(d){ return d.close; });
 
     // PRICE pane (0): area (always present — carries the phase primitive + markers) + candles
-    area=chart.addSeries(L.AreaSeries,{lineColor:'#a78bfa',topColor:'rgba(167,139,250,.18)',bottomColor:'rgba(167,139,250,0)',lineWidth:1,priceLineVisible:false,lastValueVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
+    area=chart.addSeries(L.AreaSeries,{lineColor:assetColor(ASSET),topColor:rgbaOf(assetColor(ASSET),.16),bottomColor:rgbaOf(assetColor(ASSET),0),lineWidth:1,priceLineVisible:false,lastValueVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
     candle=chart.addSeries(L.CandlestickSeries,{upColor:'#22c55e',downColor:'#f43f5e',wickUpColor:'#22c55e',wickDownColor:'#f43f5e',borderVisible:false,priceLineVisible:false,lastValueVisible:false,priceFormat:{type:'price',precision:0,minMove:1}},0);
     installFitProvider();   // price-pane autoscale now includes user drawings (double-click fit is rigorous)
     setSeriesData();   // real candles + future whitespace (so drawings can land beyond today)
@@ -2650,27 +2672,27 @@
       if(ASSET==='XAUUSD'){   // gold readout: legible price + provisional note (avg of N recorded days)
         if(px==null){ leg.style.display='none'; return; }
         var prov=(goldMeta.provMonth && day===goldMeta.provMonth);
-        leg.innerHTML='<b>'+label.slice(0,7)+'</b> · XAU <b>$'+wkFmtPrice(px)+'</b>'+(prov?(' · provisional · avg of '+(goldMeta.provN||'?')+' recorded days'):''); leg.style.display='block'; return;
+        leg.innerHTML=lgDot(ASSET)+'<b>'+label.slice(0,7)+'</b> · XAU <b>$'+wkFmtPrice(px)+'</b>'+(prov?(' · provisional · avg of '+(goldMeta.provN||'?')+' recorded days'):''); leg.style.display='block'; return;
       }
       if(ASSET==='XCUUSD.P'){   // copper readout: OHLC + USD/lb + quality note (gap / wick adjusted / thin / provisional)
         var mq=monthlyQ[day]||{};
-        if(mq.q==='missing_source_corrupt'){ leg.innerHTML='<b>'+label.slice(0,7)+'</b> · XCUUSD.P · <b>source data corrupt — gap</b>'; leg.style.display='block'; return; }
+        if(mq.q==='missing_source_corrupt'){ leg.innerHTML=lgDot(ASSET)+'<b>'+label.slice(0,7)+'</b> · XCUUSD.P · <b>source data corrupt — gap</b>'; leg.style.display='block'; return; }
         var cc=null; try{ cc=param.seriesData&&param.seriesData.get(candle); }catch(e){}
         if((!cc||cc.close==null) && px==null){ leg.style.display='none'; return; }
         var notes=[]; if(mq.q==='ohlc_incoherent') notes.push('wick adjusted for display'); if(mq.q==='thin') notes.push('thin early data'); if(mq.prov) notes.push('provisional · approximate: built from '+(mq.nd||'?')+' daily snapshots');
         var ohlc = cc ? ('O '+wkFmtPrice(cc.open)+' H '+wkFmtPrice(cc.high)+' L '+wkFmtPrice(cc.low)+' C '+wkFmtPrice(cc.close)) : ('$'+wkFmtPrice(px));
-        leg.innerHTML='<b>'+label.slice(0,7)+'</b> · XCUUSD.P '+ohlc+' · USD/lb'+(notes.length?(' · '+notes.join(' · ')):''); leg.style.display='block'; return;
+        leg.innerHTML=lgDot(ASSET)+'<b>'+label.slice(0,7)+'</b> · XCUUSD.P '+ohlc+' · USD/lb'+(notes.length?(' · '+notes.join(' · ')):''); leg.style.display='block'; return;
       }
       if(metalCfg(ASSET)){   // silver / platinum readout: "YYYY-MM · SYM · 64.60 USD/oz" + quality note (annual repeated / administered / London bar); gap = "source not available"
         var mm2=monthlyQ[day]||{};
-        if(mm2.q==='missing_source'){ leg.innerHTML='<b>'+label.slice(0,4)+'</b> · '+ASSET+' · <b>source not available — gap</b>'; leg.style.display='block'; return; }
+        if(mm2.q==='missing_source'){ leg.innerHTML=lgDot(ASSET)+'<b>'+label.slice(0,4)+'</b> · '+ASSET+' · <b>source not available — gap</b>'; leg.style.display='block'; return; }
         if(px==null){ leg.style.display='none'; return; }
         var mn=[]; if(mm2.ar) mn.push('annual average, repeated'); if(mm2.q==='administered') mn.push('administered price'); if(mm2.q==='london_bar') mn.push('London bar silver, not a New York price'); if(mm2.q==='estimated') mn.push('ESTIMATE');
-        leg.innerHTML='<b>'+label.slice(0,7)+'</b> · '+ASSET+' · <b>'+wkFmtPrice(px)+'</b> '+metalCfg(ASSET).unit+(mn.length?(' · '+mn.join(' · ')):''); leg.style.display='block'; return;
+        leg.innerHTML=lgDot(ASSET)+'<b>'+label.slice(0,7)+'</b> · '+ASSET+' · <b>'+wkFmtPrice(px)+'</b> '+metalCfg(ASSET).unit+(mn.length?(' · '+mn.join(' · ')):''); leg.style.display='block'; return;
       }
       var b=byTime[day]; if(px==null&&b) px=b.c;
       if(px==null){ leg.style.display='none'; return; }
-      leg.innerHTML='<b>'+label+'</b> · BTC <b>$'+Math.round(px).toLocaleString()+'</b>'+((b&&PHEN[b.p])?(' · '+PHEN[b.p]):''); leg.style.display='block';
+      leg.innerHTML=lgDot(ASSET)+'<b>'+label+'</b> · '+ASSET+' <b>$'+(ASSET==='BTC'?Math.round(px).toLocaleString():wkFmtPrice(px))+'</b>'+((ASSET==='BTC'&&b&&PHEN[b.p])?(' · '+PHEN[b.p]):''); leg.style.display='block';
     });
 
     // ── Fase L: live BTC price (client-side CoinGecko, every 5s, always-on; display-only) ─────────
@@ -2950,7 +2972,7 @@
       mMenu.addEventListener('click',function(e){ e.stopPropagation(); var it=e.target.closest('.wk-ad-item'); if(!it) return;
         var w=(it.dataset.mnp==='cur')?'manipCur':'manipHist'; setManipLayer(w, !layers[w]); }); }
     document.addEventListener('click',function(){ if(pzMenu) pzMenu.classList.remove('open'); });
-    document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ if(pzMenu) pzMenu.classList.remove('open'); closeSubs(); } });
+    /* UX-U1: Escape for the Pivot-Zone menus is folded into the global handler (escClosePopups) */
     refreshManipUI(); updatePZBtn(); }
 
   // ── TASK 1: dropdowns must open IN FRONT of the chart ─────────────────────────────────────────
@@ -2996,9 +3018,9 @@
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save();
         var xs=xc(ts,GS_START), xe=xc(ts,GS_END), xa=xc(ts,AV_END);
         var bx0=(xs==null)?0:xs, bx1=(xe==null)?W:xe;
-        if(bx1>bx0){ ctx.fillStyle='rgba(212,175,55,0.10)'; ctx.fillRect(bx0,0,bx1-bx0,H);   // whole gold-standard era (1833→Aug 1971), discreet but visible — incl. 1960–1971
-          var ax1=(xa==null)?bx1:xa; if(ax1>bx0){ ctx.fillStyle='rgba(212,175,55,0.05)'; ctx.fillRect(bx0,0,ax1-bx0,H); }   // 1833–1959 marker, a touch darker
-          ctx.fillStyle='rgba(212,175,55,0.16)'; ctx.fillRect(bx1-1,0,1,H); }   // faint right edge at 1971 so the band reads as one era
+        if(bx1>bx0){ ctx.fillStyle='rgba('+goldRgb()+',0.10)'; ctx.fillRect(bx0,0,bx1-bx0,H);   // whole gold-standard era (1833→Aug 1971), discreet but visible — incl. 1960–1971
+          var ax1=(xa==null)?bx1:xa; if(ax1>bx0){ ctx.fillStyle='rgba('+goldRgb()+',0.05)'; ctx.fillRect(bx0,0,ax1-bx0,H); }   // 1833–1959 marker, a touch darker
+          ctx.fillStyle='rgba('+goldRgb()+',0.16)'; ctx.fillRect(bx1-1,0,1,H); }   // faint right edge at 1971 so the band reads as one era
         ctx.restore(); }); } };
     var fg={ draw:function(target){ if(!ch || ASSET!=='XAUUSD') return; var ts=ch.timeScale();
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save();
@@ -3006,12 +3028,12 @@
         ctx.font='10px -apple-system,system-ui,sans-serif';
         // band labels at the BOTTOM of the band (above the source line) → never overlap the top-left legend / crosshair readout
         if(bx0<W-6 && (xe==null || xe>6)){ ctx.textBaseline='bottom';
-          ctx.fillStyle='rgba(212,175,55,0.62)'; ctx.fillText('Gold standard · fixed official price', Math.max(74,bx0+6), H-32);   // ≥74px → clear of the bottom-left tool pill
-          ctx.fillStyle='rgba(212,175,55,0.44)'; ctx.fillText('annual average repeated monthly', Math.max(74,bx0+6), H-18); }
-        if(xe!=null && xe>=0 && xe<=W){ ctx.save(); ctx.setLineDash([3,3]); ctx.lineWidth=1; ctx.strokeStyle='rgba(212,175,55,0.55)'; var xx=Math.round(xe)+0.5; ctx.beginPath(); ctx.moveTo(xx,0); ctx.lineTo(xx,H); ctx.stroke(); ctx.setLineDash([]);
-          ctx.textBaseline='top'; ctx.fillStyle='rgba(212,175,55,0.7)'; ctx.fillText('End of gold standard (Aug 1971)', Math.min(W-166, xx+4), 8); ctx.restore(); }   // near the 1971 line (not top-left)
+          ctx.fillStyle='rgba('+goldRgb()+',0.62)'; ctx.fillText('Gold standard · fixed official price', Math.max(74,bx0+6), H-32);   // ≥74px → clear of the bottom-left tool pill
+          ctx.fillStyle='rgba('+goldRgb()+',0.44)'; ctx.fillText('annual average repeated monthly', Math.max(74,bx0+6), H-18); }
+        if(xe!=null && xe>=0 && xe<=W){ ctx.save(); ctx.setLineDash([3,3]); ctx.lineWidth=1; ctx.strokeStyle='rgba('+goldRgb()+',0.55)'; var xx=Math.round(xe)+0.5; ctx.beginPath(); ctx.moveTo(xx,0); ctx.lineTo(xx,H); ctx.stroke(); ctx.setLineDash([]);
+          ctx.textBaseline='top'; ctx.fillStyle='rgba('+goldRgb()+',0.7)'; ctx.fillText('End of gold standard (Aug 1971)', Math.min(W-166, xx+4), 8); ctx.restore(); }   // near the 1971 line (not top-left)
         if(goldMeta.provMonth){ var px=xc(ts,goldMeta.provMonth), py=null, lastC=ACTIVE.length?ACTIVE[ACTIVE.length-1].close:null; try{ if(lastC!=null) py=area.priceToCoordinate(lastC); }catch(e){}
-          if(px!=null && py!=null){ ctx.beginPath(); ctx.arc(px,py,4,0,2*Math.PI); ctx.fillStyle='rgba(10,27,33,0.92)'; ctx.fill(); ctx.lineWidth=1.3; ctx.strokeStyle='rgba(212,175,55,0.85)'; ctx.stroke(); } }
+          if(px!=null && py!=null){ ctx.beginPath(); ctx.arc(px,py,4,0,2*Math.PI); ctx.fillStyle='rgba(10,27,33,0.92)'; ctx.fill(); ctx.lineWidth=1.3; ctx.strokeStyle='rgba('+goldRgb()+',0.85)'; ctx.stroke(); } }
         ctx.fillStyle='rgba(127,166,173,0.6)'; ctx.font='9px -apple-system,system-ui,sans-serif'; ctx.textBaseline='bottom';
         ctx.fillText('Source: World Gold Council / Timothy Green (1833–1959), World Bank Pink Sheet monthly avg (1960–) · ODC-PDDL', 74, H-4);
         ctx.restore(); }); } };
@@ -3031,7 +3053,7 @@
     function wrap(ctx,txt,maxW){ var out=[],cur=''; txt.split(' ').forEach(function(w){ var t=cur?cur+' '+w:w; if(cur && ctx.measureText(t).width>maxW){ out.push(cur); cur=w; } else cur=t; }); if(cur) out.push(cur); return out; }
     var r={ draw:function(target){ var cfg=metalCfg(ASSET); if(!ch||!cfg) return; var mc=monthlyMetaCache[ASSET], ann=mc&&mc.ann; if(!ann) return; var ts=ch.timeScale();
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save();
-        var rgb=hexRgb(cfg.color), XMIN=74, LH=11, y=58, L=[];
+        var rgb=hexRgb(assetColor(ASSET)), XMIN=74, LH=11, y=58, L=[];
         ctx.font='10px -apple-system,system-ui,sans-serif'; ctx.textBaseline='top';
         function vline(x,a){ ctx.save(); ctx.setLineDash([3,3]); ctx.lineWidth=1; ctx.strokeStyle='rgba('+rgb+','+a+')'; var xx=Math.round(x)+0.5; ctx.beginPath(); ctx.moveTo(xx,0); ctx.lineTo(xx,H); ctx.stroke(); ctx.restore(); }
         function lab(txt,x,preferBefore,alpha){   // one label beside the date line at x
@@ -3081,8 +3103,8 @@
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save();
         var gx; try{ gx=ts.timeToCoordinate(GAP); }catch(e){ gx=null; }
         ctx.font='10px -apple-system,system-ui,sans-serif'; ctx.textBaseline='top';
-        if(gx!=null && gx>=0 && gx<=W){ ctx.save(); ctx.setLineDash([3,3]); ctx.lineWidth=1; ctx.strokeStyle='rgba(184,115,51,0.55)'; var xx=Math.round(gx)+0.5; ctx.beginPath(); ctx.moveTo(xx,0); ctx.lineTo(xx,H); ctx.stroke(); ctx.setLineDash([]);
-          ctx.fillStyle='rgba(184,115,51,0.74)'; ctx.fillText('1989-09: source data corrupt — gap', Math.max(74, Math.min(W-200, xx+4)), Math.round(H*0.30)); ctx.restore(); }
+        if(gx!=null && gx>=0 && gx<=W){ ctx.save(); ctx.setLineDash([3,3]); ctx.lineWidth=1; ctx.strokeStyle='rgba('+copperRgb()+',0.55)'; var xx=Math.round(gx)+0.5; ctx.beginPath(); ctx.moveTo(xx,0); ctx.lineTo(xx,H); ctx.stroke(); ctx.setLineDash([]);
+          ctx.fillStyle='rgba('+copperRgb()+',0.74)'; ctx.fillText('1989-09: source data corrupt — gap', Math.max(74, Math.min(W-200, xx+4)), Math.round(H*0.30)); ctx.restore(); }
         ctx.fillStyle='rgba(127,166,173,0.6)'; ctx.font='9px -apple-system,system-ui,sans-serif'; ctx.textBaseline='bottom';
         // word-wrap to the free width (starts at x=74 to clear the tool pill) — full text is never truncated; one line on desktop, 2–3 on a phone
         var srcTxt='Source: COMEX copper futures (continuous) via Investing.com · USD per lb · futures, not spot', maxW=Math.max(60, W-74-6), srcLines=[], cur='';
@@ -3311,7 +3333,7 @@
       if(it.classList.contains('wk-cyc-soon')){ notify('"'+it.textContent.replace('soon','').trim()+'" is coming in a future phase'); return; }
       var mode=it.dataset.mode; setCycMode(mode===cycMode?'':mode); toggleCycMenu(false); }; });
     document.addEventListener('click', function(e){ if(!e.target.closest('#wk-cycWrap')) toggleCycMenu(false); });
-    document.addEventListener('keydown', function(e){ if(e.key==='Escape') toggleCycMenu(false); });
+    /* UX-U1: Escape → cycle menu folded into the global handler */
   }
   function initCycMode(){ wireCycMenu(); var saved=''; try{ saved=sessionStorage.getItem('wk_cycmode')||''; }catch(e){}
     document.addEventListener('visibilitychange', function(){ if(!document.hidden && cycMode==='spiral' && !spiralRAF) drawCycleOverlay(); });   // resume the pulse when the tab returns
@@ -3369,7 +3391,7 @@
     var btn=document.getElementById('wk-domBtn'); if(btn) btn.onclick=function(e){ e.stopPropagation(); toggleDomMenu(); };
     Array.prototype.forEach.call(document.querySelectorAll('#wk-domMenu .wk-dom-item'), function(it){ it.onclick=function(e){ e.stopPropagation(); setDom(it.dataset.dom, !domOn[it.dataset.dom]); }; });
     document.addEventListener('click', function(e){ if(!e.target.closest('#wk-domWrap')) toggleDomMenu(false); });
-    document.addEventListener('keydown', function(e){ if(e.key==='Escape') toggleDomMenu(false); });
+    /* UX-U1: Escape → dominance menu folded into the global handler */
     updateDomBtn(); if(domAny()) fetchDominance(); }
 
   // ── candle-size tiers: load tier · aggregate OHLC on the fly · apply ───────────
@@ -3409,7 +3431,10 @@
     {sym:'XCUUSD.P',dep:'1988',monthly:true}]               // Phase COPPER: copper, monthly OHLC CANDLES from copper_monthly (1M only; NOT lineOnly)
     .concat(TOKEN_LINE_SYMS.map(function(s){ return {sym:s, dep:'', lineOnly:true}; }))
     .sort(function(a,b){ return a.sym<b.sym?-1:(a.sym>b.sym?1:0); });   // ALPHABETICAL — BTC is NOT pinned (owner); XAUUSD before XCUUSD.P before XRP
-  var ASSET_COLORS={BTC:'#f7931a',ETH:'#627eea',ADA:'#3468d1',AVAX:'#e84142',BNB:'#f3ba2f',DOGE:'#c2a633',DOT:'#e6007a',LTC:'#5c6bc0',SOL:'#14f195',XRP:'#7fbbe0',XAUUSD:'#d4af37','XCUUSD.P':'#b87333',XAGUSD:'#c9d1d9',XPTUSD:'#a6b8ff',XCUUSD:'#e8955f'};   // NB: a dotted symbol must be a QUOTED key (bare XCUUSD.P: is a syntax error)
+  // UX-U1: DEFAULT colour of every one of the 24 dropdown symbols (the 9 tokens used to be resolved at runtime from tracked_tokens.color; these are the same values, now static).
+  // The user's choice (localStorage 'wk_asset_colors') overrides it everywhere — see assetColor().
+  var ASSET_COLOR_DEFAULTS={BTC:'#f7931a',ETH:'#627eea',ADA:'#3468d1',AVAX:'#e84142',BNB:'#f3ba2f',DOGE:'#c2a633',DOT:'#e6007a',LTC:'#5c6bc0',SOL:'#14f195',XRP:'#7fbbe0',XAUUSD:'#d4af37','XCUUSD.P':'#b87333',XAGUSD:'#c9d1d9',XPTUSD:'#a6b8ff',XCUUSD:'#e8955f',
+    AERO:'#22d3ee',CAKE:'#d1884f',CRV:'#f59e0b',CVX:'#3a66e0',HYPE:'#97fce4',LINK:'#375bd2',ONDO:'#f4f4f5',TRAC:'#4b6fe5',VIRTUAL:'#ff007c'};   // NB: a dotted symbol must be a QUOTED key (bare XCUUSD.P: is a syntax error)
   // Asset tooltips (asset button + dropdown rows). The ".P" suffix is the owner's naming — no meaning is implied.
   var ASSET_NOTES={'XCUUSD.P':'XCUUSD.P — COMEX copper futures (continuous), monthly candles, USD/lb',
     'XAGUSD':'XAGUSD — Silver, USD per troy oz, monthly line (1M only). Monthly averages, published to 0.1 USD/oz (up to ~±5% rounding at 1960s levels). Not recorded daily: the last point is the last seeded month.',
@@ -3417,11 +3442,12 @@
     'XCUUSD':'Long-run copper, monthly average (USGS · FRED/NBER · World Bank), USD/lb — 1955-08→1959-12 are ESTIMATES. Not recorded daily.'};
   // Phase METALS-1 — one small config for the silver/platinum monthly LINES (no OHLC; same machinery as gold, no per-asset forks).
   // era = the quality flag that marks the "unreliable early era" band; srcShort = the short bottom source line (full text = API meta.source, in the tooltip).
+  // (UX-U1: the line colour is NOT here any more — assetColor(sym) is the single source.)
   // unit/dec = readout unit + decimals; est (optional) = the quality flag of owner-labelled ESTIMATE months, drawn dimmed + shaded + labelled.
   var METAL_CFG={
-    XAGUSD:{ color:'#c9d1d9', unit:'USD/oz', dec:2, era:{q:'london_bar',    label:'London bar silver'},    srcShort:'World Bank · USGS · FRED · USD/oz' },
-    XPTUSD:{ color:'#a6b8ff', unit:'USD/oz', dec:2, era:{q:'administered',  label:'Administered prices'}, srcShort:'World Bank · USGS · USD/oz' },
-    XCUUSD:{ color:'#e8955f', unit:'USD/lb', dec:3, era:{q:'administered',  label:'Administered prices'}, est:{q:'estimated', label:'Estimated (PPI-scaled)'}, srcShort:'USGS · FRED · World Bank · USD/lb' } };
+    XAGUSD:{ unit:'USD/oz', dec:2, era:{q:'london_bar',    label:'London bar silver'},    srcShort:'World Bank · USGS · FRED · USD/oz' },
+    XPTUSD:{ unit:'USD/oz', dec:2, era:{q:'administered',  label:'Administered prices'}, srcShort:'World Bank · USGS · USD/oz' },
+    XCUUSD:{ unit:'USD/lb', dec:3, era:{q:'administered',  label:'Administered prices'}, est:{q:'estimated', label:'Estimated (PPI-scaled)'}, srcShort:'USGS · FRED · World Bank · USD/lb' } };
   function metalCfg(sym){ return (typeof METAL_CFG!=='undefined' && Object.prototype.hasOwnProperty.call(METAL_CFG,sym)) ? METAL_CFG[sym] : null; }
   // the asset button tooltip = the static note + (metals) the full source string the API sent (kept in one place: the API)
   function assetTitle(sym){ var n=assetNote(sym); if(metalCfg(sym) && goldMeta && goldMeta.source) n+='\n'+goldMeta.source; return n; }
@@ -3432,8 +3458,22 @@
   function isMonthlyAsset(sym){ for(var i=0;i<ASSET_LIST.length;i++){ if(ASSET_LIST[i].sym===sym) return !!ASSET_LIST[i].monthly; } return false; }
   var goldLock=false;   // true while XAUUSD is the main asset → BTC-relative visual layers no-op (hidden)
   var goldMeta={provMonth:null, provN:null, source:null, updated:null};
-  // colour: the 10 Kaggle assets use ASSET_COLORS; the 9 tokens reuse their tracked_tokens colour when loaded
-  function assetColor(sym){ if(ASSET_COLORS[sym]) return ASSET_COLORS[sym]; var e=window.WAKA_SCORE; if(e&&e.state){ var t=(e.state.tokens||[]).filter(function(x){return x.symbol===sym;})[0]; if(t&&t.color) return t.color; } return '#5eead4'; }
+  // ══ UX-U1 — ONE colour per asset, single source of truth ════════════════════════════════════════════════════════════════
+  // assetColor(sym) = the user's choice (localStorage 'wk_asset_colors' {SYM|seriesId:'#rrggbb'}, every access in try/catch) or the default.
+  // EVERY colour use — main line + area fill, overlays, score lines, "+" / ticker swatches, annotations, legend dot — derives from it; derived
+  // colours (fills, glows, estimate tints) are computed on the fly with rgbaOf()/hexRgb(), never stored. Non-asset overlay series (BTC.D, F&G…)
+  // keep their own defaults (OV_SERIES) but are overridable through the same store under their series id.
+  var COLOR_STORE_KEY='wk_asset_colors', userColors=null;
+  function isHex6(v){ return typeof v==='string' && /^#[0-9a-f]{6}$/i.test(v); }
+  function loadUserColors(){ if(userColors) return userColors; var o={};
+    try{ var j=JSON.parse(localStorage.getItem(COLOR_STORE_KEY)||'{}'); if(j&&typeof j==='object'){ Object.keys(j).forEach(function(k){ if(isHex6(j[k])) o[k]=j[k].toLowerCase(); }); } }catch(e){}
+    userColors=o; return o; }
+  function saveUserColors(){ try{ localStorage.setItem(COLOR_STORE_KEY, JSON.stringify(userColors||{})); }catch(e){} }
+  function defaultAssetColor(sym){ if(ASSET_COLOR_DEFAULTS[sym]) return ASSET_COLOR_DEFAULTS[sym]; var e=window.WAKA_SCORE; if(e&&e.state){ var t=(e.state.tokens||[]).filter(function(x){return x.symbol===sym;})[0]; if(t&&isHex6(t.color)) return t.color.toLowerCase(); } return '#5eead4'; }
+  function assetColor(sym){ var u=loadUserColors(); return u[sym]||defaultAssetColor(sym); }
+  function goldRgb(){ return hexRgb(assetColor('XAUUSD')); }   // gold / copper annotation tints follow the asset colour too
+  function copperRgb(){ return hexRgb(assetColor('XCUUSD.P')); }
+  function lgDot(sym){ return '<i class="wk-lgdot" style="background:'+assetColor(sym)+'"></i>'; }   // colour chip in the crosshair legend
   // a token's PRICE line from score_readings (reuses WAKA_SCORE — no new fetch/endpoint). One point/day.
   function tokenLinePoints(sym){ var e=window.WAKA_SCORE; if(!e||!e.state) return []; var t=(e.state.tokens||[]).filter(function(x){return x.symbol===sym;})[0]; if(!t) return [];
     var rows=(e.state.readingsByToken||{})[t.id]||[], byDay={};
@@ -3472,7 +3512,150 @@
     {id:'mayer',label:'Mayer Multiple',color:'#22d3ee'},
     {id:'mcap',label:'Total market cap',color:'#34d399'}];
   function ovLabel(id){ var s=OV_SERIES.filter(function(x){return x.id===id;})[0]; if(s) return s.label; return id; }
-  function ovDefColor(id){ if(id.indexOf('asset:')===0){ return assetColor(id.slice(6)); } var s=OV_SERIES.filter(function(x){return x.id===id;})[0]; return s?s.color:'#5eead4'; }
+  function seriesDefaultColor(id){ var s=OV_SERIES.filter(function(x){return x.id===id;})[0]; return s?s.color:'#5eead4'; }
+  function colorKeyOf(id){ return id.indexOf('asset:')===0 ? id.slice(6) : id; }   // the key in wk_asset_colors: the symbol for assets, the series id for series
+  function defaultColorFor(key){ return ASSET_COLOR_DEFAULTS[key] ? ASSET_COLOR_DEFAULTS[key] : (OV_SERIES.some(function(x){return x.id===key;}) ? seriesDefaultColor(key) : defaultAssetColor(key)); }
+  function ovDefColor(id){ if(id.indexOf('asset:')===0){ return assetColor(id.slice(6)); } var u=loadUserColors(); return u[id]||seriesDefaultColor(id); }
+  // ── UX-U1: change a colour (key = symbol, or series id for non-asset overlays; hex=null → back to the default) and repaint EVERYTHING at once ──
+  function setColorFor(key, hex){ var u=loadUserColors();
+    if(hex==null){ delete u[key]; } else if(isHex6(hex)){ u[key]=hex.toLowerCase(); } else return false;
+    saveUserColors(); applyColorsEverywhere(key); return true; }
+  function applyColorsEverywhere(key){
+    try{ if(key===ASSET){ applyEffectiveMode(); setSeriesData(); } }catch(e){}   // main line + area fill (+ provisional / estimate tints that derive from it)
+    try{ Object.keys(overlays).forEach(function(id){ if(colorKeyOf(id)!==key) return; var c=ovDefColor(id); overlays[id].color=c; try{ overlays[id].series.applyOptions({color:c}); }catch(_){} }); saveOvState(); }catch(e){}
+    try{ if(typeof scoreSeries!=='undefined' && scoreSeries[key]){ var c2=assetColor(key); scoreSeries[key].color=c2; scoreSeries[key].series.applyOptions({color:c2}); } }catch(e){}
+    try{ var as=document.getElementById('wk-assetSrch'); buildAssetList(as?as.value:''); }catch(e){}   // ticker dropdown swatches
+    try{ refreshOvUI(); }catch(e){}                                                                   // "+" dropdown swatches
+    try{ if(scoreOn) updateScorePanel(); }catch(e){}                                                  // score panel dots
+    try{ if(cpEl && colorPickerOpen() && cpKey===key) cpRefresh(); }catch(e){}
+    try{ if(chart) chart.timeScale().applyOptions({}); }catch(e){} }                                  // nudge a repaint for the annotation primitives (gold / metals / copper)
+  // One-time migration (flag wk_color_migr_v1, kept in sessionStorage like the source it reads, so every tab migrates its own wk_overlays once):
+  // per-overlay custom colours picked in the old "+" swatches are copied into the single store; the stored overlay state itself is left untouched.
+  (function migrateColorsV1(){ try{
+    if(sessionStorage.getItem('wk_color_migr_v1')==='1') return;
+    var raw=sessionStorage.getItem('wk_overlays'), u=loadUserColors(), n=0;
+    if(raw){ var st=JSON.parse(raw); if(st && typeof st==='object'){ Object.keys(st).forEach(function(id){ var c=st[id]&&st[id].color; if(!isHex6(c)) return; var key=colorKeyOf(id);
+      if(u[key]) return;                                                  // an existing choice in the store wins
+      if(c.toLowerCase()===defaultColorFor(key).toLowerCase()) return;   // it is just the default → nothing custom to keep
+      u[key]=c.toLowerCase(); n++; }); } }
+    if(n) saveUserColors();
+    sessionStorage.setItem('wk_color_migr_v1','1');
+  }catch(e){} })();
+  try{ window.__assetColors=function(){ return { defaults:ASSET_COLOR_DEFAULTS, user:loadUserColors(), effective:ASSET_LIST.map(function(a){ return [a.sym, assetColor(a.sym)]; }) }; }; window.__setColor=setColorFor; }catch(e){}
+
+  // ══ UX-U1 — shared line hit-test (U2 hover-highlight and U4 tags REUSE this) ═══════════════════════════════════════════
+  // GESTURE MAP (later steps must respect it):
+  //   desktop : click on a line → colour picker (U1) · hover a line → highlight (U2, later) · double-click on the price-pane background → fit (U3, later;
+  //             today's double-click behaviour is unchanged) · double-click on an oscillator pane → its settings (existing) · double-click a drawing → style panel (existing)
+  //   iPhone  : long-press (~500 ms) on a line → colour picker (U1) · tap on a line → highlight (U2, later) · double-tap background → fit (U3, later)
+  //   A click/tap after a drag or pan (movement > ~4 px mouse / ~8 px touch) is NOT a click. While a drawing tool is active the line gestures are off.
+  //   A drawing under the pointer wins over a line (drawing selection keeps working). Existing handlers (drawings, forecasts, crosshair) are untouched.
+  // lineAtPoint(clientX, clientY, touch) → the LINE/AREA series nearest to the pointer on the PRICE pane (main asset + overlays), or null.
+  //   Distance = pixel distance to the drawn segment (each series converted with ITS OWN price scale). Tolerance 6 px (mouse) / 12 px (touch).
+  //   Whitespace/gaps are ignored: a segment is skipped when either end has no value or when the left point's colour is transparent (breakAtGaps / estimate seams
+  //   that hide a bridging segment). The main series counts only in LINE mode (candlesticks are not lines). Ties (< 0.5 px apart) go to the series drawn on top.
+  function lineTimeKey(t){ if(t==null) return null; if(typeof t==='object' && t.year) return t.year+'-'+String(t.month).padStart(2,'0')+'-'+String(t.day).padStart(2,'0'); return t; }
+  function lineHiddenSeg(pt){ var c=pt.color||pt.lineColor; return !!c && /rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/.test(c); }
+  function lineSeriesHit(series, px, py, tx){ var data; try{ data=series.data(); }catch(e){ return null; } if(!data||data.length<2) return null;
+    var ts=chart.timeScale(), lo=0, hi=data.length, best=null;
+    while(lo<hi){ var mid=(lo+hi)>>1; if(lineTimeKey(data[mid].time)<tx) lo=mid+1; else hi=mid; }
+    for(var i=Math.max(0,lo-3); i<Math.min(data.length-1,lo+2); i++){ var a=data[i], b=data[i+1];
+      if(a.value==null||b.value==null||lineHiddenSeg(a)) continue;
+      var xa=null,xb=null,ya=null,yb=null; try{ xa=ts.timeToCoordinate(a.time); xb=ts.timeToCoordinate(b.time); ya=series.priceToCoordinate(a.value); yb=series.priceToCoordinate(b.value); }catch(e){ continue; }
+      if(xa==null||xb==null||ya==null||yb==null||!isFinite(ya)||!isFinite(yb)) continue;
+      var d=distToSeg(px,py,{x:xa,y:ya},{x:xb,y:yb}); if(best==null||d<best.d) best={d:d, t:a.time, v:a.value}; }
+    return best; }
+  function lineAtPoint(clientX, clientY, touch){ if(!chart||!area) return null;
+    var host=document.getElementById('wk-chart'); if(!host) return null; var r=host.getBoundingClientRect(), px=clientX-r.left, py=clientY-r.top;
+    var ph=null; try{ ph=chart.panes()[0].getHeight(); }catch(e){}
+    if(px<0||py<0||px>r.width||(ph!=null&&py>ph)) return null;                 // PRICE pane only (oscillator panes are indicators, not assets)
+    var tx=null; try{ tx=lineTimeKey(chart.timeScale().coordinateToTime(px)); }catch(e){} if(tx==null) return null;
+    var tol=touch?12:6, best=null;
+    function consider(id,key,label,kind,series){ var h=lineSeriesHit(series,px,py,tx); if(!h||h.d>tol) return; if(!best || h.d<best.dist+0.5) best={ id:id, key:key, label:label, kind:kind, dist:Math.round(h.d*10)/10, t:h.t, v:h.v }; }
+    if(mode==='line') consider('main', ASSET, ASSET, 'main', area);            // main first; overlays are drawn above it, so they win near-ties
+    Object.keys(overlays).forEach(function(id){ var o=overlays[id]; if(!o||!o.series) return; consider(id, colorKeyOf(id), (id.indexOf('asset:')===0?id.slice(6):ovLabel(id).split(' — ')[0]), 'overlay', o.series); });
+    return best; }
+  try{ window.__lineAt=function(cx,cy,touch){ return lineAtPoint(cx,cy,!!touch); };   // read-only probe for tests
+    window.__lineGeom=function(id,time){ try{ var s=(id==='main')?area:(overlays[id]&&overlays[id].series); if(!s) return null; var d=s.data(), pt=null; for(var i=0;i<d.length;i++){ if(d[i].time===time){ pt=d[i]; break; } } if(!pt||pt.value==null) return null;
+      var r=document.getElementById('wk-chart').getBoundingClientRect(); var x=chart.timeScale().timeToCoordinate(time), y=s.priceToCoordinate(pt.value); return (x==null||y==null)?null:{ x:r.left+x, y:r.top+y }; }catch(e){ return null; } }; }catch(e){}
+
+  try{ window.__lineColors=function(){ var o={main:null,mainFill:null,overlays:{},score:{}}; try{ var ao=area.options(); o.main=ao.lineColor; o.mainFill=ao.topColor; }catch(e){} Object.keys(overlays).forEach(function(id){ try{ o.overlays[id]=overlays[id].series.options().color; }catch(e){} }); return o; }; }catch(e){}   // read-only probe
+  // ══ UX-U1 — colour picker popup (palette + custom hex + Reset to default), anchored near the click ═════════════════════════
+  var PICKER_PALETTE=['#f7931a','#fbbf24','#e5e7eb','#22c55e','#14f195','#2dd4bf','#22d3ee','#60a5fa','#818cf8','#a78bfa','#f472b6','#f43f5e'];   // 12 colours that read well on the dark panel
+  var cpEl=null, cpKey=null;
+  function colorPickerOpen(){ return !!(cpEl && cpEl.classList.contains('on')); }
+  function cpRefresh(){ if(!cpEl||cpKey==null) return; var cur=loadUserColors()[cpKey]||defaultColorFor(cpKey);
+    cpEl.querySelector('.wk-cp-dot').style.background=cur;
+    var hx=cpEl.querySelector('.wk-cp-hex'); if(document.activeElement!==hx) hx.value=cur;
+    Array.prototype.forEach.call(cpEl.querySelectorAll('.wk-cp-sw'),function(b){ b.classList.toggle('on', b.getAttribute('data-c').toLowerCase()===cur.toLowerCase()); }); }
+  function buildColorPicker(){ if(cpEl) return cpEl; var d=document.createElement('div'); d.className='wk-colorpop'; d.id='wk-colorpop'; d.setAttribute('role','dialog'); d.setAttribute('aria-label','Line colour');
+    d.innerHTML='<div class="wk-cp-h"><i class="wk-cp-dot"></i><span class="wk-cp-t"></span></div><div class="wk-cp-grid"></div>'
+      +'<div class="wk-cp-row"><input class="wk-cp-hex" type="text" maxlength="7" spellcheck="false" autocomplete="off" placeholder="#rrggbb" aria-label="Hex colour"><button type="button" class="wk-cp-reset">Reset to default</button></div>';
+    var g=d.querySelector('.wk-cp-grid');
+    PICKER_PALETTE.forEach(function(c){ var b=document.createElement('button'); b.type='button'; b.className='wk-cp-sw'; b.setAttribute('data-c',c); b.style.background=c; b.setAttribute('aria-label',c);
+      b.onclick=function(e){ e.stopPropagation(); if(cpKey!=null) setColorFor(cpKey,c); }; g.appendChild(b); });
+    var hx=d.querySelector('.wk-cp-hex');
+    hx.addEventListener('input', function(){ var v=hx.value.trim(); if(v && v.charAt(0)!=='#') v='#'+v; if(isHex6(v) && cpKey!=null) setColorFor(cpKey,v); });
+    hx.addEventListener('keydown', function(e){ e.stopPropagation(); if(e.key==='Enter'){ hx.blur(); } });                   // Escape is handled by the global ESC handler (capture phase)
+    d.querySelector('.wk-cp-reset').onclick=function(e){ e.stopPropagation(); if(cpKey!=null){ setColorFor(cpKey,null); var h2=d.querySelector('.wk-cp-hex'); h2.blur(); cpRefresh(); } };
+    d.addEventListener('click', function(e){ e.stopPropagation(); });
+    document.body.appendChild(d); cpEl=d;
+    document.addEventListener('pointerdown', function(e){ if(colorPickerOpen() && !e.target.closest('.wk-colorpop')) closeColorPicker(); }, true);   // outside press closes it
+    return d; }
+  function openColorPicker(key, clientX, clientY, label){ var d=buildColorPicker(); cpKey=key; d.querySelector('.wk-cp-t').textContent=(label||key)+' · line colour';
+    d.classList.add('on'); cpRefresh();
+    var vw=window.innerWidth, vh=window.innerHeight, w=d.offsetWidth||212, h=d.offsetHeight||150;
+    var left=Math.min(Math.max(8,(clientX||0)+10), Math.max(8,vw-w-8)), top=Math.min(Math.max(8,(clientY||0)+10), Math.max(8,vh-h-8));
+    d.style.left=left+'px'; d.style.top=top+'px'; }
+  function closeColorPicker(){ if(cpEl){ cpEl.classList.remove('on'); var hx=cpEl.querySelector('.wk-cp-hex'); if(hx) hx.blur(); } cpKey=null; }
+  try{ window.__colorPicker=function(){ return { open:colorPickerOpen(), key:cpKey, hex:cpEl?cpEl.querySelector('.wk-cp-hex').value:null, swatches:cpEl?cpEl.querySelectorAll('.wk-cp-sw').length:0 }; }; window.__openColorPicker=openColorPicker; }catch(e){}
+
+  // gesture wiring: desktop click / iPhone long-press on a line → colour picker. Capture-phase listeners on #wk-chart: nothing existing is intercepted.
+  var colorGestWired=false;
+  function wireColorGestures(){ if(colorGestWired) return; colorGestWired=true; var chEl=document.getElementById('wk-chart'); if(!chEl) return;
+    var st=null, lpTimer=null, suppressUntil=0;
+    function blocked(el){ if(drawTool) return true; return !!(el && el.closest && el.closest('.wk-drawbar,.wk-modetog,.wk-legend,.wk-livetag,.wk-titles,.wk-goend,.wk-colorpop,.wk-scorepanel,.wk-rkpin,.wk-fcdlg,.wk-stylepanel,.wk-manipbox,.wk-loading')); }
+    function tryOpen(cx,cy,touch){ var r=chEl.getBoundingClientRect(); try{ if(lineDrawingAt(cx-r.left, cy-r.top)) return false; }catch(e){}   // a drawing under the pointer wins (selection keeps working)
+      var hit=lineAtPoint(cx,cy,touch); if(!hit) return false; openColorPicker(hit.key, cx, cy, hit.label); return true; }
+    chEl.addEventListener('pointerdown', function(e){ if(e.pointerType==='mouse' && e.button!==0){ st=null; return; } if(blocked(e.target)){ st=null; return; }
+      st={x:e.clientX,y:e.clientY,type:e.pointerType,id:e.pointerId,moved:false,fired:false}; clearTimeout(lpTimer);
+      if(e.pointerType==='touch'){ lpTimer=setTimeout(function(){ if(st && !st.moved && !st.fired && !drawTool){ if(tryOpen(st.x,st.y,true)){ st.fired=true; suppressUntil=Date.now()+800; } } }, 500); } }, true);
+    chEl.addEventListener('pointermove', function(e){ if(!st||e.pointerId!==st.id) return; if(Math.hypot(e.clientX-st.x,e.clientY-st.y)>(st.type==='touch'?8:4)){ st.moved=true; clearTimeout(lpTimer); } }, true);
+    chEl.addEventListener('pointerup', function(e){ clearTimeout(lpTimer); var s=st; st=null; if(!s||e.pointerId!==s.id) return;
+      if(s.type==='mouse' && !s.moved && !s.fired && !drawTool) tryOpen(e.clientX,e.clientY,false); }, true);   // a plain tap on iPhone is reserved for U2's highlight
+    chEl.addEventListener('pointercancel', function(){ clearTimeout(lpTimer); st=null; }, true);
+    chEl.addEventListener('click', function(e){ if(Date.now()<suppressUntil){ e.stopPropagation(); e.preventDefault(); } }, true);   // the long-press that opened the picker is not also a tap
+    chEl.addEventListener('contextmenu', function(e){ if(Date.now()<suppressUntil) e.preventDefault(); }, true); }
+
+  // ══ UX-U1 — ONE global Escape handler (capture phase). Priority — the first that applies runs and the event stops:
+  //   1 open popup / menu / dropdown / PIN dialog  2 drawing in progress → cancel  3 active drawing tool → cursor  4 selected object → deselect (repeat ESC to walk down).
+  //   ESC never deletes a finished drawing and never changes data. Typing in a text field: only that field's popup closes. The entry 0222 lock is NOT closable.
+  var escDeselectors=[];   // later steps (U2 highlighted line, U4 tags…) push a function(){ …; return true if it deselected something }
+  function escClosePopups(){ var did=false;
+    if(colorPickerOpen()){ closeColorPicker(); return true; }
+    var pin=document.getElementById('wk-rkpin'); if(pin && pin.classList.contains('on')){ pin.classList.remove('on'); return true; }                       // rocket PIN screen
+    var fd=document.querySelector('.wk-fcdlg.on'); if(fd){ var cb=fd.querySelector('#wk-fcdlg-cancel'); if(cb){ cb.click(); return true; } }
+    if(stylePanel && stylePanel.classList.contains('on')){ closeStylePanel(); return true; }
+    var mg=document.getElementById('wk-mg'); if(mg && mg.classList.contains('open')){ closeManage(); return true; }
+    var menus=document.querySelectorAll('.wk-per-menu.open,.wk-ind-menu.open,.wk-cyc-menu.open,.wk-ad-menu.open,.wk-dgroup.open');
+    if(menus.length){ Array.prototype.forEach.call(menus,function(m){ m.classList.remove('open'); }); did=true; }
+    return did; }
+  function escStep(e){
+    var t=e.target, typing=!!(t && (t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.isContentEditable));
+    if(escClosePopups()) return true;
+    if(typing || !bodyEl.classList.contains('wk-b')) return false;
+    if(drawTool && drawPending.length){ drawPending=[]; try{ clearPrev(); }catch(_){} return true; }                                                    // 2) drawing in progress → cancel (finished drawings untouched)
+    if(drawTool){ exitDraw(); return true; }                                                                                                              // 3) active tool → back to the cursor
+    for(var i=0;i<escDeselectors.length;i++){ try{ if(escDeselectors[i]()) return true; }catch(_){} }                                                      // 4) other selected objects (later steps)
+    if(drawSelId && drawMgr){ try{ drawMgr.deselectAll(); }catch(_){} drawSelId=null; try{ redrawFcOverlays(); }catch(_){} return true; }                  // 4) selected drawing / forecast pivot → deselect
+    return false; }
+  var escWired=false;
+  function wireEscape(){ if(escWired) return; escWired=true;
+    document.addEventListener('keydown', function(e){ if(e.key!=='Escape') return; if(!document.documentElement.classList.contains('pjdc266-unlocked')) return;
+      if(escStep(e)){ e.stopImmediatePropagation(); e.preventDefault(); } }, true); }
+  try{ window.__drawCount=function(){ try{ return drawMgr.getAllDrawings().length; }catch(e){ return null; } }; }catch(e){}   // read-only probe
+  try{ window.__escState=function(){ return { picker:colorPickerOpen(), drawTool:drawTool, pending:drawPending.length, selected:drawSelId||null, menus:document.querySelectorAll('.wk-per-menu.open,.wk-ind-menu.open,.wk-cyc-menu.open').length }; }; }catch(e){}
+
 
   // fetch a {time,value} line for an overlay id (asset:<COIN> price, or a series id), cached.
   var ovDataCache={};
@@ -3522,17 +3705,17 @@
   try{ window.__gapMarks=function(id){ try{ var s=(id==null)?area:(overlays[id]&&overlays[id].series); if(!s) return null; return s.data().filter(function(x){ return x.lineColor||x.color; }).map(function(x){ return x.time; }); }catch(e){ return null; } }; }catch(e){}   // read-only test probe: the points whose bridging segment is hidden
   function realignAllOverlays(){ Object.keys(overlays).forEach(function(id){ var o=overlays[id]; if(!o) return; fetchOverlayData(id, function(pts){ try{ o.series.setData(breakAtGaps(alignOverlay(id, pts))); }catch(e){} }); }); }
 
-  function addOverlay(id, color){ if(!chart||overlays[id]) return; color=color||ovDefColor(id);
+  function addOverlay(id, color){ if(!chart||overlays[id]) return; color=ovDefColor(id);   // UX-U1: the colour always comes from the single source (a stale stored/passed colour is ignored)
     // (a) the monthly asset on an intraday main chart → not drawn (monthly data only)
     if(id.indexOf('asset:')===0 && isMonthlyAsset(id.slice(6)) && !isMonthlyAsset(ASSET) && isIntra()){ notify(id.slice(6)+': monthly data only'); return; }
     var scaleId='wkov_'+id.replace(/[^a-z0-9]/gi,'_');
     var s; try{ s=chart.addSeries(L.LineSeries,{color:color,lineWidth:1.5,priceScaleId:scaleId,lastValueVisible:false,priceLineVisible:false,crosshairMarkerVisible:false},0); }catch(e){ return; }
-    try{ chart.priceScale(scaleId).applyOptions({visible:false,scaleMargins:{top:0.08,bottom:0.08}}); }catch(e){}   // own INVISIBLE scale → doesn't distort the base price axis ("new price scale")
+    try{ chart.priceScale(scaleId).applyOptions({visible:false,scaleMargins:{top:0.08,bottom:0.08},mode:(isLog?1:0)}); }catch(e){}   // own INVISIBLE scale → doesn't distort the base price axis ("new price scale")
     overlays[id]={series:s,color:color,scaleId:scaleId};
     fetchOverlayData(id, function(pts){ try{ s.setData(breakAtGaps(alignOverlay(id, pts))); }catch(e){} });   // clip/snap/bucket per direction (gold-aware); a source hole stays a visible hole
     saveOvState(); refreshOvUI(); if(scoreOn && id.indexOf('asset:')===0) refreshScoreLines(true); }
   function removeOverlay(id){ var o=overlays[id]; if(!o) return; try{ chart.removeSeries(o.series); }catch(e){} delete overlays[id]; saveOvState(); refreshOvUI(); if(scoreOn && id.indexOf('asset:')===0) refreshScoreLines(false); }
-  function setOverlayColor(id, color){ var o=overlays[id]; if(!o) return; o.color=color; try{ o.series.applyOptions({color:color}); }catch(e){} saveOvState(); refreshOvUI(); }
+  function setOverlayColor(id, color){ setColorFor(colorKeyOf(id), color); }   // UX-U1: routes through the single colour store (updates plot, dropdowns, score lines… at once)
   function toggleOverlay(id){ if(overlays[id]) removeOverlay(id); else addOverlay(id); }
 
   // ── Phase VI(b): SCORE overlay — reuses Screen A's engine (window.WAKA_SCORE). One master toggle
@@ -3719,25 +3902,32 @@
   // (a filtered subset is never wider than the full-list max). Recompute when ASSET_LIST changes.
   function sizeAssetMenu(){ var menu=document.getElementById('wk-assetMenu'); if(!menu) return;
     var cv=sizeAssetMenu._cv||(sizeAssetMenu._cv=document.createElement('canvas')); var ctx=cv.getContext('2d');
-    ctx.font='700 13px -apple-system,system-ui,sans-serif'; var w=0;
+    ctx.font='600 11.5px -apple-system,system-ui,sans-serif'; var w=0;
     ASSET_LIST.forEach(function(a){ var m=ctx.measureText(a.sym).width; if(m>w) w=m; });
-    var px=Math.ceil(w) + 20/*item padding*/ + 12/*menu padding*/ + 16/*scrollbar allowance*/ + 6/*breathing*/;
+    var px=Math.ceil(w) + 18/*item padding*/ + 24/*swatch + gap*/ + 12/*menu padding*/ + 16/*scrollbar allowance*/ + 6/*breathing*/;
     menu.style.minWidth=Math.max(96,px)+'px'; }
+  // UX-U1 (TICKER-DD-2): the ticker dropdown now reads like the "+" overlay list — search field with the magnifier, small-caps ASSETS header, same row metrics /
+  // hover / scrollbar, the asset colour SWATCH on the right of each row (no checkboxes: single choice → the current asset's row is highlighted). Clicking a row
+  // selects the asset (as before); clicking its SWATCH opens the colour picker for that asset without changing the selection.
   function buildAssetList(filter){ var host=document.getElementById('wk-assetList'); if(!host) return; host.innerHTML=''; filter=(filter||'').trim().toUpperCase();
-    ASSET_LIST.filter(function(a){ return !filter || a.sym.indexOf(filter)>=0; }).forEach(function(a){
+    var rows=ASSET_LIST.filter(function(a){ return !filter || a.sym.indexOf(filter)>=0; });
+    if(rows.length){ var h=document.createElement('div'); h.className='wk-ov-head wk-as-head'; h.textContent='ASSETS'; host.appendChild(h); }
+    rows.forEach(function(a){
       var it=document.createElement('div'); it.className='wk-asset-item'+(a.sym===ASSET?' on':''); it.dataset.sym=a.sym; if(ASSET_NOTES[a.sym]) it.title=ASSET_NOTES[a.sym];
-      it.innerHTML='<span class="wk-ai-sym" style="color:'+assetColor(a.sym)+'">'+a.sym+'</span>';   // ticker name only (no date subtitle) — owner request 2026-10-15
-      it.onclick=function(){ applyAsset(a.sym); }; host.appendChild(it); });
+      it.innerHTML='<span class="wk-ai-sym">'+a.sym+'</span><span class="wk-ai-sw" title="Change line colour" style="background:'+assetColor(a.sym)+'"></span>';   // ticker name + colour swatch (no date subtitle — owner request 2026-10-15)
+      it.onclick=function(){ applyAsset(a.sym); };
+      it.querySelector('.wk-ai-sw').onclick=function(e){ e.stopPropagation(); e.preventDefault(); openColorPicker(a.sym, e.clientX, e.clientY, a.sym); };
+      host.appendChild(it); });
     sizeAssetMenu(); }
   function refreshOvUI(){ Array.prototype.forEach.call(document.querySelectorAll('#wk-ovList .wk-ov-item'),function(it){ var id=it.dataset.id; var on=!!overlays[id];
-      it.classList.toggle('on', on); var chk=it.querySelector('.wk-ov-chk'); if(chk) chk.textContent=on?'✓':''; var col=it.querySelector('.wk-ov-col'); if(col){ col.style.background=(overlays[id]?overlays[id].color:ovDefColor(id)); } });
+      it.classList.toggle('on', on); var chk=it.querySelector('.wk-ov-chk'); if(chk) chk.textContent=on?'✓':''; var col=it.querySelector('.wk-ov-col'); if(col){ var cc=ovDefColor(id); col.style.background=cc; try{ col.value=cc; }catch(e){} } });
     var b=document.getElementById('wk-ovBtn'); if(b) b.classList.toggle('on', Object.keys(overlays).length>0); }
   function ovRow(id,label,color){ var on=!!overlays[id];
     var it=document.createElement('div'); it.className='wk-ov-item'+(on?' on':''); it.dataset.id=id;
-    it.innerHTML='<span class="wk-ov-chk">'+(on?'✓':'')+'</span><span class="wk-ov-nm">'+label+'</span><input type="color" class="wk-ov-col" value="'+(on?overlays[id].color:color)+'" title="Color">';
+    it.innerHTML='<span class="wk-ov-chk">'+(on?'✓':'')+'</span><span class="wk-ov-nm">'+label+'</span><input type="color" class="wk-ov-col" value="'+(on?overlays[id].color:color)+'" style="background:'+(on?overlays[id].color:color)+'" title="Color">';
     it.querySelector('.wk-ov-nm').onclick=function(){ toggleOverlay(id); };
     it.querySelector('.wk-ov-chk').onclick=function(){ toggleOverlay(id); };
-    var ci=it.querySelector('.wk-ov-col'); ci.onclick=function(e){ e.stopPropagation(); }; ci.oninput=function(e){ if(!overlays[id]) addOverlay(id, e.target.value); else setOverlayColor(id, e.target.value); };
+    var ci=it.querySelector('.wk-ov-col'); ci.onclick=function(e){ e.preventDefault(); e.stopPropagation(); openColorPicker(colorKeyOf(id), e.clientX, e.clientY, label); };   // UX-U1: the swatch opens the shared picker popup (the native input only mirrors the colour)
     return it; }
   // Collapse state for the two overlay groups, persisted across dropdown re-open AND refresh.
   var OV_GRP_KEY='wk_overlay_groups';
@@ -4225,7 +4415,7 @@
     rb.onclick=function(e){ e.stopPropagation(); if(rocketUnlocked()) openRocketMenu(); else openRkPin(); };   // locked → PIN screen; unlocked → dropdown
     var menu=document.getElementById('wk-rocketMenu'); if(menu) menu.addEventListener('click',function(e){ e.stopPropagation(); });
     document.addEventListener('click',function(){ var mm=document.getElementById('wk-rocketMenu'); if(mm) mm.classList.remove('open'); });
-    document.addEventListener('keydown',function(e){ if(e.key!=='Escape') return; var m=document.getElementById('wk-rkpin'); if(m && m.classList.contains('on')){ m.classList.remove('on'); e.stopPropagation(); } });   // Esc closes the PIN screen
+    /* UX-U1: Esc closing the rocket PIN screen is folded into the global handler (escClosePopups) */
   }
 
   // ── Fase L: live BTC price (CoinGecko, client-side, 5s, fault-tolerant, display-only) ──────────
@@ -4505,6 +4695,7 @@
   var drawWired=false;
   function wireDrawing(){
     if(drawWired) return; drawWired=true;   // guard: even if render() ran twice, the global listeners attach ONCE
+    try{ wireColorGestures(); }catch(e){} try{ wireEscape(); }catch(e){}   // UX-U1: line click / long-press colour picker + the single global Escape handler
     var D=window.LightweightChartsDrawing;
     var bar=document.getElementById('wk-drawbar');
     if(!D || !chart || !area){ if(bar) bar.style.display='none'; return; }   // CDN failed → hide bar, never break the chart
@@ -4577,8 +4768,7 @@
       else { lastTap=now; lastTX=p.clientX; lastTY=p.clientY; } });
     document.addEventListener('keydown', function(e){
       if(!bodyEl.classList.contains('wk-b')) return;
-      if(e.key==='Escape' && stylePanel && stylePanel.classList.contains('on')){ closeStylePanel(); return; }   // ESC closes the style panel first
-      if(e.key==='Escape' && drawTool){ if(drawPending.length){ drawPending=[]; clearPrev(); } else exitDraw(); return; }   // ESC cancels the in-progress creation, then exits the tool
+      // (UX-U1: Escape — style panel / in-progress drawing / active tool / selection — is handled by the single global handler, escStep)
       // Delete / Backspace removes the selected drawing (desktop). Trash button does the same on mobile.
       if((e.key==='Delete'||e.key==='Backspace') && drawSelId && drawMgr){ var tg=e.target; if(tg&&(tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.isContentEditable)) return;
         try{ drawMgr.removeDrawing(drawSelId); }catch(_){} drawSelId=null; saveDrawings(); e.preventDefault(); }
@@ -4810,7 +5000,7 @@
     // ESTIMATED months (owner-labelled, e.g. copper 1955-08→1959-12) are drawn at ~50% line opacity. The segment i→i+1 takes the colour of point i, so it is
     // dimmed when EITHER end is an estimate: that paints the real→estimate seam (1955-07→08) and the estimate→World Bank seam (1959-12→1960-01) as part of the
     // estimated stretch — the seam step is shown, never smoothed.
-    var mcfE=metalCfg(ASSET), estRGB=(mcfE&&mcfE.est)?hexRgb(mcfE.color):null;
+    var mcfE=metalCfg(ASSET), estRGB=(mcfE&&mcfE.est)?hexRgb(assetColor(ASSET)):null;
     var aD=ACTIVE.map(function(d,i){ if(d.close==null) return {time:d.time};
       var pt={time:d.time,value:d.close};
       if(i+1<ACTIVE.length && ACTIVE[i+1].close==null){ pt.lineColor=T0; pt.topColor=T0; pt.bottomColor=T0; }
@@ -4895,9 +5085,8 @@
     applyEffectiveMode(); }
   // effective mode: forced line for OHLC-less tokens + gold; candle-default for XCUUSD.P; else the user's BTC pick
   function applyEffectiveMode(){ mode = isLineOnly(ASSET) ? 'line' : (isMonthlyAsset(ASSET) ? monthlyCandleMode : userMode);
-    // XAUUSD renders in gold; everything else keeps the purple line
-    var lc=(ASSET==='XAUUSD')?'#d4af37':(ASSET==='XCUUSD.P')?'#b87333':'#a78bfa', tc=(ASSET==='XAUUSD')?'rgba(212,175,55,.16)':(ASSET==='XCUUSD.P')?'rgba(184,115,51,.14)':'rgba(167,139,250,.18)', bc=(ASSET==='XAUUSD')?'rgba(212,175,55,0)':(ASSET==='XCUUSD.P')?'rgba(184,115,51,0)':'rgba(167,139,250,0)';
-    var mcf=metalCfg(ASSET); if(mcf){ lc=mcf.color; tc='rgba('+hexRgb(mcf.color)+',.14)'; bc='rgba('+hexRgb(mcf.color)+',0)'; }   // silver / platinum line colours (config map)
+    // UX-U1: the main line / area fill take the asset colour from the single source (BTC = orange by default; the old purple default is gone)
+    var baseC=assetColor(ASSET), lc=baseC, tc=rgbaOf(baseC,.16), bc=rgbaOf(baseC,0);
     // area stays visible (carries the phase primitive + markers); transparent in candle mode
     if(area) area.applyOptions(mode==='candle'
       ? {lineColor:'rgba(0,0,0,0)',topColor:'rgba(0,0,0,0)',bottomColor:'rgba(0,0,0,0)'}
@@ -4907,6 +5096,12 @@
     var cb=document.querySelector('.wk-mode-b[data-mode="candle"]'); if(cb){ var lo=isLineOnly(ASSET); cb.classList.toggle('wk-mode-off', lo); cb.title=lo?'Candles — unavailable (line only, no OHLC)':'Candles'; }
   }
 
+  // UX-U1: LOG ↔ LINEAR applies to EVERY plotted asset price scale on the price pane: the main asset and each overlay's own scale (oscillator panes and the
+  // 0–100 score scale are indicators, not assets → unchanged). Overlays added later start in the current mode (addOverlay). The mode is not persisted (as before).
+  function applyScaleModeAll(){ var m=isLog?1:0; try{ area.priceScale().applyOptions({mode:m}); }catch(e){}
+    Object.keys(overlays).forEach(function(id){ try{ chart.priceScale(overlays[id].scaleId).applyOptions({mode:m}); }catch(e){} });
+    try{ positionLiveTag(); }catch(e){} try{ positionTitles(); }catch(e){} try{ redrawFcOverlays(); }catch(e){} }   // priceToCoordinate-positioned layers re-lay out
+  try{ window.__scaleModes=function(){ var o={main:area.priceScale().options().mode}; Object.keys(overlays).forEach(function(id){ try{ o[id]=chart.priceScale(overlays[id].scaleId).options().mode; }catch(e){ o[id]=null; } }); return o; }; }catch(e){}
   function toggleInd(k,on){
     ind[k]=on;
     if(k==='halving') return setHalvings(on);
@@ -4938,7 +5133,7 @@
     document.addEventListener('click',function(e){ if(!e.target.closest('#wk-csBtn') && !e.target.closest('#wk-csMenu')) csMenu.classList.remove('open'); });
     Array.prototype.forEach.call(document.querySelectorAll('.wk-cs-item'),function(it){ it.onclick=function(){ applyCandleSize(it.dataset.cs); csMenu.classList.remove('open'); }; });
     var st=document.getElementById('wk-scaleToggle');
-    st.onclick=function(){ isLog=!isLog; st.textContent=isLog?'LOG':'LIN'; try{ area.priceScale().applyOptions({mode:isLog?1:0}); }catch(e){} };
+    st.onclick=function(){ isLog=!isLog; st.textContent=isLog?'LOG':'LIN'; applyScaleModeAll(); };
     Array.prototype.forEach.call(document.querySelectorAll('.wk-mode-b[data-mode]'),function(bn){ bn.onclick=function(){ setMode(bn.dataset.mode); }; });
   }
 
