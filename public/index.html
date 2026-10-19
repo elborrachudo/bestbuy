@@ -2183,7 +2183,7 @@
   function wkFmtPrice(v){ if(v==null||!isFinite(v)) return '';
     if(typeof ASSET!=='undefined' && ASSET==='XAUUSD'){ return v<100 ? v.toFixed(2) : Math.round(v).toLocaleString('en-US'); }   // gold: 2 decimals under 100, else integer w/ thousands comma (legible 18.93 → 5,020)
     if(typeof ASSET!=='undefined' && ASSET==='XCUUSD.P'){ return v.toFixed(3); }   // copper: USD per lb, 3 decimals (6.556)
-    if(typeof ASSET!=='undefined' && metalCfg(ASSET)){ return v.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }   // silver / platinum: USD per oz, 2 decimals (64.60 · 1,784.00)
+    if(typeof ASSET!=='undefined' && metalCfg(ASSET)){ var dc=metalCfg(ASSET).dec; return v.toLocaleString('en-US',{minimumFractionDigits:dc,maximumFractionDigits:dc}); }   // metals: decimals from the config (silver/platinum USD/oz 2 → 64.60 · 1,784.00; long-run copper USD/lb 3 → 6.565)
     if(v>=1e6) return (v/1e6).toFixed(v>=1e7?0:1).replace(/\.0$/,'')+'M'; if(v>=1e3) return (v/1e3).toFixed(v>=1e5?0:1).replace(/\.0$/,'')+'k'; return ''+Math.round(v); }
 
   // ── client-side indicator math (BTC: not stored per-day) ──────────────────────
@@ -2665,8 +2665,8 @@
         var mm2=monthlyQ[day]||{};
         if(mm2.q==='missing_source'){ leg.innerHTML='<b>'+label.slice(0,4)+'</b> · '+ASSET+' · <b>source not available — gap</b>'; leg.style.display='block'; return; }
         if(px==null){ leg.style.display='none'; return; }
-        var mn=[]; if(mm2.ar) mn.push('annual average, repeated'); if(mm2.q==='administered') mn.push('administered price'); if(mm2.q==='london_bar') mn.push('London bar silver, not a New York price');
-        leg.innerHTML='<b>'+label.slice(0,7)+'</b> · '+ASSET+' · <b>'+wkFmtPrice(px)+'</b> USD/oz'+(mn.length?(' · '+mn.join(' · ')):''); leg.style.display='block'; return;
+        var mn=[]; if(mm2.ar) mn.push('annual average, repeated'); if(mm2.q==='administered') mn.push('administered price'); if(mm2.q==='london_bar') mn.push('London bar silver, not a New York price'); if(mm2.q==='estimated') mn.push('ESTIMATE');
+        leg.innerHTML='<b>'+label.slice(0,7)+'</b> · '+ASSET+' · <b>'+wkFmtPrice(px)+'</b> '+metalCfg(ASSET).unit+(mn.length?(' · '+mn.join(' · ')):''); leg.style.display='block'; return;
       }
       var b=byTime[day]; if(px==null&&b) px=b.c;
       if(px==null){ leg.style.display='none'; return; }
@@ -3027,6 +3027,7 @@
     try{ window.__metalLayout=function(){ return layout; }; }catch(e){}   // read-only test probe: the label rectangles of the last draw (layout-rule verification)
     function xc(ts,t){ var x; try{ x=ts.timeToCoordinate(t); }catch(e){ x=null; } return x; }
     function nm(t){ var y=+t.slice(0,4), m=+t.slice(5,7)+1; if(m>12){ m=1; y++; } return y+'-'+(m<10?'0'+m:m)+'-01'; }   // first day of the next month
+    function pm(t){ var y=+t.slice(0,4), m=+t.slice(5,7)-1; if(m<1){ m=12; y--; } return y+'-'+(m<10?'0'+m:m)+'-01'; }   // first day of the previous month
     function wrap(ctx,txt,maxW){ var out=[],cur=''; txt.split(' ').forEach(function(w){ var t=cur?cur+' '+w:w; if(cur && ctx.measureText(t).width>maxW){ out.push(cur); cur=w; } else cur=t; }); if(cur) out.push(cur); return out; }
     var r={ draw:function(target){ var cfg=metalCfg(ASSET); if(!ch||!cfg) return; var mc=monthlyMetaCache[ASSET], ann=mc&&mc.ann; if(!ann) return; var ts=ch.timeScale();
       target.useMediaCoordinateSpace(function(scope){ var ctx=scope.context, W=scope.mediaSize.width, H=scope.mediaSize.height; ctx.save();
@@ -3037,6 +3038,7 @@
           var availB=x-5-XMIN, xl=Math.max(XMIN,x+5), availA=W-xl-6, lines=null, left=false;
           if(preferBefore && availB>=70){ var l1=wrap(ctx,txt,availB); if(l1.length<=3) lines=l1; }
           if(!lines && availA>=70){ var l2=wrap(ctx,txt,availA); if(l2.length<=3){ lines=l2; left=true; } }
+          if(!lines && !preferBefore && availB>=70){ var l3=wrap(ctx,txt,availB); if(l3.length<=3) lines=l3; }   // preferred side (after) too narrow → the other side of the SAME date line, never dropped
           if(!lines) return;
           var wmax=0; lines.forEach(function(s){ var w=ctx.measureText(s).width; if(w>wmax) wmax=w; });
           var bx0=left?xl:(x-5-wmax);
@@ -3052,6 +3054,13 @@
         if(ann.eraLast){ var xe=xc(ts,nm(ann.eraLast)), xs=xc(ts,ann.first);
           if(xe!=null && xe>0){ var b0=(xs==null||xs<0)?0:xs, b1=Math.min(W,xe); if(b1>b0){ ctx.fillStyle='rgba('+rgb+',0.06)'; ctx.fillRect(b0,0,b1-b0,H); }
             if(onScreen(xe)){ vline(xe,0.34); lab(ann.eraLabel+' (until '+ann.eraLast.slice(0,4)+')',xe,true,0.66); } } }
+        // 2b) owner-labelled ESTIMATE stretch (copper 1955-08→1959-12): a clearly visible shaded band between its two seam lines + a label beside the end seam
+        // the band + seam lines span EXACTLY the dimmed stretch: from the last real point before (1955-07) to the first real point after (1960-01), so both seam segments sit inside it
+        if(cfg.est && ann.estFirst){ var xe0=xc(ts,pm(ann.estFirst)), xe1=xc(ts,nm(ann.estLast));
+          if(xe0!=null && xe1!=null){ var q0=Math.max(0,xe0), q1=Math.min(W,xe1); if(q1>q0){ ctx.fillStyle='rgba('+rgb+',0.13)'; ctx.fillRect(q0,0,q1-q0,H); }
+            if(onScreen(xe0)) vline(xe0,0.55); if(onScreen(xe1)) vline(xe1,0.55);
+            var etxt=cfg.est.label+' '+ann.estFirst.slice(0,7)+' → '+ann.estLast.slice(0,7);
+            if(onScreen(xe1)) lab(etxt,xe1,false,0.9); else if(onScreen(xe0)) lab(etxt,xe0,true,0.9); } }
         // 3) a source gap (platinum 1907): dashed marker mid-gap + label to its right
         if(ann.gapFirst){ var g0=xc(ts,ann.gapFirst), g1=xc(ts,nm(ann.gapLast)); if(g0!=null && g1!=null){ var xg=(g0+g1)/2; if(onScreen(xg)){ vline(xg,0.62); lab(ann.gapFirst.slice(0,4)+': source not available — gap',xg,false,0.78); } } }
         // 4) short source line, bottom-left (full text = tooltip); wraps to the free width
@@ -3396,19 +3405,23 @@
     {sym:'XAUUSD',dep:'1833',lineOnly:true,monthly:true},   // Phase XAUUSD: gold, monthly LINE from gold_monthly (1M only, BTC-relative indicators hidden)
     {sym:'XAGUSD',dep:'1833',lineOnly:true,monthly:true},      // Phase METALS-1: silver, monthly LINE from commodity_monthly (1M only; same machinery as gold)
     {sym:'XPTUSD',dep:'1880',lineOnly:true,monthly:true},      // Phase METALS-1: platinum, monthly LINE from commodity_monthly (1M only)
+    {sym:'XCUUSD',dep:'1850',lineOnly:true,monthly:true},      // Phase COPPER-LR: long-run copper LINE from commodity_monthly (1M only). NOT the COMEX candles (that is XCUUSD.P)
     {sym:'XCUUSD.P',dep:'1988',monthly:true}]               // Phase COPPER: copper, monthly OHLC CANDLES from copper_monthly (1M only; NOT lineOnly)
     .concat(TOKEN_LINE_SYMS.map(function(s){ return {sym:s, dep:'', lineOnly:true}; }))
     .sort(function(a,b){ return a.sym<b.sym?-1:(a.sym>b.sym?1:0); });   // ALPHABETICAL — BTC is NOT pinned (owner); XAUUSD before XCUUSD.P before XRP
-  var ASSET_COLORS={BTC:'#f7931a',ETH:'#627eea',ADA:'#3468d1',AVAX:'#e84142',BNB:'#f3ba2f',DOGE:'#c2a633',DOT:'#e6007a',LTC:'#5c6bc0',SOL:'#14f195',XRP:'#7fbbe0',XAUUSD:'#d4af37','XCUUSD.P':'#b87333',XAGUSD:'#c9d1d9',XPTUSD:'#a6b8ff'};   // NB: a dotted symbol must be a QUOTED key (bare XCUUSD.P: is a syntax error)
+  var ASSET_COLORS={BTC:'#f7931a',ETH:'#627eea',ADA:'#3468d1',AVAX:'#e84142',BNB:'#f3ba2f',DOGE:'#c2a633',DOT:'#e6007a',LTC:'#5c6bc0',SOL:'#14f195',XRP:'#7fbbe0',XAUUSD:'#d4af37','XCUUSD.P':'#b87333',XAGUSD:'#c9d1d9',XPTUSD:'#a6b8ff',XCUUSD:'#e8955f'};   // NB: a dotted symbol must be a QUOTED key (bare XCUUSD.P: is a syntax error)
   // Asset tooltips (asset button + dropdown rows). The ".P" suffix is the owner's naming — no meaning is implied.
   var ASSET_NOTES={'XCUUSD.P':'XCUUSD.P — COMEX copper futures (continuous), monthly candles, USD/lb',
     'XAGUSD':'XAGUSD — Silver, USD per troy oz, monthly line (1M only). Monthly averages, published to 0.1 USD/oz (up to ~±5% rounding at 1960s levels). Not recorded daily: the last point is the last seeded month.',
-    'XPTUSD':'XPTUSD — Platinum, USD per troy oz, monthly line (1M only). Monthly averages. Not recorded daily: the last point is the last seeded month.'};
+    'XPTUSD':'XPTUSD — Platinum, USD per troy oz, monthly line (1M only). Monthly averages. Not recorded daily: the last point is the last seeded month.',
+    'XCUUSD':'Long-run copper, monthly average (USGS · FRED/NBER · World Bank), USD/lb — 1955-08→1959-12 are ESTIMATES. Not recorded daily.'};
   // Phase METALS-1 — one small config for the silver/platinum monthly LINES (no OHLC; same machinery as gold, no per-asset forks).
   // era = the quality flag that marks the "unreliable early era" band; srcShort = the short bottom source line (full text = API meta.source, in the tooltip).
+  // unit/dec = readout unit + decimals; est (optional) = the quality flag of owner-labelled ESTIMATE months, drawn dimmed + shaded + labelled.
   var METAL_CFG={
-    XAGUSD:{ color:'#c9d1d9', era:{q:'london_bar',    label:'London bar silver'},    srcShort:'World Bank · USGS · FRED · USD/oz' },
-    XPTUSD:{ color:'#a6b8ff', era:{q:'administered',  label:'Administered prices'}, srcShort:'World Bank · USGS · USD/oz' } };
+    XAGUSD:{ color:'#c9d1d9', unit:'USD/oz', dec:2, era:{q:'london_bar',    label:'London bar silver'},    srcShort:'World Bank · USGS · FRED · USD/oz' },
+    XPTUSD:{ color:'#a6b8ff', unit:'USD/oz', dec:2, era:{q:'administered',  label:'Administered prices'}, srcShort:'World Bank · USGS · USD/oz' },
+    XCUUSD:{ color:'#e8955f', unit:'USD/lb', dec:3, era:{q:'administered',  label:'Administered prices'}, est:{q:'estimated', label:'Estimated (PPI-scaled)'}, srcShort:'USGS · FRED · World Bank · USD/lb' } };
   function metalCfg(sym){ return (typeof METAL_CFG!=='undefined' && Object.prototype.hasOwnProperty.call(METAL_CFG,sym)) ? METAL_CFG[sym] : null; }
   // the asset button tooltip = the static note + (metals) the full source string the API sent (kept in one place: the API)
   function assetTitle(sym){ var n=assetNote(sym); if(metalCfg(sym) && goldMeta && goldMeta.source) n+='\n'+goldMeta.source; return n; }
@@ -3650,8 +3663,9 @@
       var gm={ provMonth:last?last.t:null, provN:last?last.n_days:null, source:(j&&j.meta&&j.meta.source)||null, updated:(j&&j.meta&&j.meta.updated)||null };
       // metals annotation anchors, DERIVED from the data (no hard-coded dates): first non-annual month, last month of the "early era" flag, the gap months
       var ann=null, mcf=metalCfg(coin);
-      if(mcf){ ann={ first:dc.length?dc[0].t:null, firstMonthly:null, eraLast:null, eraLabel:mcf.era.label, gapFirst:null, gapLast:null };
-        dc.forEach(function(d){ if(ann.firstMonthly==null && !d.ar) ann.firstMonthly=d.t; if(d.q===mcf.era.q) ann.eraLast=d.t; if(d.q==='missing_source'){ if(ann.gapFirst==null) ann.gapFirst=d.t; ann.gapLast=d.t; } }); }
+      if(mcf){ ann={ first:dc.length?dc[0].t:null, firstMonthly:null, eraLast:null, eraLabel:mcf.era.label, gapFirst:null, gapLast:null, estFirst:null, estLast:null };
+        dc.forEach(function(d){ if(ann.firstMonthly==null && !d.ar) ann.firstMonthly=d.t; if(d.q===mcf.era.q) ann.eraLast=d.t; if(d.q==='missing_source'){ if(ann.gapFirst==null) ann.gapFirst=d.t; ann.gapLast=d.t; }
+          if(mcf.est && d.q===mcf.est.q){ if(ann.estFirst==null) ann.estFirst=d.t; ann.estLast=d.t; } }); }
       monthlyMetaCache[coin]={ q:mq, gm:gm, ann:ann }; monthlyQ=mq; goldMeta=gm;
       cb();
     }).catch(function(){ assetDaily[coin]=[]; var gm0={provMonth:null,provN:null,source:null,updated:null}; monthlyMetaCache[coin]={ q:{}, gm:gm0, ann:null }; monthlyQ={}; goldMeta=gm0; cb(); }); }
@@ -4793,9 +4807,14 @@
     // would draw a sloped line over a source hole = visual interpolation. So the last real point before a hole gets a TRANSPARENT line+fill:
     // its segment (the one that would bridge the hole) is hidden. (A point's colour paints the segment that STARTS at it.)
     var T0='rgba(0,0,0,0)';
+    // ESTIMATED months (owner-labelled, e.g. copper 1955-08→1959-12) are drawn at ~50% line opacity. The segment i→i+1 takes the colour of point i, so it is
+    // dimmed when EITHER end is an estimate: that paints the real→estimate seam (1955-07→08) and the estimate→World Bank seam (1959-12→1960-01) as part of the
+    // estimated stretch — the seam step is shown, never smoothed.
+    var mcfE=metalCfg(ASSET), estRGB=(mcfE&&mcfE.est)?hexRgb(mcfE.color):null;
     var aD=ACTIVE.map(function(d,i){ if(d.close==null) return {time:d.time};
       var pt={time:d.time,value:d.close};
       if(i+1<ACTIVE.length && ACTIVE[i+1].close==null){ pt.lineColor=T0; pt.topColor=T0; pt.bottomColor=T0; }
+      else if(estRGB && i+1<ACTIVE.length && (d.q==='estimated' || ACTIVE[i+1].q==='estimated')){ pt.lineColor='rgba('+estRGB+',0.5)'; pt.topColor='rgba('+estRGB+',0.05)'; pt.bottomColor='rgba('+estRGB+',0)'; }
       return pt; });
     var cD=ACTIVE.map(function(d){ if(d.close==null) return {time:d.time};   // gap → whitespace (spacing kept, no candle)
       var hi=d.high, lo=d.low;

@@ -21,6 +21,9 @@ const COMMODITIES = {
             note: 'Pre-1960 months repeat the annual value. 1833–1899 is London bar silver, not a New York price. Published to 0.1 USD/oz (up to ~±5% rounding at 1960s levels). Not recorded daily.' },
   XPTUSD: { source: 'Platinum: World Bank Pink Sheet monthly average (1960–) · USGS annual (1880–1959) · USD per troy oz',
             note: 'Pre-1960 months repeat the annual value. Prices up to 1983 are administered producer prices. 1907 is not available in the source (gap). Not recorded daily.' },
+  // Long-run copper LINE (NOT the COMEX candles — those are XCUUSD.P from copper_monthly). 1955-08→1959-12 are the owner's labelled ESTIMATES (q='estimated').
+  XCUUSD: { source: 'Copper: USGS annual (1850–59) · FRED/NBER monthly (1860–1955) · ESTIMATES 1955-08→1959-12 (BLS PPI scaled to USGS annual) · World Bank Pink Sheet monthly average (1960–) · USD per lb',
+            note: '1850–1859 repeat the annual value. Prices up to 1952 are administered/producer prices (LME closed 1939–53). 1955-08→1959-12 are ESTIMATES (BLS PPI scaled so each year averages to the USGS annual), not observed prices. 1960– is the LME grade A monthly average, a different instrument from the COMEX futures of XCUUSD.P. Not recorded daily.' },
 };
 const SERIES = {
   btcd:    { table: 'market_history', filter: 'coin=eq.BTC', col: 'btc_dominance_pct' },
