@@ -40,15 +40,6 @@ const SERIES = {
 export default async function handler(req, res) {
   const base = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!base || !key) { res.status(500).json({ ok: false, error: 'missing supabase env' }); return; }
-  // TEMPORARY S0 gate probe — PREVIEW deployments only (never production); reverted right after the probe run.
-  if (req.query && req.query.probe && process.env.VERCEL_ENV === 'preview') {
-    try {
-      if (req.query.probe === 's0') { const E = await import('../lib/setup-engine/setup-engine.js'); const P = await import('../lib/s0probe.js');
-        const out = await P.runProbe(E, 'vercel-preview'); out.vercelRegion = process.env.VERCEL_REGION || null; res.status(200).json(out); return; }
-      if (req.query.probe === 'edge') { const t0 = Date.now(); const r = await fetch(base + '/functions/v1/s0-probe', { method: 'POST', headers: { Authorization: 'Bearer ' + key, 'content-type': 'application/json' }, body: '{}' });
-        const txt = await r.text(); let j = null; try { j = JSON.parse(txt); } catch (_) {} res.status(200).json({ edgeStatus: r.status, ms: Date.now() - t0, body: j || txt.slice(0, 500) }); return; }
-    } catch (e) { res.status(500).json({ probeError: String(e && e.message || e) }); return; }
-  }
   const tier = (req.query && req.query.tier) || 'daily';
   const coin = ((req.query && req.query.coin) || 'BTC').toUpperCase();
   const series = req.query && req.query.series;
