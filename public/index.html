@@ -2690,6 +2690,11 @@
         var mn=[]; if(mm2.ar) mn.push('annual average, repeated'); if(mm2.q==='administered') mn.push('administered price'); if(mm2.q==='london_bar') mn.push('London bar silver, not a New York price'); if(mm2.q==='estimated') mn.push('ESTIMATE');
         leg.innerHTML=lgDot(ASSET)+'<b>'+label.slice(0,7)+'</b> · '+ASSET+' · <b>'+wkFmtPrice(px)+'</b> '+metalCfg(ASSET).unit+(mn.length?(' · '+mn.join(' · ')):''); leg.style.display='block'; return;
       }
+      if(isPerpAsset(ASSET)){   // SETUPS S1: BTC.P readout — OHLC in candle mode, close in line mode; no BTC cycle phase (different instrument)
+        var cp=null; try{ cp=param.seriesData&&param.seriesData.get(candle); }catch(e){}
+        if(px==null && !(cp&&cp.close!=null)){ leg.style.display='none'; return; }
+        var ohP=(mode==='candle'&&cp&&cp.close!=null) ? ('O '+wkFmtPrice(cp.open)+' H '+wkFmtPrice(cp.high)+' L '+wkFmtPrice(cp.low)+' C <b>'+wkFmtPrice(cp.close)+'</b>') : ('<b>$'+wkFmtPrice(px!=null?px:cp.close)+'</b>');
+        leg.innerHTML=lgDot(ASSET)+'<b>'+label+'</b> · BTC.P · Hyperliquid perp · USD · '+ohP; leg.style.display='block'; return; }
       var b=byTime[day]; if(px==null&&b) px=b.c;
       if(px==null){ leg.style.display='none'; return; }
       leg.innerHTML=lgDot(ASSET)+'<b>'+label+'</b> · '+ASSET+' <b>$'+(ASSET==='BTC'?Math.round(px).toLocaleString():wkFmtPrice(px))+'</b>'+((ASSET==='BTC'&&b&&PHEN[b.p])?(' · '+PHEN[b.p]):''); leg.style.display='block';
@@ -3410,6 +3415,7 @@
     if(k!==key){ if(cur)out.push(cur); cur={time:k,open:c.o,high:c.h,low:c.l,close:c.c,value:c.c,p:c.p,mayer:c.mayer,pct:c.pct,ma50w:c.ma50w,ma200w:c.ma200w,ma50d:c.ma50d,ma200d:c.ma200d,q:c.q,prov:c.prov,nd:c.nd}; key=k; }
     else { if(c.h>cur.high)cur.high=c.h; if(c.l<cur.low)cur.low=c.l; cur.close=c.c; cur.value=c.c; cur.p=c.p; cur.mayer=c.mayer; cur.pct=c.pct; cur.ma50w=c.ma50w; cur.ma200w=c.ma200w; cur.ma50d=c.ma50d; cur.ma200d=c.ma200d; cur.q=c.q; cur.prov=c.prov; cur.nd=c.nd; } } if(cur)out.push(cur); return out; }
   function buildActive(size){ var spec=CSPEC[size]||CSPEC['1D'];
+    if(isPerpAsset(ASSET)){ var pc=perpCache[PERP_TF[perpCs(size)]]||[]; return spec.kind==='intra' ? aggIntra(pc, spec.sec) : aggDay(pc, 'D'); }   // BTC.P: native candles (bucket = its own timeframe → identity)
     if(ASSET!=='BTC'){ var base=assetDaily[ASSET]||[]; return aggDay(base, spec.kind==='intra'?'D':spec.grp); }   // non-BTC: daily-family only, from market_history
     var cands=tierCache[spec.tier]||[]; return spec.kind==='intra' ? aggIntra(cands, spec.sec) : aggDay(cands, spec.grp); }
   function loadTier(tier, cb){ if(tierCache[tier]){ cb(tierCache[tier]); return; } fetch('/api/btc-candles?tier='+tier).then(function(r){return r.json();}).then(function(j){ tierCache[tier]=(j&&j.ok&&j.candles)?j.candles:[]; cb(tierCache[tier]); }).catch(function(){ tierCache[tier]=[]; cb([]); }); }
@@ -3428,15 +3434,17 @@
     {sym:'XAGUSD',dep:'1833',lineOnly:true,monthly:true},      // Phase METALS-1: silver, monthly LINE from commodity_monthly (1M only; same machinery as gold)
     {sym:'XPTUSD',dep:'1880',lineOnly:true,monthly:true},      // Phase METALS-1: platinum, monthly LINE from commodity_monthly (1M only)
     {sym:'XCUUSD',dep:'1850',lineOnly:true,monthly:true},      // Phase COPPER-LR: long-run copper LINE from commodity_monthly (1M only). NOT the COMEX candles (that is XCUUSD.P)
-    {sym:'XCUUSD.P',dep:'1988',monthly:true}]               // Phase COPPER: copper, monthly OHLC CANDLES from copper_monthly (1M only; NOT lineOnly)
+    {sym:'XCUUSD.P',dep:'1988',monthly:true},               // Phase COPPER: copper, monthly OHLC CANDLES from copper_monthly (1M only; NOT lineOnly)
+    {sym:'BTC.P',dep:'2020',perp:true}]                       // SETUPS S1: Hyperliquid BTC perpetual — native 1m·5m·15m·1H·4H·1D candles from perp_candles (a different instrument from BTC spot)
     .concat(TOKEN_LINE_SYMS.map(function(s){ return {sym:s, dep:'', lineOnly:true}; }))
     .sort(function(a,b){ return a.sym<b.sym?-1:(a.sym>b.sym?1:0); });   // ALPHABETICAL — BTC is NOT pinned (owner); XAUUSD before XCUUSD.P before XRP
   // UX-U1: DEFAULT colour of every one of the 24 dropdown symbols (the 9 tokens used to be resolved at runtime from tracked_tokens.color; these are the same values, now static).
   // The user's choice (localStorage 'wk_asset_colors') overrides it everywhere — see assetColor().
   var ASSET_COLOR_DEFAULTS={BTC:'#f7931a',ETH:'#627eea',ADA:'#3468d1',AVAX:'#e84142',BNB:'#f3ba2f',DOGE:'#c2a633',DOT:'#e6007a',LTC:'#5c6bc0',SOL:'#14f195',XRP:'#7fbbe0',XAUUSD:'#d4af37','XCUUSD.P':'#b87333',XAGUSD:'#c9d1d9',XPTUSD:'#a6b8ff',XCUUSD:'#e8955f',
-    AERO:'#22d3ee',CAKE:'#d1884f',CRV:'#f59e0b',CVX:'#3a66e0',HYPE:'#97fce4',LINK:'#375bd2',ONDO:'#f4f4f5',TRAC:'#4b6fe5',VIRTUAL:'#ff007c'};   // NB: a dotted symbol must be a QUOTED key (bare XCUUSD.P: is a syntax error)
+    AERO:'#22d3ee',CAKE:'#d1884f',CRV:'#f59e0b',CVX:'#3a66e0',HYPE:'#97fce4',LINK:'#375bd2',ONDO:'#f4f4f5',TRAC:'#4b6fe5',VIRTUAL:'#ff007c','BTC.P':'#c084fc'};   // NB: a dotted symbol must be a QUOTED key (bare XCUUSD.P: is a syntax error)
   // Asset tooltips (asset button + dropdown rows). The ".P" suffix is the owner's naming — no meaning is implied.
   var ASSET_NOTES={'XCUUSD.P':'XCUUSD.P — COMEX copper futures (continuous), monthly candles, USD/lb',
+    'BTC.P':'BTC.P — Hyperliquid BTC perpetual, USD. Candles 1m · 5m · 15m · 1H · 4H · 1D, closed bars only, refreshed every ~10 min. A different instrument from BTC (Bitstamp spot).',
     'XAGUSD':'XAGUSD — Silver, USD per troy oz, monthly line (1M only). Monthly averages, published to 0.1 USD/oz (up to ~±5% rounding at 1960s levels). Not recorded daily: the last point is the last seeded month.',
     'XPTUSD':'XPTUSD — Platinum, USD per troy oz, monthly line (1M only). Monthly averages. Not recorded daily: the last point is the last seeded month.',
     'XCUUSD':'Long-run copper, monthly average (USGS · FRED/NBER · World Bank), USD/lb — 1955-08→1959-12 are ESTIMATES. Not recorded daily.'};
@@ -3456,7 +3464,15 @@
   // XAUUSD is line-only too (forced line) but its DATA comes from gold_monthly via the API (1M), NOT the
   // readings-based token path. isMonthlyAsset() separates the two: forced-line is shared, the token data path is not.
   function isMonthlyAsset(sym){ for(var i=0;i<ASSET_LIST.length;i++){ if(ASSET_LIST[i].sym===sym) return !!ASSET_LIST[i].monthly; } return false; }
-  var goldLock=false;   // true while XAUUSD is the main asset → BTC-relative visual layers no-op (hidden)
+  // SETUPS S1 — BTC.P: native candles per timeframe (no client aggregation), fetched per timeframe and cached. Candle sizes allowed on it:
+  var PERP_CS=['1m','5m','15m','1H','4H','1D'], PERP_TF={'1m':'1m','5m':'5m','15m':'15m','1H':'1h','4H':'4h','1D':'1D'}, perpCache={};
+  function isPerpAsset(sym){ for(var i=0;i<ASSET_LIST.length;i++){ if(ASSET_LIST[i].sym===sym) return !!ASSET_LIST[i].perp; } return false; }
+  function perpCs(cs){ return PERP_CS.indexOf(cs)>=0 ? cs : '1D'; }
+  function loadPerp(cs, cb){ var tf=PERP_TF[perpCs(cs)]; if(perpCache[tf]){ cb(perpCache[tf]); return; }
+    fetch('/api/btc-candles?coin=BTC.P&tier='+tf).then(function(r){return r.json();}).then(function(j){ perpCache[tf]=(j&&j.ok&&j.candles)?j.candles:[]; cb(perpCache[tf]); }).catch(function(){ perpCache[tf]=[]; cb([]); }); }
+  // the candle-size menu shows only the timeframes the main asset has (BTC.P: its 6; others unchanged)
+  function refreshCsMenu(){ Array.prototype.forEach.call(document.querySelectorAll('.wk-cs-item'),function(it){ it.style.display=(isPerpAsset(ASSET) && PERP_CS.indexOf(it.dataset.cs)<0)?'none':''; it.classList.toggle('on', it.dataset.cs===CSIZE); }); }
+  var goldLock=false;   // true while the main asset is not BTC-relative (monthly commodities, BTC.P) → BTC-relative visual layers no-op (hidden)
   var goldMeta={provMonth:null, provN:null, source:null, updated:null};
   // ══ UX-U1 — ONE colour per asset, single source of truth ════════════════════════════════════════════════════════════════
   // assetColor(sym) = the user's choice (localStorage 'wk_asset_colors' {SYM|seriesId:'#rrggbb'}, every access in try/catch) or the default.
@@ -3659,7 +3675,18 @@
 
   // fetch a {time,value} line for an overlay id (asset:<COIN> price, or a series id), cached.
   var ovDataCache={};
-  function fetchOverlayData(id, cb){ if(ovDataCache[id]){ cb(ovDataCache[id]); return; }
+  // SETUPS S1: the BTC.P ↔ BTC overlays follow the main chart's timeframe (time-aligned: same resolution, same time type). Other overlays: unchanged.
+  function ovResKey(id){ var intra=isIntra();
+    if(id==='asset:BTC.P') return (intra && PERP_CS.indexOf(CSIZE)>=0) ? 'perp:'+PERP_TF[CSIZE] : null;   // daily family → the 1D series below (tier=daily)
+    if(id==='asset:BTC' && isPerpAsset(ASSET)) return intra ? 'btc:'+CSIZE : null;
+    return null; }
+  function realignTfOverlays(){ Object.keys(overlays).forEach(function(id){ if(id!=='asset:BTC.P' && id!=='asset:BTC') return; var o=overlays[id]; if(!o) return;
+    fetchOverlayData(id, function(pts){ try{ o.series.setData(breakAtGaps(alignOverlay(id, pts))); }catch(e){} }); }); }
+  function fetchOverlayData(id, cb){ var rk=ovResKey(id);
+    if(rk){ var ck=id+'@'+rk; if(ovDataCache[ck]){ cb(ovDataCache[ck]); return; }
+      if(rk.indexOf('perp:')===0){ loadPerp(CSIZE, function(c){ var pts=c.filter(function(x){ return x.c!=null; }).map(function(x){ return {time:x.t, value:x.c}; }); ovDataCache[ck]=pts; cb(pts); }); return; }
+      var sp=CSPEC[CSIZE]; loadTier(sp.tier, function(c){ var pts=aggIntra(c||[], sp.sec).map(function(x){ return {time:x.time, value:x.close}; }); ovDataCache[ck]=pts; cb(pts); }); return; }
+    if(ovDataCache[id]){ cb(ovDataCache[id]); return; }
     if(id.indexOf('asset:')===0 && isLineOnly(id.slice(6)) && !isMonthlyAsset(id.slice(6))){ var pts=tokenLinePoints(id.slice(6)); if(pts.length) ovDataCache[id]=pts; cb(pts); return; }   // token overlay = price-line from readings (no OHLC endpoint). XAUUSD is NOT a token → fetch its monthly series below.
     var url = (id.indexOf('asset:')===0) ? ('/api/btc-candles?tier='+(isMonthlyAsset(id.slice(6))?'monthly':'daily')+'&coin='+id.slice(6)) : ('/api/btc-candles?series='+id);
     fetch(url).then(function(r){return r.json();}).then(function(j){
@@ -3852,7 +3879,10 @@
       monthlyMetaCache[coin]={ q:mq, gm:gm, ann:ann }; monthlyQ=mq; goldMeta=gm;
       cb();
     }).catch(function(){ assetDaily[coin]=[]; var gm0={provMonth:null,provN:null,source:null,updated:null}; monthlyMetaCache[coin]={ q:{}, gm:gm0, ann:null }; monthlyQ={}; goldMeta=gm0; cb(); }); }
-  function loadAssetDaily(coin, cb){ if(coin==='BTC'||assetDaily[coin]){ cb(); return; }
+  function loadAssetDaily(coin, cb){
+    if(isPerpAsset(coin)){ loadPerp(perpCs(CSIZE), function(){ cb(); }); return; }   // BTC.P: the timeframe it will open on
+    if(coin==='BTC'){ var bs=CSPEC[CSIZE]; if(bs && !tierCache[bs.tier]){ loadTier(bs.tier, function(){ cb(); }); return; } cb(); return; }   // back from BTC.P on an intraday size → load that BTC tier first
+    if(assetDaily[coin]){ cb(); return; }
     if(isMonthlyAsset(coin)){ buildMonthlyAsset(coin, cb); return; }   // XAUUSD: monthly line from gold_monthly (NOT the token/readings path)
     if(isLineOnly(coin)){ buildTokenDaily(coin, cb); return; }   // the 9 tokens: line from readings, not market_history
     fetch('/api/btc-candles?tier=daily&coin='+coin).then(function(r){return r.json();}).then(function(j){
@@ -3874,21 +3904,23 @@
       var mmc=monthlyMetaCache[coin]; if(mmc){ monthlyQ=mmc.q; goldMeta=mmc.gm; }   // this asset's own quality flags / provisional meta (cached switches never mix assets)
       var lab=document.getElementById('wk-assetLabel'); if(lab) lab.textContent=coin;
       var area2=document.getElementById('wk-assetBtn'); if(area2) area2.title=assetTitle(coin);
-      goldLock = isMonthlyAsset(coin);   // hide BTC-relative visual layers while XAUUSD is the main asset
+      goldLock = isMonthlyAsset(coin) || isPerpAsset(coin);   // hide BTC-relative visual layers (monthly commodities; BTC.P = a different instrument with less history)
       // per-asset timeframe lock: BTC = all; Kaggle coins + tokens = 1D; XAUUSD = 1M (monthly data only)
-      if(coin!=='BTC'){ CSIZE = isMonthlyAsset(coin) ? '1M' : '1D'; var cl=document.getElementById('wk-csLabel'); if(cl) cl.textContent=CSIZE;
+      if(isPerpAsset(coin)){ CSIZE=perpCs(CSIZE); var clp=document.getElementById('wk-csLabel'); if(clp) clp.textContent=CSIZE; }   // BTC.P keeps the current size when it has it, else 1D
+      else if(coin!=='BTC'){ CSIZE = isMonthlyAsset(coin) ? '1M' : '1D'; var cl=document.getElementById('wk-csLabel'); if(cl) cl.textContent=CSIZE;
         Array.prototype.forEach.call(document.querySelectorAll('.wk-cs-item'),function(it){ it.classList.toggle('on', it.dataset.cs===CSIZE); }); }
       else if(fromMonthly && CSIZE==='1M'){ CSIZE='1D'; var clb=document.getElementById('wk-csLabel'); if(clb) clb.textContent='1D';   // returning BTC from XAUUSD → restore 1D (so forecasts/restoreScenLayers come back)
         Array.prototype.forEach.call(document.querySelectorAll('.wk-cs-item'),function(it){ it.classList.toggle('on', it.dataset.cs==='1D'); }); }
       // grey the candle-size button for non-BTC (single allowed timeframe), restore for BTC
-      var csBtn=document.getElementById('wk-csBtn'); if(csBtn) csBtn.classList.toggle('wk-cs-off', coin!=='BTC');
+      var csBtn=document.getElementById('wk-csBtn'); if(csBtn) csBtn.classList.toggle('wk-cs-off', coin!=='BTC' && !isPerpAsset(coin));
+      refreshCsMenu(); try{ chart.applyOptions({timeScale:{timeVisible:isIntra(), secondsVisible:false}}); }catch(e){}
       ACTIVE=buildActive(CSIZE); CLOSE=ACTIVE.map(function(d){return d.close;});
       computeAccDist();
       setSeriesData(); applyLive(); applyEffectiveMode();   // tokens + XAUUSD → forced line (no OHLC); other assets → user's mode
       updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators(); rebuildMaLayers();
       refreshAssetScope();   // Phase XAUUSD: disable / restore BTC-relative indicators (phases, halvings, Mayer/pct, MAs, Pivot Zone, Score, rocket)
       realignAllOverlays();  // re-clip/snap/bucket existing overlays for the new main asset (gold-aware, no axis stretch)
-      setRangeDays(coin==='BTC'?90:0);   // coin → fit its full history; BTC → 90D default
+      setRangeDays(coin==='BTC'?90:(isPerpAsset(coin)?CS_WIN[CSIZE]:0));   // coin → fit its full history; BTC → 90D default; BTC.P → the size's default window
       refreshAssetUI(); positionLiveTag(); positionTitles();
       if(scoreOn) refreshScoreLines(true);   // Phase VI(b): score follows the main asset
       if(coin==='BTC' && CSIZE==='1D'){ try{ restoreScenLayers(); }catch(e){} }   // back on BTC/1D → re-render persisted projection layers
@@ -5024,11 +5056,13 @@
 
   function applyCandleSize(size, opt){ var spec=CSPEC[size]; if(!spec) return; opt=opt||{};
     if(isMonthlyAsset(ASSET)){ if(size!=='1M'){ notify(ASSET+': monthly data only (1M)'); var mm=document.getElementById('wk-csMenu'); if(mm) mm.classList.remove('open'); return; } }   // XAUUSD / XCUUSD.P = monthly only
+    else if(isPerpAsset(ASSET)){ if(PERP_CS.indexOf(size)<0){ notify(ASSET+': 1m · 5m · 15m · 1H · 4H · 1D only'); var mp=document.getElementById('wk-csMenu'); if(mp) mp.classList.remove('open'); return; } }   // BTC.P = its 6 native sizes
     else if(ASSET!=='BTC' && size!=='1D'){ notify(ASSET+': daily candles only (1D)'); var m=document.getElementById('wk-csMenu'); if(m) m.classList.remove('open'); return; }   // other non-BTC = daily only
     var pre=visibleEpochRange();   // capture the current window (epoch) for the intraday (b) keep-in-place case
     // Fase P: show the bar only when the tier must actually be fetched (a cached switch is instant → no bar)
-    var pid=(!tierCache[spec.tier]) ? wkLoading.start('Switching to '+size+'…') : null;
-    loadTier(spec.tier, function(cands){
+    var perpMain=isPerpAsset(ASSET);
+    var pid=(perpMain ? !perpCache[PERP_TF[size]] : !tierCache[spec.tier]) ? wkLoading.start('Switching to '+size+'…') : null;
+    (perpMain ? function(cb){ loadPerp(size, cb); } : function(cb){ loadTier(spec.tier, cb); })(function(cands){
       // intraday tier unavailable (network) → silent fallback to 1D (no toast); never an empty chart
       if(spec.kind==='intra' && (!cands || !cands.length)){ if(pid) wkLoading.done(pid); if(size!=='1D') applyCandleSize('1D', {keepRange:true}); return; }
       CSIZE=size; try{ sessionStorage.setItem('wk_csize', size); }catch(e){}
@@ -5040,6 +5074,7 @@
       setSeriesData();   // real candles + future whitespace for the new resolution
       applyLive();   // re-develop the new last bar + reposition the live tag for this view
       updateHalvings(); refreshIndicatorAvailability(); rebuildPhase(); rebuildOpenOscillators(); rebuildMaLayers();
+      try{ realignTfOverlays(); }catch(e){}   // SETUPS S1: BTC.P ↔ BTC overlays re-fetch at the new resolution
       var lab=document.getElementById('wk-csLabel'); if(lab) lab.textContent=size;
       Array.prototype.forEach.call(document.querySelectorAll('.wk-cs-item'),function(it){ it.classList.toggle('on', it.dataset.cs===size); });
       if(opt.keepRange){ /* keep current view */ }

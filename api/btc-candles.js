@@ -104,6 +104,23 @@ export default async function handler(req, res) {
       return;
     }
 
+    // ── BTC.P (SETUPS S1): Hyperliquid BTC perpetual, native candles per timeframe from perp_candles (written every ~10 min by the
+    //    Supabase Edge Function setups-tick; closed bars only, never rewritten). tier = 1m · 5m · 15m · 1h · 4h · 1D (aliases 1H/4H/1d/daily).
+    //    Intraday time = UTC epoch seconds; 1D time = 'YYYY-MM-DD' (same conventions as BTC). MUST stay ABOVE the unknown-coin guard. ─────
+    if (coin === 'BTC.P') {
+      const PERP_TF = { '1m': '1m', '5m': '5m', '15m': '15m', '1h': '1h', '1H': '1h', '4h': '4h', '4H': '4h', '1D': '1D', '1d': '1D', daily: '1D' };
+      const tf = PERP_TF[tier];
+      if (!tf) { res.status(400).json({ ok: false, error: `unknown tier '${tier}' for BTC.P (1m, 5m, 15m, 1h, 4h, 1D)` }); return; }
+      const rows = await sbSelectAll(base, key, `perp_candles?symbol=eq.BTC.P&tf=eq.${tf}&select=t,o,h,l,c,v,n&order=t.asc`);
+      const candles = rows.map((r) => ({ t: tf === '1D' ? String(r.t).slice(0, 10) : secs(r.t), o: n(r.o), h: n(r.h), l: n(r.l), c: n(r.c), v: n(r.v), n: r.n == null ? null : Number(r.n) }));
+      const first = candles.length ? candles[0].t : null, last = candles.length ? candles[candles.length - 1].t : null;
+      res.setHeader('Cache-Control', (tf === '1m' || tf === '5m') ? 's-maxage=60, stale-while-revalidate=120' : 's-maxage=300, stale-while-revalidate=600');
+      res.status(200).json({ ok: true, tier: tf, coin, count: candles.length, first, last,
+        meta: { source: 'Hyperliquid BTC perpetual (candleSnapshot) · USD · closed bars only, refreshed every ~10 min', updated: last },
+        candles });
+      return;
+    }
+
     // ── unknown coin, ANY tier: a coin that is not BTC / a whitelisted 1D coin / a monthly asset handled
     //    above is an error — never a misleading "unknown tier", and never silently BTC's data (tier=1h|1m
     //    previously ignored `coin`). This is what makes a retired symbol (bare XCUUSD) a clean 400. ───────
